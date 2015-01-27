@@ -7,7 +7,7 @@ import           RangeSet (RangeSet)
 import qualified RangeSet as RS
 
 import           Coding
-import           OutputTerm
+import           OutputTerm(OutputTerm(..), Term(..), ConstFunction(..))
 
 {----------------------------------------------------------------------}
 {- Boolean algebras                                                   -}
@@ -83,7 +83,7 @@ coarsestPartition elems =
       | otherwise = Nothing
 
 {----------------------------------------------------------------------}
-{- Functions                                                          -}
+{- Functions, terms                                                   -}
 {----------------------------------------------------------------------}
 
 class Function t dom rng where
