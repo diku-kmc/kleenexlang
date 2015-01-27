@@ -15,11 +15,11 @@ type RegisterUpdate var func = M.Map var func
 
 data SST st pred func var delta =
   SST
-  { sstS :: S.Set st
-  , sstE :: M.Map st [(pred, RegisterUpdate var func, st)]
-  , sstI :: st
-  , sstF :: M.Map st [Either var delta]
-  , sstV :: S.Set var
+  { sstS :: S.Set st -- ^ State set
+  , sstE :: M.Map st [(pred, RegisterUpdate var func, st)] -- ^ Symbolic transition relation
+  , sstI :: st -- ^ Initial state
+  , sstF :: M.Map st [Either var delta] -- ^ Final states with final output
+  , sstV :: S.Set var -- ^ Output variables. The minimal variable is the designated output variable.
   }
   deriving (Show)
 
@@ -45,6 +45,7 @@ lubAbstractVal _ _ = Ambiguous
 lubAbstractValuations :: (Ord var, Eq delta) => [AbstractValuation var delta] -> AbstractValuation var delta
 lubAbstractValuations = M.unionsWith lubAbstractVal
 
+-- TODO: Implement static analysis. See old code.
 
 {-- Simulation --}
 
