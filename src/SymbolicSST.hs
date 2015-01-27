@@ -1,5 +1,8 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 module SymbolicSST where
+
+import           Control.Applicative
 
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -19,6 +22,28 @@ data SST st pred func var delta =
   , sstV :: S.Set var
   }
   deriving (Show)
+
+{-- Analysis --}
+
+data AbstractVal a = Exact a | Ambiguous deriving (Eq, Ord, Show, Functor)
+type AbstractValuation var delta = M.Map var (AbstractVal [delta])
+type AbstractEnvironment st var delta = M.Map st (AbstractValuation var delta)
+
+instance Applicative AbstractVal where
+  pure = Exact
+  (Exact f) <*> (Exact x) = Exact (f x)
+  _ <*> _ = Ambiguous
+
+isExact :: AbstractVal a -> Bool
+isExact (Exact _) = True
+isExact _ = False
+
+lubAbstractVal :: (Eq a) => AbstractVal a -> AbstractVal a -> AbstractVal a
+lubAbstractVal (Exact x) (Exact y) = if x == y then Exact x else Ambiguous
+lubAbstractVal _ _ = Ambiguous
+
+lubAbstractValuations :: (Ord var, Eq delta) => [AbstractValuation var delta] -> AbstractValuation var delta
+lubAbstractValuations = M.unionsWith lubAbstractVal
 
 
 {-- Simulation --}
