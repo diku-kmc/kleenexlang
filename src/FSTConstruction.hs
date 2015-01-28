@@ -8,6 +8,7 @@ import           Control.Monad.State
 import           Data.Monoid
 import qualified Data.Set as S
 
+import           Expression
 import           SymbolicFST
 
 data ConstructState st pred func delta =
@@ -18,14 +19,6 @@ data ConstructState st pred func delta =
   deriving (Eq, Ord, Show)
 
 type Construct st pred func delta = State (ConstructState st pred func delta)
-
-data Mu pred func delta a = Var a
-                          | Loop (forall b. b -> Mu pred func delta b)
-                          | Alt (Mu pred func delta a) (Mu pred func delta a)
-                          | RW pred func (Mu pred func delta a)
-                          | W delta (Mu pred func delta a)
-                          | Seq (Mu pred func delta a) (Mu pred func delta a)
-                          | Accept
 
 fresh :: (Enum st, Ord st) => Construct st pred func delta st
 fresh = do
