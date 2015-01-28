@@ -27,9 +27,23 @@ executable repg
 
                      -- Remove before distributing: Only needed because haskell-mode
                      -- is too stupid to figure out build-depends for the test suite.
-                     , Cabal >= 1.22.0.0
-                     , QuickCheck >= 2.7.6
+--                     , Cabal >= 1.22.0.0
+--                     , QuickCheck >= 2.7.6
 
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+
+executable repg-viz
+  main-is:             VisualizationMain.hs
+  -- other-modules:       
+  -- other-extensions:    
+  build-depends:       base >=4.6
+                     , containers >= 0.5.0.0
+                     , free >= 4.9
+                     , graphviz == 2999.17.*
+                     , kmc-regexps-syntax
+                     , mtl >= 2.2.1
+                     , text >= 0.11.3.1
   hs-source-dirs:      src
   default-language:    Haskell2010
 
