@@ -40,6 +40,12 @@ edgesFromList xs = EdgeSet { eForward  = M.fromListWith (++) [ (q,  [(p, u, q')]
 edgesToList :: EdgeSet st pred func var -> [(st, pred, RegisterUpdate var func, st)]
 edgesToList es = [ (q,p,u,q') | (q, xs) <- M.toList (eForward es), (p,u,q') <- xs ]
 
+mapEdges :: (Ord st)
+         => ((st, pred, RegisterUpdate var func, st) -> (st, pred, RegisterUpdate var func, st))
+         -> EdgeSet st pred func var
+         -> EdgeSet st pred func var
+mapEdges f = edgesFromList . map f . edgesToList
+
 -- | Construct an SST from an edge set and a list of final outputs.
 construct :: (Ord st, Ord var) =>
        st                              -- ^ Initial state
@@ -58,6 +64,21 @@ construct qin es os =
     outf = M.fromListWith (error "Inconsistent output function: Same state has more than one update.")
     ru = M.fromListWith (error "Inconsistent register update: Same variable updated more than once.")
 
+construct' :: (Ord st, Ord var) =>
+       st                              -- ^ Initial state
+    -> [(st, pred, RegisterUpdate var func, st)] -- ^ Edge set
+    -> [(st, [Either var delta])]      -- ^ Final outputs
+    -> SST st pred func var delta
+construct' qin es os =
+  SST
+  { sstS = S.fromList (qin:concat [ [q, q'] | (q, _, _, q') <- es ])
+  , sstE = edgesFromList [ (q, p, ru, q') | (q, p, ru, q') <- es ]
+  , sstI = qin
+  , sstF = outf os
+  , sstV = S.fromList [ v | (_,_,ru,_) <- es, v <- M.keys ru ]
+  }
+  where
+    outf = M.fromListWith (error "Inconsistent output function: Same state has more than one update.")
 
 {-- Analysis --}
 
@@ -158,6 +179,33 @@ abstractInterpretation sst = go (S.toList $ sstS sst) M.empty
       go states gamma = let (gamma', states') = updateAbstractEnvironment sst states gamma
                         in go states' gamma'
 
+applyAbstractEnvironment :: (Monad func, Ord st, Ord var, Monoid (func (Either var delta))) =>
+                            M.Map st (M.Map var (AbstractVal [delta]))
+                         -> SST st pred (func (Either var delta)) var delta
+                         -> SST st pred (func (Either var delta)) var delta
+applyAbstractEnvironment gamma sst =
+  sst { sstE = mapEdges apply (sstE sst) }
+  where
+    apply (q, p, kappa, q') =
+      let srcRho = maybe M.empty id (M.lookup q gamma)
+          exactKeys = M.keys $ M.filter isExact $ maybe M.empty id (M.lookup q' gamma)
+          kappa' = M.map (applyAbstractValuation srcRho) $ foldr M.delete kappa exactKeys
+      in (q, p, kappa', q')
+
+optimize :: (Eq delta, Monad func, Ord st, Ord var, Monoid (func (Either var delta)),
+             DecFunction (func (Either var delta)) [Either var delta]) =>
+            SST st pred (func (Either var delta)) var delta
+         -> SST st pred (func (Either var delta)) var delta
+optimize sst = let gamma = abstractInterpretation sst in applyAbstractEnvironment gamma sst
+
+enumerateStates :: (Ord k, Ord var) =>
+                   SST k pred func var delta -> SST Int pred func var delta
+enumerateStates sst =
+  construct' (states M.! sstI sst)
+             [ (states M.! q, p, kappa, states M.! q') | (q, p, kappa, q') <- edgesToList (sstE sst) ]
+             [ (states M.! q, o) | (q, o) <- M.toList (sstF sst) ]
+    where
+      states = M.fromList (zip (S.toList (sstS sst)) [(0::Int)..])
 
 {-- Simulation --}
 
