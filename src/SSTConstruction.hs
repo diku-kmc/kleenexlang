@@ -116,12 +116,6 @@ specialize ts =
   [ (q, p, [ (v, specFunc p f) | (v,f) <- xs ], q')
     | (q, p, xs, q') <- ts ]
   where
-    specTransition (p, upd, q') =
-      if size p == 1 then
-        (p, M.map (specFunc (lookupIndex 0 p)) upd, q')
-      else
-        (p, upd, q')
-
     specFunc p f =
       if size p == 1 then
           mconcat $ map return (evalFunction f (lookupIndex 0 p))
