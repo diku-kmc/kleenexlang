@@ -37,6 +37,7 @@ class EffBoolean b dom => Enumerable b dom | b -> dom where
 
 -- | A decidable Boolean algebra is a Boolean algebra for which we can decide
 -- equivalence.
+{-
 class Boolean b => DecBoolean b where
   (.==.) :: b -> b -> Bool
   b1 .==. b2 = not (b1 ./=. b2)
@@ -49,7 +50,7 @@ class Boolean b => DecBoolean b where
 
   (.<>.) :: b -> b -> Bool
   b1 .<>. b2 = (b1 `conj` b2) .==. bot
-
+-}
 
 -- | Compute the coarsest partitioning of a list of elements of a decidable boolean algebra.
 --   For a subset S of a boolean algebra, another subset P is a partition of S iff
@@ -58,21 +59,21 @@ class Boolean b => DecBoolean b where
 --
 -- If P,Q are partitions of a subset S, then Q is coarser than P if P is a partition of Q.
 -- TODO: Prove that the greedy approach employed in the algorithm below is actually correct.
-coarsestPartition :: DecBoolean b => [b] -> [b]
+coarsestPartition :: (Boolean b, PartialOrder b) => [b] -> [b]
 coarsestPartition elems =
   case findOverlap elems of
     Just (x, y, elems') ->
       let xy' = x `minus` y
           yx' = y `minus` x
           i   = x `conj` y
-          f p = if p .==. bot then [] else [p]
+          f p = if p `eq` bot then [] else [p]
        in
       coarsestPartition (f xy' ++ f yx' ++ f i ++ elems')
     Nothing -> elems
   where
     findOverlapWith _ [] = Nothing
     findOverlapWith b (x:xs)
-      | not (b .<>. x) = Just (x, xs)
+      | not ((b `conj` x) `eq` bot) = Just (x, xs)
       | Just (y, xs') <- findOverlapWith b xs = Just (y, x:xs')
       | otherwise = Nothing
 
@@ -91,6 +92,29 @@ class Function t dom rng where
 
 class DecFunction t rng where
     isConstant :: t -> Maybe rng
+
+{----------------------------------------------------------------------}
+{- Partial orders                                                     -}
+{----------------------------------------------------------------------}
+
+class PartialOrder a where
+  lte :: a -> a -> Bool
+
+  comparable :: a -> a -> Bool
+  comparable x y = (x `lte` y) || (y `lte` x)
+
+  gte :: a -> a -> Bool
+  gte = flip lte
+
+  lt :: a -> a -> Bool
+  lt x y = lte x y && not (eq x y)
+
+  gt :: a -> a -> Bool
+  gt = flip lt
+
+  eq :: a -> a -> Bool
+  eq x y = lte x y && lte y x
+
 
 {----------------------------------------------------------------------}
 {- Instances                                                          -}
@@ -128,6 +152,12 @@ instance (Ord a, Enum a, Bounded a) => Enumerable (RangeSet a) a where
   lookupIndex = RS.lookupIndex
   size = RS.size
 
+{-
 instance (Ord a, Enum a, Bounded a) => DecBoolean (RangeSet a) where
   (.==.) = (==)
   (.<=.) = RS.isSubsetOf
+-}
+
+instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
+    lte = RS.isSubsetOf
+    eq = (==)

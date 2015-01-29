@@ -4,6 +4,7 @@ module TreeWriter
 (Tree(..)
 ,TreeWriterT
 ,TreeWriter
+,mapOutput
 ,plus
 ,zero
 ,tell
@@ -32,6 +33,10 @@ data Tree w a = Tip { tOutput :: w, tValue :: a }
 instance Functor (Tree w) where
   fmap f (Tip w a) = Tip w (f a)
   fmap f (Fork w t1 t2) = Fork w (fmap f t1) (fmap f t2)
+
+mapOutput :: (w -> w') -> Tree w a -> Tree w' a
+mapOutput f (Tip w a) = Tip (f w) a
+mapOutput f (Fork w t1 t2) = Fork (f w) (mapOutput f t1) (mapOutput f t2)
 
 -- | Prepends the given value to the top output of a tree
 tprepend :: (Monoid w) => w -> Tree w a -> Tree w a

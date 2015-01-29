@@ -68,13 +68,13 @@ evalEdges (OrderedEdgeSet { eForward = me }) q x =
           | evalBoolean p x = [(evalFunction f x, q')]
           | otherwise = []
 
-abstractEvalEdges :: (Ord st, DecBoolean pred)
+abstractEvalEdges :: (Ord st, PartialOrder pred)
                   => OrderedEdgeSet st pred func delta
                   -> st -> pred -> [(func, st)]
 abstractEvalEdges (OrderedEdgeSet { eForward = me}) q p =
   case M.lookup q me of
     Nothing -> []
-    Just es -> [ (f, q') | (p', f, q') <- es, p .<=. p' ]
+    Just es -> [ (f, q') | (p', f, q') <- es, p `lte` p' ]
 
 evalEpsilonEdges :: (Ord st) => OrderedEdgeSet st pred func delta
                  -> st -> [(delta, st)]
@@ -90,7 +90,7 @@ fstEvalEdges :: (Ord st, EffBoolean pred dom, Function func dom delta)
                 => FST st pred func delta -> st -> dom -> [(delta, st)]
 fstEvalEdges fst' q a = evalEdges (fstE fst') q a
 
-fstAbstractEvalEdges :: (Ord st, DecBoolean pred)
+fstAbstractEvalEdges :: (Ord st, PartialOrder pred)
                      => FST st pred func delta -> st -> pred -> [(func, st)]
 fstAbstractEvalEdges aut = abstractEvalEdges (fstE aut)
 
@@ -101,6 +101,16 @@ isChoiceState fst' q =
   case (M.member q (eForward . fstE $ fst'), M.member q (eForwardEpsilon . fstE $ fst')) of
     (True, True) -> error "Inconsistent FST - a state is both a choice and symbol state"
     (_, b) -> b
+
+coarsestPredicateSet :: (Boolean pred, PartialOrder pred, Ord st, Ord pred) =>
+                        FST st pred func delta
+                     -> [st]
+                     -> [pred]
+coarsestPredicateSet fst' qs = coarsestPartition ps
+  where
+    ps = S.toList $ S.fromList
+           [ p | q <- qs
+               , (p, _, _) <- maybe [] id (M.lookup q (eForward . fstE $ fst')) ]
 
 run :: (Monoid delta, EffBoolean pred dom, Function func dom delta, Ord st)
        => FST st pred func delta -> [dom] -> [delta]
