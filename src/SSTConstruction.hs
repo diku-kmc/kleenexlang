@@ -24,10 +24,10 @@ instance PartialOrder Var where
 
 -- | The closure monad models a computation consisting of concurrent threads
 -- with shared state executed in round-robin
-type Closure st delta func = TreeWriterT (func (Either Var delta)) (State (S.Set st))
+type Closure st w = TreeWriterT w (State (S.Set st))
 type PathTree w a = Maybe (Tree w a)
 
-visit :: (Ord st) => st -> Closure st t delta st
+visit :: (Ord st) => st -> Closure st w st
 visit st = do { vis <- get;
                 when (S.member st vis) zero;
                 modify (S.insert st);
@@ -35,67 +35,59 @@ visit st = do { vis <- get;
               }
 
 -- | Resume a closure computation
-resume :: Tree (func (Either Var delta)) a -> Closure st delta func a
+resume :: Tree w a -> Closure st w a
 resume (Tip w x) = tell w >> return x
 resume (Fork w t1 t2) = tell w >> plus (resume t1) (resume t2)
 
 -- | Resume a possibly failing closure computation
-resume' :: PathTree (func (Either Var delta)) a -> Closure st delta func a
+resume' :: PathTree w a -> Closure st w a
 resume' = maybe zero resume
 
 -- | Interpret a closure computation as a path tree.
-runClosure :: (Monoid (func (Either Var delta)))
-           => Closure st delta func a -> PathTree (func (Either Var delta)) a
+runClosure :: (Monoid w) => Closure st w a -> PathTree w a
 runClosure x = evalState (evalTreeWriterT x) S.empty
 
 {------------------------------------------------------------------------------}
 {-- Computing path trees --}
 
-inj :: (Monad func, Monoid (func (Either Var delta))) => [delta] -> func (Either Var delta)
-inj = mconcat . map (return . Right)
-
 -- | Non-deterministically follow all non-input transitions.
-closure :: (Monad func, Monoid (func (Either Var delta)), Ord st)
-           => FST st pred (func delta) [delta] -> st -> Closure st delta func st
-closure fst' q =
+closure :: (Monoid w, Ord st)
+           => FST st pred func o
+           -> (o -> w)
+           -> st
+           -> Closure st w st
+closure fst' inj q =
   case fstEvalEpsilonEdges fst' q of
     [] -> return q
     [(out, q')] ->
-        tell (inj out) >> visit q' >> closure fst' q'
+        tell (inj out) >> visit q' >> closure fst' inj q'
     [(out1, q1'), (out2, q2')] ->
-       plus (tell (inj out1) >> visit q1' >> closure fst' q1')
-            (tell (inj out2) >> visit q2' >> closure fst' q2')
+       plus (tell (inj out1) >> visit q1' >> closure fst' inj q1')
+            (tell (inj out2) >> visit q2' >> closure fst' inj q2')
     _ -> error "Computing closures for FSTs with epsilon-fanout greater than two is not supported yet"
 
 consume :: (PartialOrder pred, Monad func, Monoid (func (Either Var delta)), Ord st)
-        => FST st pred (func delta) [delta] -> pred -> st -> Closure st delta func st
+        => FST st pred (func delta) [delta] -> pred -> st -> Closure st (func (Either Var delta)) st
 consume fst' p q =
   case fstAbstractEvalEdges fst' q p of
     [] -> zero
     [(f, q')] ->
-      tell (f >>= return . Right) >> return q' --closure fst' q'
+      tell (f >>= return . Right) >> return q'
     _ -> error "Stepping for FSTs with read-fanout greater than one is not supported yet"
 
---step :: (PartialOrder pred, Monad func, Monoid (func (Either Var delta)), Ord st)
---        => FST st pred (func delta) [delta] -> pred -> st -> Closure st delta func st
---step fst' p q = closure fst' q >>= consume fst' p
-
-eof :: (Ord st) => FST st pred (func delta) [delta] -> st -> Closure st delta func st
+eof :: (Ord st) => FST st pred func m -> st -> Closure st w st
 eof fst' q | S.member q (fstF fst') = return q
            | otherwise = zero
 
 closureAbstractTree :: (Monad func, Monoid (func (Either Var delta)), Ord st)
             => FST st pred (func delta) [delta]
             -> PathTree Var st
-            -> PathTree (func (Either Var delta)) st
+            -> PathTree [Either Var delta] st
 closureAbstractTree fst' tr =
   let tr' = fmap (mapOutput (return . Left)) tr
-  in runClosure (resume' tr' >>= closure fst')
+  in runClosure (resume' tr' >>= closure fst' (map Right))
 
-eofTree :: (Ord st, Monoid (func (Either Var delta)))
-        => FST st pred (func delta) [delta]
-        -> PathTree (func (Either Var delta)) st
-        -> PathTree (func (Either Var delta)) st
+eofTree :: (Ord a, Monoid w) => FST a pred func m -> PathTree w a -> PathTree w a
 eofTree fst' tr = runClosure (resume' tr >>= eof fst')
 
 consumeTree :: (PartialOrder pred, Monad func, Monoid (func (Either Var delta)), Ord st)
@@ -125,6 +117,8 @@ abstract' :: (Monad func)
 abstract' Nothing = ([], Nothing)
 abstract' (Just t) = let (m', t') = abstract t in (m', Just t')
 
+unabstract :: (Monad m, Monoid (m a1)) => Maybe (Tree [a1] a) -> Maybe (Tree (m a1) a)
+unabstract = fmap (mapOutput (mconcat . map return))
 
 {------------------------------------------------------------------------------}
 {-- SST specialization --}
@@ -168,11 +162,12 @@ sstFromFST fst' =
       | (t, ws') <- S.deleteFindMin ws, S.member t states
                                        = saturate ws' states trans outs
       | (t, ws') <- S.deleteFindMin ws =
-        let t'  = closureAbstractTree fst' t
-            wl' = S.fromList [ newt | (_,_,_,newt) <- ts ]
-            ts  = do p <- coarsestPredicateSet fst' (tflat' t')
-                     let (kappa, t'') = abstract' $ consumeTree fst' p t'
-                     guard (isJust t'')
-                     return (t, p, kappa, t'')
-            os  = [ undefined | Just (Tip w _) <- [eofTree fst' t'] ]
+        let tcl  = closureAbstractTree fst' t
+            tcl' = unabstract tcl
+            wl'  = S.fromList [ newt | (_,_,_,newt) <- ts ]
+            ts   = do p <- coarsestPredicateSet fst' (tflat' tcl')
+                      let (kappa, t'') = abstract' $ consumeTree fst' p tcl'
+                      guard (isJust t'')
+                      return (t, p, kappa, t'')
+            os   = [ (t, w) | Just (Tip w _) <- [eofTree fst' tcl] ]
         in saturate (S.union ws' wl') (S.insert t states) (ts ++ trans) (os ++ outs)
