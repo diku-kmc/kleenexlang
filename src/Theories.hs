@@ -87,7 +87,10 @@ coarsestPartition elems =
 {----------------------------------------------------------------------}
 
 class Function t dom rng where
-  evalFunction :: t -> dom -> rng
+    evalFunction :: t -> dom -> rng
+
+class DecFunction t rng where
+    isConstant :: t -> Maybe rng
 
 {----------------------------------------------------------------------}
 {- Instances                                                          -}
@@ -98,6 +101,13 @@ instance (Enumerable ba dom, Enum rng, Bounded rng) => Function (OutputTerm ba r
     where
       evalTerm (Const y) = [y]
       evalTerm (Code b) = codeFixedWidthEnumSized (size b) (indexOf x b)
+
+instance DecFunction (OutputTerm ba rng) [rng] where
+    isConstant (OutputTerm ts) = go ts
+        where
+          go [] = Just []
+          go (Code _:_) = Nothing
+          go (Const y:xs) = go xs >>= return . (y:)
 
 -- | Constant function ignores its argument and always returns the same constant.
 instance Function (ConstFunction rng) dom rng where

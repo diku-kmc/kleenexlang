@@ -47,18 +47,17 @@ fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]
                  ,GV.NodeAttrs [GA.Shape GA.Circle]]
 
-formatNode :: (Ord st) => FST st pred func delta -> (st, st) -> GA.Attributes
-formatNode fst' (q, _) =
+formatNode :: (Ord st) => (st -> Bool) -> (st -> Bool) -> (st, st) -> GA.Attributes
+formatNode isFinal isInitial (q, _) =
   concat
-  [ [ GA.Shape GA.DoubleCircle | S.member q (fstF fst') ]
-  , [ GA.Shape GA.BoxShape     | q == fstI fst' ]
+  [ [ GA.Shape GA.DoubleCircle | isFinal q ]
+  , [ GA.Shape GA.BoxShape     | isInitial q ]
   ]
 
-formatEdge :: (Ord st, Pretty pred, Pretty delta, Pretty func)
-              => FST st pred func delta
-              -> (st, st, Either (pred, func) delta)
+formatFSTEdge :: (Ord st, Pretty pred, Pretty delta, Pretty func)
+              => (st, st, Either (pred, func) delta)
               -> GA.Attributes
-formatEdge _ (_, _, l) =
+formatFSTEdge (_, _, l) =
   case l of
     Left (p, f)  -> [ GV.textLabel $ pack (pretty p ++ " / " ++ pretty f) ]
     Right l' -> [ GV.textLabel $ pack ("/ " ++ pretty l') ]
@@ -68,8 +67,8 @@ fstToDot fst' = GV.graphElemsToDot params nodes edges
     where
       params = GV.nonClusteredParams
                { GV.globalAttributes = fstGlobalAttrs
-               , GV.fmtNode = formatNode fst'
-               , GV.fmtEdge = formatEdge fst'
+               , GV.fmtNode = formatNode (\q -> S.member q (fstF fst')) (== fstI fst')
+               , GV.fmtEdge = formatFSTEdge
                }
       nodes = map (\x -> (x,x)) (S.toList (fstS fst'))
       edges = [ (q, q', l) | (q, l, q') <- edgesToList (fstE fst') ]
