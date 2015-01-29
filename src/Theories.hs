@@ -35,23 +35,6 @@ class EffBoolean b dom => Enumerable b dom | b -> dom where
   lookupIndex :: Int -> b -> dom
   size :: b -> Int
 
--- | A decidable Boolean algebra is a Boolean algebra for which we can decide
--- equivalence.
-{-
-class Boolean b => DecBoolean b where
-  (.==.) :: b -> b -> Bool
-  b1 .==. b2 = not (b1 ./=. b2)
-
-  (./=.) :: b -> b -> Bool
-  b1 ./=. b2 = not (b1 .==. b2)
-
-  (.<=.) :: b -> b -> Bool
-  b1 .<=. b2 = (b1 `disj` b2) .==. b2
-
-  (.<>.) :: b -> b -> Bool
-  b1 .<>. b2 = (b1 `conj` b2) .==. bot
--}
-
 -- | Compute the coarsest partitioning of a list of elements of a decidable boolean algebra.
 --   For a subset S of a boolean algebra, another subset P is a partition of S iff
 --   (i) for all a, b in P, if a /= b, then a /\ b = 0
@@ -120,11 +103,11 @@ class PartialOrder a where
 {- Instances                                                          -}
 {----------------------------------------------------------------------}
 
-instance (Enumerable ba dom, Enum rng, Bounded rng) => Function (OutputTerm ba rng) dom [rng] where
+instance (Enumerable ba dom, Enum rng, Bounded rng, Monad f) => Function (OutputTerm ba (f rng)) dom [f rng] where
   evalFunction (OutputTerm ts) x = concatMap evalTerm ts
-    where
-      evalTerm (Const y) = [y]
-      evalTerm (Code b) = codeFixedWidthEnumSized (size b) (indexOf x b)
+      where
+        evalTerm (Const y) = [y]
+        evalTerm (Code b) = map return $ codeFixedWidthEnumSized (size b) (indexOf x b)
 
 instance DecFunction (OutputTerm ba rng) [rng] where
     isConstant (OutputTerm ts) = go ts
@@ -151,12 +134,6 @@ instance (Ord a, Enum a, Bounded a) => Enumerable (RangeSet a) a where
   indexOf = RS.indexOf
   lookupIndex = RS.lookupIndex
   size = RS.size
-
-{-
-instance (Ord a, Enum a, Bounded a) => DecBoolean (RangeSet a) where
-  (.==.) = (==)
-  (.<=.) = RS.isSubsetOf
--}
 
 instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
     lte = RS.isSubsetOf

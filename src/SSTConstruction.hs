@@ -143,14 +143,11 @@ specialize ts =
 {------------------------------------------------------------------------------}
 {-- SST construction from FST --}
 
-sstFromFST :: (Monad func
-              ,Monoid (func (Either Var delta))
-              ,PartialOrder pred
-              ,Enumerable pred dom
-              ,Function (func (Either Var delta)) dom [Either Var delta]
-              ,Ord st, Ord pred)
-           => FST st pred (func delta) [delta]
-           -> SST (PathTree Var st) pred (func (Either Var delta)) Var delta
+sstFromFST :: (Monad func, Ord st, Ord pred, Monoid (func (Either Var delta)),
+               Function (func (Either Var delta)) dom [Either Var delta],
+               Enumerable pred dom, PartialOrder pred) =>
+              FST st pred (func delta) [delta]
+              -> SST (PathTree Var st) pred (func (Either Var delta)) Var delta
 sstFromFST fst' =
   construct initialState (specialize transitions) outputs
   where

@@ -168,6 +168,7 @@ valuate s (Left v:xs) = maybe (error "valuate: Variable not in valuation") id (M
                         ++ valuate s xs
 
 data Stream a = Chunk a (Stream a) | Done | Fail String
+  deriving (Show)
 
 run :: (Ord st, Ord var, EffBoolean pred dom, Function func dom [Either var delta])
        => SST st pred func var delta -> [dom] -> Stream [delta]
