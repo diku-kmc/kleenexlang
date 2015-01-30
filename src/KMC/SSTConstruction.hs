@@ -66,13 +66,15 @@ closure fst' inj q =
             (tell (inj out2) >> visit q2' >> closure fst' inj q2')
     _ -> error "Computing closures for FSTs with epsilon-fanout greater than two is not supported yet"
 
-consume :: (PartialOrder pred, Monad func, Monoid (func (Either Var delta)), Ord st)
+consume :: (PartialOrder pred
+           ,Monad func
+           ,Monoid (func (Either Var delta))
+           ,Ord st)
         => FST st pred (func delta) [delta] -> pred -> st -> Closure st (func (Either Var delta)) st
 consume fst' p q =
   case fstAbstractEvalEdges fst' q p of
-    [] -> zero
-    [(f, q')] ->
-      tell (f >>= return . Right) >> return q'
+    []        -> zero
+    [(f, q')] -> tell (f >>= return . Right) >> return q'
     _ -> error "Stepping for FSTs with read-fanout greater than one is not supported yet"
 
 eof :: (Ord st) => FST st pred func m -> st -> Closure st w st

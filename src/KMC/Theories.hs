@@ -3,11 +3,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module KMC.Theories where
 
+import           Data.Monoid
+
 import           KMC.RangeSet (RangeSet)
 import qualified KMC.RangeSet as RS
 
 import           KMC.Coding
-import           KMC.OutputTerm(OutputTerm(..), Term(..), ConstFunction(..))
+import           KMC.OutputTerm
 
 {----------------------------------------------------------------------}
 {- Boolean algebras                                                   -}
@@ -102,6 +104,29 @@ class PartialOrder a where
 {----------------------------------------------------------------------}
 {- Instances                                                          -}
 {----------------------------------------------------------------------}
+
+instance (Ord a, Enum a, Bounded a, Enum rng, Bounded rng) => Function (RangeSet a) a [rng] where
+  evalFunction rs x = codeFixedWidthEnumSized (RS.size rs) (RS.indexOf x rs)
+
+instance (Function t1 dom rng, Function t2 dom rng) => Function (Either t1 t2) dom rng where
+  evalFunction (Left f1) x = evalFunction f1 x
+  evalFunction (Right f2) x = evalFunction f2 x
+
+instance Function t dom rng => Function (InList t) dom [rng] where
+  evalFunction (InList f) x = [evalFunction f x]
+
+instance Function t dom rng => Function (Inr t) dom (Either a rng) where
+  evalFunction (Inr t) x = Right (evalFunction t x)
+
+instance Function t dom rng => Function (Inl t) dom (Either rng b) where
+  evalFunction (Inl t) x = Left (evalFunction t x)
+
+instance Function (Identity a) a a where
+  evalFunction Identity x = x
+
+instance (Monoid rng, Function t dom rng) => Function [t] dom rng where
+  evalFunction [] _ = mempty
+  evalFunction (f:fs) x = evalFunction f x `mappend` evalFunction fs x
 
 instance (Enumerable ba dom, Enum rng, Bounded rng, Monad f) => Function (OutputTerm ba (f rng)) dom [f rng] where
   evalFunction (OutputTerm ts) x = concatMap evalTerm ts

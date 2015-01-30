@@ -3,8 +3,6 @@ module KMC.OutputTerm where
 
 import Data.Monoid
 
---import qualified Data.Map as M
-
 data Term bool b = Const b
                  | Code bool
   deriving (Functor, Show, Eq, Ord)
@@ -14,6 +12,26 @@ newtype OutputTerm bool b = OutputTerm { unpack :: [Term bool b] }
 
 data ConstFunction a = ConstFunction a
   deriving (Show, Eq, Ord)
+
+data Identity a = Identity
+  deriving (Show, Eq, Ord)
+
+data InList a = InList a
+  deriving (Show, Eq, Ord)
+
+data Inl a = Inl a
+  deriving (Show, Eq, Ord)
+
+data Inr a = Inr a
+  deriving (Show, Eq, Ord)
+
+type Term' a = Either (InList (Identity a)) (ConstFunction [a])
+
+test_t1 :: Term' Int
+test_t1 = Left (InList Identity)
+
+test_t2 :: Term' Int
+test_t2 = Right (ConstFunction [42])
 
 instance Monad (OutputTerm bool) where
     return x = OutputTerm [Const x]
