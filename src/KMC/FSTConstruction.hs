@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-module FSTConstruction
+module KMC.FSTConstruction
 (Mu(..)
 ,fromMu)
 where
@@ -8,8 +8,8 @@ import           Control.Monad.State
 import           Data.Monoid
 import qualified Data.Set as S
 
-import           Expression
-import           SymbolicFST
+import           KMC.Expression
+import           KMC.SymbolicFST
 
 data ConstructState st pred func delta =
   ConstructState { edges     :: [Edge st pred func delta]

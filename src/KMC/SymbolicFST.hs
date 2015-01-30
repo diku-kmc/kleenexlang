@@ -1,10 +1,10 @@
-module SymbolicFST where
+module KMC.SymbolicFST where
 
 import qualified Data.Map as M
 import           Data.Monoid
 import qualified Data.Set as S
 
-import           Theories
+import           KMC.Theories
 
 
 -- | (Non-)deterministic Finite State Transducer. To be well-formed, the
@@ -56,7 +56,7 @@ edgesToList es =
   [ (q, Left (a,b), q') | (q, xs) <- M.toList (eForward es), (a,b,q') <- xs ]
   ++ [ (q, Right y, q') | (q, xs) <- M.toList (eForwardEpsilon es), (y, q') <- xs ]
 
-evalEdges :: (Ord st, EffBoolean pred dom, Function func dom delta)
+evalEdges :: (Ord st, SetLike pred dom, Function func dom delta)
           => OrderedEdgeSet st pred func delta
           -> st -> dom -> [(delta, st)]
 evalEdges (OrderedEdgeSet { eForward = me }) q x =
@@ -65,7 +65,7 @@ evalEdges (OrderedEdgeSet { eForward = me }) q x =
     Just es -> concatMap evalEdge es
       where
         evalEdge (p, f, q')
-          | evalBoolean p x = [(evalFunction f x, q')]
+          | member x p = [(evalFunction f x, q')]
           | otherwise = []
 
 abstractEvalEdges :: (Ord st, PartialOrder pred)
@@ -86,7 +86,7 @@ evalEpsilonEdges (OrderedEdgeSet { eForwardEpsilon = meps }) q =
 fstEvalEpsilonEdges :: (Ord st) => FST st pred func delta -> st -> [(delta, st)]
 fstEvalEpsilonEdges aut = evalEpsilonEdges (fstE aut)
 
-fstEvalEdges :: (Ord st, EffBoolean pred dom, Function func dom delta)
+fstEvalEdges :: (Ord st, SetLike pred dom, Function func dom delta)
                 => FST st pred func delta -> st -> dom -> [(delta, st)]
 fstEvalEdges fst' q a = evalEdges (fstE fst') q a
 
@@ -112,7 +112,7 @@ coarsestPredicateSet fst' qs = coarsestPartition ps
            [ p | q <- qs
                , (p, _, _) <- maybe [] id (M.lookup q (eForward . fstE $ fst')) ]
 
-run :: (Monoid delta, EffBoolean pred dom, Function func dom delta, Ord st)
+run :: (Monoid delta, SetLike pred dom, Function func dom delta, Ord st)
        => FST st pred func delta -> [dom] -> [delta]
 run fst' = go S.empty (fstI fst')
     where

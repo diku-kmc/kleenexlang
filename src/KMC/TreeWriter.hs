@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveFunctor #-}
-module TreeWriter
+module KMC.TreeWriter
 (Tree(..)
 ,TreeWriterT
 ,TreeWriter

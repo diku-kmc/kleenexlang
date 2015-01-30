@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances #-}
-module Visualization where
+module KMC.Visualization where
 
 import qualified Data.GraphViz as GV
 import qualified Data.GraphViz.Attributes.Complete as GA
@@ -13,14 +13,14 @@ import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
 
-import           OutputTerm
-import           RangeSet
-import           SymbolicFST
-import           SymbolicSST
+import           KMC.OutputTerm
+import           KMC.RangeSet
+import           KMC.SymbolicFST
+import           KMC.SymbolicSST
+import           KMC.FSTConstruction
+import           KMC.SSTConstruction
+import           KMC.Expression
 
-import           FSTConstruction
-import           SSTConstruction
-import           Expression
 import           KMC.Syntax.Parser
 import           KMC.Syntax.Config
 

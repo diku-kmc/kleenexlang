@@ -1,5 +1,5 @@
 {-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
-module Coding
+module KMC.Coding
     (bitWidth
     ,codeFixedWidth
     ,codeFixedWidthEnum

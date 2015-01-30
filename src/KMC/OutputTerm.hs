@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
-module OutputTerm where
+module KMC.OutputTerm where
 
 import Data.Monoid
 

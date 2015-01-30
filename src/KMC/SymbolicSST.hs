@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
-module SymbolicSST where
+module KMC.SymbolicSST where
 
 import           Control.Applicative
 import           Control.Monad
@@ -9,7 +9,7 @@ import           Data.Monoid
 import qualified Data.Set as S
 import qualified Data.Map as M
 
-import           Theories
+import           KMC.Theories
 
 type Valuation var delta = M.Map var [delta]
 type Environment st var delta = M.Map st (Valuation var delta)
@@ -218,7 +218,7 @@ valuate s (Left v:xs) = maybe (error "valuate: Variable not in valuation") id (M
 data Stream a = Chunk a (Stream a) | Done | Fail String
   deriving (Show)
 
-run :: (Ord st, Ord var, EffBoolean pred dom, Function func dom [Either var delta])
+run :: (Ord st, Ord var, SetLike pred dom, Function func dom [Either var delta])
        => SST st pred func var delta -> [dom] -> Stream [delta]
 run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
     where
@@ -241,7 +241,7 @@ run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
 
       findTrans _ [] = Nothing
       findTrans a ((p, upd, q'):ts) =
-        if evalBoolean p a then
+        if member a p then
             Just (upd, q')
         else
             findTrans a ts

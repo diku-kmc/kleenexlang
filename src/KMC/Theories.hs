@@ -1,13 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-module Theories where
+module KMC.Theories where
 
-import           RangeSet (RangeSet)
-import qualified RangeSet as RS
+import           KMC.RangeSet (RangeSet)
+import qualified KMC.RangeSet as RS
 
-import           Coding
-import           OutputTerm(OutputTerm(..), Term(..), ConstFunction(..))
+import           KMC.Coding
+import           KMC.OutputTerm(OutputTerm(..), Term(..), ConstFunction(..))
 
 {----------------------------------------------------------------------}
 {- Boolean algebras                                                   -}
@@ -25,12 +25,12 @@ class Boolean b where
 
 -- | An effective Boolean algebra is a Boolean algebra whose elements can be
 -- interpreted as predicates on some domain.
-class Boolean b => EffBoolean b dom | b -> dom where
-  evalBoolean :: b -> (dom -> Bool)
+class Boolean b => SetLike b dom | b -> dom where
+  member :: dom -> b -> Bool
 
 -- | An Enumerable is a set-like boolean algebra for which we can enumerate all
 -- members by consecutive none-negative integers.
-class EffBoolean b dom => Enumerable b dom | b -> dom where
+class SetLike b dom => Enumerable b dom | b -> dom where
   indexOf :: dom -> b -> Int
   lookupIndex :: Int -> b -> dom
   size :: b -> Int
@@ -127,8 +127,8 @@ instance (Ord a, Enum a, Bounded a) => Boolean (RangeSet a) where
   conj = RS.intersection
   disj = RS.union
 
-instance (Ord a, Enum a, Bounded a) => EffBoolean (RangeSet a) a where
-  evalBoolean = flip RS.member
+instance (Ord a, Enum a, Bounded a) => SetLike (RangeSet a) a where
+  member = RS.member
 
 instance (Ord a, Enum a, Bounded a) => Enumerable (RangeSet a) a where
   indexOf = RS.indexOf

@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleContexts #-}
-module SSTConstruction where
+module KMC.SSTConstruction where
 
 import           Control.Monad.State
 import           Data.Maybe (isJust)
 import           Data.Monoid
 import qualified Data.Set as S
-import           SymbolicFST
-import           SymbolicSST
-import           Theories
-import           TreeWriter
+import           KMC.SymbolicFST
+import           KMC.SymbolicSST
+import           KMC.Theories
+import           KMC.TreeWriter
 
 data Var = Var [Int]
   deriving (Eq, Ord, Show)

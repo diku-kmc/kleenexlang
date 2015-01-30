@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module RangeSet
+module KMC.RangeSet
 (RangeSet
 ,rangeSet
 ,singleton

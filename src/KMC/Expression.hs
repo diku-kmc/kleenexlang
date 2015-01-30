@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-module Expression
+module KMC.Expression
 (Mu(..)
 ,fromRegex)
 where
@@ -7,9 +7,9 @@ where
 import Data.Word
 import Data.Char
 import KMC.Syntax.External
-import OutputTerm
-import RangeSet
-import Theories
+import KMC.OutputTerm
+import KMC.RangeSet
+import KMC.Theories
 
 data Mu pred func delta a = Var a
                           | Loop (forall b. b -> Mu pred func delta b)

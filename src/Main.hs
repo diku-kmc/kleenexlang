@@ -2,14 +2,14 @@ module Main where
 
 import Data.Word (Word8)
 
-import Expression
-import FSTConstruction
+import KMC.Expression
+import KMC.FSTConstruction
 import KMC.Syntax.Config
 import KMC.Syntax.Parser
-import OutputTerm
-import RangeSet
-import SSTConstruction
-import SymbolicSST
+import KMC.OutputTerm
+import KMC.RangeSet
+import KMC.SSTConstruction
+import KMC.SymbolicSST
 
 sstFromFancy :: String
              -> SST (PathTree Var Int)
