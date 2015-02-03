@@ -11,14 +11,19 @@ import KMC.OutputTerm
 import KMC.RangeSet
 import KMC.Theories
 
-data Mu pred func a = Var a
-                    | Loop (forall b. b -> Mu pred func b)
-                    | Alt (Mu pred func a) (Mu pred func a)
-                    | RW pred func (Mu pred func a)
-                    | W (Rng func) (Mu pred func a)
-                    | Seq (Mu pred func a) (Mu pred func a)
-                    | Accept
+-- | Symbolic mu-recursive expressions with output.
+data Mu pred func a =
+        Var a -- ^ Recursion variable.
+      | Loop (forall b. b -> Mu pred func b) -- ^ Fixed point.
+      | Alt (Mu pred func a) (Mu pred func a) -- ^ Alternation.
+      | RW pred func (Mu pred func a) -- ^ Read a symbol matching the given
+                                      -- predicate and write an output indexed
+                                      -- by the concrete input symbol.
+      | W (Rng func) (Mu pred func a) -- ^ Write a constant.
+      | Seq (Mu pred func a) (Mu pred func a) -- ^ Sequence
+      | Accept -- ^ Accept
 
+-- | Translate a regular expression to a mu-expression which denotes the parsing relation.
 fromRegex :: (Ord sigma, Enum sigma, Bounded sigma) =>
              Regex -> Mu (RangeSet sigma) (Join (Const sigma [Bool] :+: Enumerator (RangeSet sigma) sigma Bool) [Bool]) a
 fromRegex One            = Accept

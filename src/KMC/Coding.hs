@@ -8,15 +8,20 @@ module KMC.Coding
     ,decodeEnum)
 where
 
--- | Compute the bit width to fit n values in a word of digits of a given base
-bitWidth :: Int -> Int -> Int
+-- | Compute the number of digits required to fit n values in a word of digits of a given base
+bitWidth :: Int -- ^ Base
+         -> Int -- ^ Domain size
+         -> Int
 bitWidth base n = go 0
     where
       go w | base^w >= n = w
            | otherwise   = go (w+1)
   
 -- | Code an integral value as a big-endian sequence of digits in an arbitrary base.
-codeFixedWidth :: Int -> Int -> Int -> [Int]
+codeFixedWidth :: Int   -- ^ Base
+               -> Int   -- ^ Number of digits
+               -> Int   -- ^ Value
+               -> [Int]
 codeFixedWidth base width ndata = go width ndata
     where
       go 0 _  = []
@@ -33,23 +38,36 @@ codeFixedWidth base width ndata = go width ndata
                        else
                            q:go (w-1) r
 
-codeFixedWidthEnum :: forall b. (Enum b, Bounded b) => Int -> Int -> [b]
+-- | Code a value in a fixed number of digits of an arbitrary base
+codeFixedWidthEnum :: forall b. (Enum b, Bounded b) =>
+                      Int -- ^ Number of digits to code the value in
+                   -> Int -- ^ Value
+                   -> [b]
 codeFixedWidthEnum width ndata = map toEnum $ codeFixedWidth base width ndata
     where
       base = fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1
 
-codeFixedWidthEnumSized :: forall b. (Enum b, Bounded b) => Int -> Int -> [b]
+-- | Code a value in a fixed number of digits of an arbitrary base. The number
+-- of digits required is inferred from the size of the domain.
+codeFixedWidthEnumSized :: forall b. (Enum b, Bounded b) =>
+                           Int -- ^ Size of domain
+                        -> Int -- ^ Value
+                        -> [b]
 codeFixedWidthEnumSized size ndata = map toEnum $ codeFixedWidth base width ndata
     where
       base = fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1
       width = bitWidth base size
 
-decode :: Int -> [Int] -> Int
+-- | Decode a value encoded as digits in a given base
+decode :: Int   -- ^ Base
+       -> [Int] -- ^ Digits
+       -> Int
 decode base ds = go (length ds) ds
     where
       go _ [] = 0
       go n (d:ds') = base^(n-1) * d + go (n-1) ds'
 
+-- | Decode a value encoded as digits in an enumerable bounded base.
 decodeEnum :: forall b. (Enum b, Bounded b) => [b] -> Int
 decodeEnum ds = decode base (map fromEnum ds)
     where
