@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 module KMC.SSTConstruction where
 
@@ -21,6 +22,7 @@ instance PartialOrder Var where
         prefixOf _ _ = False
 
 {-- Closure monad --}
+
 
 -- | The closure monad models a computation consisting of concurrent threads
 -- with shared state executed in round-robin
@@ -47,64 +49,61 @@ resume' = maybe zero resume
 runClosure :: (Monoid w) => Closure st w a -> PathTree w a
 runClosure x = evalState (evalTreeWriterT x) S.empty
 
+
 {------------------------------------------------------------------------------}
 {-- Computing path trees --}
 
+
 -- | Non-deterministically follow all non-input transitions.
-closure :: (Monoid w, Ord st)
-           => FST st pred func o
-           -> (o -> w)
+closure :: (Ord st)
+           => FST st pred func
            -> st
-           -> Closure st w st
-closure fst' inj q =
+           -> Closure st (UpdateString var (Rng func)) st
+closure fst' q =
   case fstEvalEpsilonEdges fst' q of
     [] -> return q
     [(out, q')] ->
-        tell (inj out) >> visit q' >> closure fst' inj q'
+        tell [Right out] >> visit q' >> closure fst' q'
     [(out1, q1'), (out2, q2')] ->
-       plus (tell (inj out1) >> visit q1' >> closure fst' inj q1')
-            (tell (inj out2) >> visit q2' >> closure fst' inj q2')
+       plus (tell [Right out1] >> visit q1' >> closure fst' q1')
+            (tell [Right out2] >> visit q2' >> closure fst' q2')
     _ -> error "Computing closures for FSTs with epsilon-fanout greater than two is not supported yet"
 
-consume :: (PartialOrder pred
-           ,Monad func
-           ,Monoid (func (Either Var delta))
-           ,Ord st)
-        => FST st pred (func delta) [delta] -> pred -> st -> Closure st (func (Either Var delta)) st
+consume :: (PartialOrder pred, Ord st)
+        => FST st pred func -> pred -> st -> Closure st (UpdateStringFunc var func) st
 consume fst' p q =
   case fstAbstractEvalEdges fst' q p of
     []        -> zero
-    [(f, q')] -> tell (f >>= return . Right) >> return q'
+    [(f, q')] -> tell [FuncA f] >> return q'
     _ -> error "Stepping for FSTs with read-fanout greater than one is not supported yet"
 
-eof :: (Ord st) => FST st pred func m -> st -> Closure st w st
-eof fst' q | S.member q (fstF fst') = return q
+eof :: (Ord st) => FST st pred func -> st -> Closure st w st
+eof fst' q | S.member q (fstF fst') = visit q
            | otherwise = zero
 
-closureAbstractTree :: (Monad func, Monoid (func (Either Var delta)), Ord st)
-            => FST st pred (func delta) [delta]
-            -> PathTree Var st
-            -> PathTree [Either Var delta] st
+closureAbstractTree :: (Ord a) =>
+                       FST a pred func
+                    -> PathTree var a
+                    -> PathTree (UpdateString var (Rng func)) a
 closureAbstractTree fst' tr =
   let tr' = fmap (mapOutput (return . Left)) tr
-  in runClosure (resume' tr' >>= closure fst' (map Right))
+  in runClosure (resume' tr' >>= closure fst')
 
-eofTree :: (Ord a, Monoid w) => FST a pred func m -> PathTree w a -> PathTree w a
+eofTree :: (Ord a, Monoid w) => FST a pred func -> PathTree w a -> PathTree w a
 eofTree fst' tr = runClosure (resume' tr >>= eof fst')
 
-consumeTree :: (PartialOrder pred, Monad func, Monoid (func (Either Var delta)), Ord st)
-            => FST st pred (func delta) [delta]
+consumeTree :: (PartialOrder pred, Ord st)
+            => FST st pred func
             -> pred
-            -> PathTree (func (Either Var delta)) st
-            -> PathTree (func (Either Var delta)) st
+            -> PathTree (UpdateStringFunc var func) st
+            -> PathTree (UpdateStringFunc var func) st
 consumeTree fst' p tr = runClosure (resume' tr >>= consume fst' p)
 
 {------------------------------------------------------------------------------}
 {-- Abstracting path trees --}
 
-abstract :: (Monad func)
-            => Tree (func (Either Var delta)) a
-            -> ([(Var, func (Either Var delta))], Tree Var a)
+abstract :: Tree (UpdateStringFunc Var func) a
+            -> ([(Var, UpdateStringFunc Var func)], Tree Var a)
 abstract t = go [] t
   where
   go v (Tip w a) = ([(Var v, w)], Tip (Var v) a)
@@ -113,43 +112,38 @@ abstract t = go [] t
         (m2', t2') = go (1:v) t2
     in ((Var v, w):(m1' ++ m2'), Fork (Var v) t1' t2')
 
-abstract' :: (Monad func)
-            => PathTree (func (Either Var delta)) a
-            -> ([(Var, func (Either Var delta))], PathTree Var a)
+abstract' :: PathTree (UpdateStringFunc Var func) a
+            -> ([(Var, UpdateStringFunc Var func)], PathTree Var a)
 abstract' Nothing = ([], Nothing)
 abstract' (Just t) = let (m', t') = abstract t in (m', Just t')
 
-unabstract :: (Monad m, Monoid (m a1)) => Maybe (Tree [a1] a) -> Maybe (Tree (m a1) a)
-unabstract = fmap (mapOutput (mconcat . map return))
+unabstract :: PathTree (UpdateString var (Rng func)) a -> PathTree (UpdateStringFunc var func) a
+unabstract = fmap (mapOutput (constUpdateStringFunc))
 
 {------------------------------------------------------------------------------}
 {-- SST specialization --}
 
-specialize :: (Monad func
-              ,Monoid (func (Either var delta))
-              ,Function (func (Either var delta)) dom [Either var delta]
-              ,Enumerable pred dom
+specialize :: (Function func, Rng func ~ [delta]
+              ,Enumerable pred (Dom func)
               ,Ord st) =>
-              [(st, pred, [(var, func (Either var delta))], st)]
-              -> [(st, pred, [(var, func (Either var delta))], st)]
+              [(st, pred, [(var, UpdateStringFunc var func)], st)]
+              -> [(st, pred, [(var, UpdateStringFunc var func)], st)]
 specialize ts =
   [ (q, p, [ (v, specFunc p f) | (v,f) <- xs ], q')
     | (q, p, xs, q') <- ts ]
   where
     specFunc p f =
       if size p == 1 then
-          mconcat $ map return (evalFunction f (lookupIndex 0 p))
+          constUpdateStringFunc $ evalUpdateStringFunc (lookupIndex 0 p) f
       else
           f
 
 {------------------------------------------------------------------------------}
 {-- SST construction from FST --}
 
-sstFromFST :: (Monad func, Ord st, Ord pred, Monoid (func (Either Var delta)),
-               Function (func (Either Var delta)) dom [Either Var delta],
-               Enumerable pred dom, PartialOrder pred) =>
-              FST st pred (func delta) [delta]
-              -> SST (PathTree Var st) pred (func (Either Var delta)) Var delta
+sstFromFST :: (Ord a, Ord pred, PartialOrder pred, Function func,
+               Enumerable pred (Dom func), Rng func ~ [delta]) =>
+              FST a pred func -> SST (Maybe (Tree Var a)) pred func Var
 sstFromFST fst' =
   construct initialState (specialize transitions) outputs
   where

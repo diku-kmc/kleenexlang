@@ -1,34 +1,40 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RankNTypes #-}
 module KMC.Expression
 (Mu(..)
 ,fromRegex)
 where
 
-import Data.Word
 import Data.Char
 import KMC.Syntax.External
 import KMC.OutputTerm
 import KMC.RangeSet
 import KMC.Theories
 
-data Mu pred func delta a = Var a
-                          -- | Loop (forall b. b -> Mu pred func delta b)
-                          | Loop (a -> Mu pred func delta a)
-                          | Alt (Mu pred func delta a) (Mu pred func delta a)
-                          | RW pred func (Mu pred func delta a)
-                          | W delta (Mu pred func delta a)
-                          | Seq (Mu pred func delta a) (Mu pred func delta a)
-                          | Accept
+-- | Symbolic mu-recursive expressions with output.
+data Mu pred func a =
+        Var a -- ^ Recursion variable.
+   -- | Loop (forall b. b -> Mu pred func delta b)
+      | Loop (a -> Mu pred func a) -- ^ Fixed point.
+      | Alt (Mu pred func a) (Mu pred func a) -- ^ Alternation.
+      | RW pred func (Mu pred func a) -- ^ Read a symbol matching the given
+                                      -- predicate and write an output indexed
+                                      -- by the concrete input symbol.
+      | W (Rng func) (Mu pred func a) -- ^ Write a constant.
+      | Seq (Mu pred func a) (Mu pred func a) -- ^ Sequence
+      | Accept -- ^ Accept
 
-fromRegex :: Regex -> Mu (RangeSet Word8) (OutputTerm (RangeSet Word8) Bool) [Bool] a
+-- | Translate a regular expression to a mu-expression which denotes the parsing relation.
+fromRegex :: (Ord sigma, Enum sigma, Bounded sigma) =>
+             Regex -> Mu (RangeSet sigma) (Join (Const sigma [Bool] :+: Enumerator (RangeSet sigma) sigma Bool) [Bool]) a
 fromRegex One            = Accept
-fromRegex Dot            = RW top (OutputTerm [Code top]) Accept
-fromRegex (Chr a)        = RW (singleton n) (OutputTerm [Code (singleton n)]) Accept
+fromRegex Dot            = RW top (Join [Inr $ Enumerator $ top]) Accept
+fromRegex (Chr a)        = RW (singleton n) (Join [Inr $ Enumerator (singleton n)]) Accept
                            where n = toEnum (ord a)
 fromRegex (Group _ e)    = fromRegex e
 fromRegex (Concat e1 e2) = Seq (fromRegex e1) (fromRegex e2)
 fromRegex (Branch e1 e2) = Alt (W [False] (fromRegex e1)) (W [True] (fromRegex e2))
-fromRegex (Class b rs)   = RW rs' (OutputTerm [Code rs']) Accept
+fromRegex (Class b rs)   = RW rs' (Join [Inr $ Enumerator rs']) Accept
     where rs' = (if b then id else complement)
                 $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
 fromRegex (Star e)       = Loop $ \x -> Alt (W [False] (Seq (fromRegex e) (Var x)))
