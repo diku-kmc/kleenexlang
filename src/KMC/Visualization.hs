@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module KMC.Visualization where
 
@@ -13,13 +16,14 @@ import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
 
+import           KMC.Expression
+import           KMC.FSTConstruction
 import           KMC.OutputTerm
 import           KMC.RangeSet
+import           KMC.SSTConstruction
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
-import           KMC.FSTConstruction
-import           KMC.SSTConstruction
-import           KMC.Expression
+import           KMC.Theories
 
 import           KMC.Syntax.Parser
 import           KMC.Syntax.Config
@@ -42,19 +46,24 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left x) = "(" ++ pretty x ++ ")"
   pretty (Right y) = pretty y
 
-instance Pretty SSTConstruction.Var where
-  pretty (SSTConstruction.Var xs) = "x" ++ concatMap show xs
+instance Pretty KMC.SSTConstruction.Var where
+  pretty (KMC.SSTConstruction.Var xs) = "x" ++ concatMap show xs
 
 instance Pretty a => Pretty [a] where
   pretty = concatMap pretty
 
-instance (Pretty p, Pretty a) => Pretty (OutputTerm p a) where
-  pretty (OutputTerm xs) = concatMap aux xs
+instance (Pretty p, Pretty a) => Pretty (Join (Const dom a :+: Enumerator p dom rng) [rng]) where
+  pretty (Join xs) = concatMap aux xs
       where
-        aux (Const b) = pretty b
-        aux (Code p) = "{" ++ pretty p ++ "}"
+        aux (Inl (Const x)) = pretty x
+        aux (Inr (Enumerator p)) = "{" ++ pretty p ++ "}"
 
-instance (Pretty var, Pretty func) => Pretty (RegisterUpdate var func) where
+instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) where
+  pretty (VarA v) = "(" ++ pretty v ++ ")"
+  pretty (ConstA x) = pretty x
+  pretty (FuncA f) = "{" ++ pretty f ++ "}"
+
+instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate var func) where
   pretty m = "[" ++ intercalate "\\l," [ pretty v ++ ":=" ++ pretty f | (v,f) <- M.toList m ] ++ "]"
 
 fstGlobalAttrs :: [GV.GlobalAttributes]
@@ -76,7 +85,7 @@ formatFSTEdge (_, _, l) =
     Left (p, f)  -> [ GV.textLabel $ pack (pretty p ++ " / " ++ pretty f) ]
     Right l' -> [ GV.textLabel $ pack ("/ " ++ pretty l') ]
 
-fstToDot :: (Ord st, Pretty pred, Pretty delta, Pretty func) => FST st pred func delta -> GV.DotGraph st
+fstToDot :: (Ord st, Pretty pred, Pretty (Rng func), Pretty func) => FST st pred func -> GV.DotGraph st
 fstToDot fst' = GV.graphElemsToDot params nodes edges
     where
       params = GV.nonClusteredParams
@@ -85,9 +94,9 @@ fstToDot fst' = GV.graphElemsToDot params nodes edges
                , GV.fmtEdge = formatFSTEdge
                }
       nodes = map (\x -> (x,x)) (S.toList (fstS fst'))
-      edges = [ (q, q', l) | (q, l, q') <- SymbolicFST.edgesToList (fstE fst') ]
+      edges = [ (q, q', l) | (q, l, q') <- KMC.SymbolicFST.edgesToList (fstE fst') ]
 
-sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st) => SST st pred func var delta -> GV.DotGraph Int
+sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st, Pretty (Rng func)) => SST st pred func var -> GV.DotGraph Int
 sstToDot sst = GV.graphElemsToDot params nodes edges
     where
       params = GV.nonClusteredParams
@@ -98,7 +107,7 @@ sstToDot sst = GV.graphElemsToDot params nodes edges
                }
       nodes = map (\x -> (statesMap M.! x, statesMap M.! x)) (S.toList (sstS sst))
       edges = [ (statesMap M.! q, statesMap M.! q', (p,k))
-              | (q, xs) <- M.toList (SymbolicSST.eForward $ sstE sst), (p, k, q') <- xs ]
+              | (q, xs) <- M.toList (KMC.SymbolicSST.eForward $ sstE sst), (p, k, q') <- xs ]
 
       formatSSTEdge (_,_, (p,k)) = [ GV.textLabel $ pack (pretty p ++ " /\\l" ++ pretty k) ]
       statesMap = M.fromList (zip (S.toList (sstS sst)) [(0::Int)..])
@@ -108,7 +117,13 @@ fancyToDot :: String -> GV.DotGraph Int
 fancyToDot str =
   case parseRegex fancyRegexParser str of
     Left e -> error e
-    Right (_, e) -> fstToDot (fromMu (fromRegex e))
+    Right (_, e) -> let fst' = fromMu (fromRegex e)
+                              :: FST Int
+                                     (RangeSet Word8)
+                                     (Join
+                                      (Const Word8 [Bool] :+: Enumerator (RangeSet Word8) Word8 Bool)
+                                      [Bool])
+                    in fstToDot fst'
 
 fancyToSSTDot :: String -> GV.DotGraph Int
 fancyToSSTDot str =
@@ -117,9 +132,10 @@ fancyToSSTDot str =
     Right (_, e) -> let sst = sstFromFST (fromMu (fromRegex e))
                               :: SST (PathTree Var Int)
                                      (RangeSet Word8)
-                                     (OutputTerm (RangeSet Word8) (Either Var Bool))
+                                     (Join
+                                      (Const Word8 [Bool] :+: Enumerator (RangeSet Word8) Word8 Bool)
+                                      [Bool])
                                      Var
-                                     Bool
                     in sstToDot (optimize $ enumerateStates sst)
 
 mkViz :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> IO ()

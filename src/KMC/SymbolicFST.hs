@@ -1,3 +1,5 @@
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
 module KMC.SymbolicFST where
 
 import qualified Data.Map as M
@@ -12,26 +14,31 @@ import           KMC.Theories
 --
 -- (i) For any state s, the only transitions out of s are epsilon-transitions or
 -- symbol transitions, but not both.
-data FST q pred func delta =
+data FST q pred func =
   FST
   { fstS :: S.Set q
-  , fstE :: OrderedEdgeSet q pred func delta
+  , fstE :: OrderedEdgeSet q pred func
   , fstI :: q
   , fstF :: S.Set q
   }
-  deriving (Eq, Ord, Show)
 
-type Edge q pred func delta = (q, Either (pred, func) delta, q)
+type Edge q pred func = (q, Either (pred, func) (Rng func), q)
 
-data OrderedEdgeSet q pred func delta =
+data OrderedEdgeSet q pred func =
   OrderedEdgeSet { eForward :: M.Map q [(pred,func,q)]
                  , eBackward :: M.Map q [(pred,func,q)]
-                 , eForwardEpsilon :: M.Map q [(delta, q)]
-                 , eBackwardEpsilon :: M.Map q [(delta, q)]
+                 , eForwardEpsilon :: M.Map q [(Rng func, q)]
+                 , eBackwardEpsilon :: M.Map q [(Rng func, q)]
                  }
-  deriving (Eq, Ord, Show)
 
-edgesFromList :: (Ord q) => [Edge q pred func delta] -> OrderedEdgeSet q pred func delta
+deriving instance (Eq q, Eq pred, Eq func, Eq (Rng func)) => Eq (OrderedEdgeSet q pred func)
+deriving instance (Ord q, Ord pred, Ord func, Ord (Rng func)) => Ord (OrderedEdgeSet q pred func)
+deriving instance (Show q, Show pred, Show func, Show (Rng func)) => Show (OrderedEdgeSet q pred func)
+deriving instance (Eq q, Eq pred, Eq func, Eq (Rng func)) => Eq (FST q pred func)
+deriving instance (Ord q, Ord pred, Ord func, Ord (Rng func)) => Ord (FST q pred func)
+deriving instance (Show q, Show pred, Show func, Show (Rng func)) => Show (FST q pred func)
+
+edgesFromList :: (Ord q) => [Edge q pred func] -> OrderedEdgeSet q pred func
 edgesFromList es =
   OrderedEdgeSet
   { eForward = M.fromListWith (++) [ (q, [(a, b, q')]) | (q, Left (a,b), q') <- es ]
@@ -40,9 +47,9 @@ edgesFromList es =
   , eBackwardEpsilon = M.fromListWith (++) [(q', [(y,q)]) | (q, Right y, q') <- es ]
   }
 
-unionEdges :: (Ord q) => OrderedEdgeSet q pred func delta
-           -> OrderedEdgeSet q pred func delta
-           -> OrderedEdgeSet q pred func delta
+unionEdges :: (Ord q) => OrderedEdgeSet q pred func
+           -> OrderedEdgeSet q pred func
+           -> OrderedEdgeSet q pred func
 unionEdges es es' =
   OrderedEdgeSet
   { eForward  = M.unionWith (++) (eForward es) (eForward es')
@@ -51,59 +58,68 @@ unionEdges es es' =
   , eBackwardEpsilon = M.unionWith (++) (eBackwardEpsilon es) (eBackwardEpsilon es')
   }
 
-edgesToList :: OrderedEdgeSet q pred func delta -> [(q, Either (pred, func) delta, q)]
+edgesToList :: OrderedEdgeSet q pred func -> [(q, Either (pred, func) (Rng func), q)]
 edgesToList es =
   [ (q, Left (a,b), q') | (q, xs) <- M.toList (eForward es), (a,b,q') <- xs ]
   ++ [ (q, Right y, q') | (q, xs) <- M.toList (eForwardEpsilon es), (y, q') <- xs ]
 
-evalEdges :: (Ord st, SetLike pred dom, Function func dom delta)
-          => OrderedEdgeSet st pred func delta
-          -> st -> dom -> [(delta, st)]
+evalEdges :: (Ord st
+             ,Function func
+             ,SetLike pred (Dom func))
+          => OrderedEdgeSet st pred func
+          -> st -> Dom func -> [(Rng func, st)]
 evalEdges (OrderedEdgeSet { eForward = me }) q x =
   case M.lookup q me of
     Nothing -> []
     Just es -> concatMap evalEdge es
       where
         evalEdge (p, f, q')
-          | member x p = [(evalFunction f x, q')]
+          | member x p = [(eval f x, q')]
           | otherwise = []
 
-abstractEvalEdges :: (Ord st, PartialOrder pred)
-                  => OrderedEdgeSet st pred func delta
+abstractEvalEdges :: (Ord st
+                     ,PartialOrder pred)
+                  => OrderedEdgeSet st pred func
                   -> st -> pred -> [(func, st)]
 abstractEvalEdges (OrderedEdgeSet { eForward = me}) q p =
   case M.lookup q me of
     Nothing -> []
     Just es -> [ (f, q') | (p', f, q') <- es, p `lte` p' ]
 
-evalEpsilonEdges :: (Ord st) => OrderedEdgeSet st pred func delta
-                 -> st -> [(delta, st)]
+evalEpsilonEdges :: (Ord st) => OrderedEdgeSet st pred func
+                 -> st -> [(Rng func, st)]
 evalEpsilonEdges (OrderedEdgeSet { eForwardEpsilon = meps }) q =
   case M.lookup q meps of
     Nothing -> []
     Just es -> es
 
-fstEvalEpsilonEdges :: (Ord st) => FST st pred func delta -> st -> [(delta, st)]
+fstEvalEpsilonEdges :: (Ord st) => FST st pred func -> st -> [(Rng func, st)]
 fstEvalEpsilonEdges aut = evalEpsilonEdges (fstE aut)
 
-fstEvalEdges :: (Ord st, SetLike pred dom, Function func dom delta)
-                => FST st pred func delta -> st -> dom -> [(delta, st)]
+fstEvalEdges :: (Ord st
+                ,Function func
+                ,SetLike pred (Dom func))
+                => FST st pred func -> st -> Dom func -> [(Rng func, st)]
 fstEvalEdges fst' q a = evalEdges (fstE fst') q a
 
-fstAbstractEvalEdges :: (Ord st, PartialOrder pred)
-                     => FST st pred func delta -> st -> pred -> [(func, st)]
+fstAbstractEvalEdges :: (Ord st
+                        ,PartialOrder pred)
+                     => FST st pred func -> st -> pred -> [(func, st)]
 fstAbstractEvalEdges aut = abstractEvalEdges (fstE aut)
 
 -- | Is the given state a non-deterministic choice state, or an input action
 -- state?
-isChoiceState :: (Ord st) => FST st pred func delta -> st -> Bool
+isChoiceState :: (Ord st) => FST st pred func -> st -> Bool
 isChoiceState fst' q =
   case (M.member q (eForward . fstE $ fst'), M.member q (eForwardEpsilon . fstE $ fst')) of
     (True, True) -> error "Inconsistent FST - a state is both a choice and symbol state"
     (_, b) -> b
 
-coarsestPredicateSet :: (Boolean pred, PartialOrder pred, Ord st, Ord pred) =>
-                        FST st pred func delta
+coarsestPredicateSet :: (Boolean pred
+                        ,PartialOrder pred
+                        ,Ord st
+                        ,Ord pred) =>
+                        FST st pred func
                      -> [st]
                      -> [pred]
 coarsestPredicateSet fst' qs = coarsestPartition ps
@@ -112,8 +128,11 @@ coarsestPredicateSet fst' qs = coarsestPartition ps
            [ p | q <- qs
                , (p, _, _) <- maybe [] id (M.lookup q (eForward . fstE $ fst')) ]
 
-run :: (Monoid delta, SetLike pred dom, Function func dom delta, Ord st)
-       => FST st pred func delta -> [dom] -> [delta]
+run :: (Function func
+       ,SetLike pred (Dom func)
+       ,Monoid (Rng func)
+       ,Ord st)
+       => FST st pred func -> [Dom func] -> [Rng func]
 run fst' = go S.empty (fstI fst')
     where
       go _ q [] =

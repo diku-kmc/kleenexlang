@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 module KMC.FSTConstruction
 (Mu(..)
@@ -10,17 +11,17 @@ import qualified Data.Set as S
 
 import           KMC.Expression
 import           KMC.SymbolicFST
+import           KMC.Theories
 
-data ConstructState st pred func delta =
-  ConstructState { edges     :: [Edge st pred func delta]
+data ConstructState st pred func =
+  ConstructState { edges     :: [Edge st pred func]
                  , nextState :: st
                  , states    :: S.Set st
                  }
-  deriving (Eq, Ord, Show)
 
-type Construct st pred func delta = State (ConstructState st pred func delta)
+type Construct st pred func = State (ConstructState st pred func)
 
-fresh :: (Enum st, Ord st) => Construct st pred func delta st
+fresh :: (Enum st, Ord st) => Construct st pred func st
 fresh = do
   q <- gets nextState
   modify $ \s -> s { nextState = succ q
@@ -28,11 +29,11 @@ fresh = do
                    }
   return q
 
-addEdge :: st -> Either (pred, func) delta -> st -> Construct st pred func delta ()
+addEdge :: st -> Either (pred, func) (Rng func) -> st -> Construct st pred func ()
 addEdge q lbl q' = modify $ \s -> s { edges = (q, lbl, q'):edges s }
 
-construct :: (Enum st, Ord st, Monoid delta)
-             => st -> Mu pred func delta st -> Construct st pred func delta st
+construct :: (Enum st, Ord st, Monoid (Rng func))
+             => st -> Mu pred func st -> Construct st pred func st
 construct _ (Var q) = return q
 construct qf (Loop e) = mfix (construct qf . e)
 construct qf (RW p f e) = do
@@ -57,9 +58,9 @@ construct qf (Seq e1 e2) = do
   q2 <- construct qf e2
   construct q2 e1
 
-fromMu :: (Enum st, Ord st, Monoid delta) =>
-          (forall a. Mu pred func delta a)
-       -> FST st pred func delta
+fromMu :: (Enum st, Ord st, Monoid (Rng func)) =>
+          (forall a. Mu pred func a)
+       -> FST st pred func
 fromMu e =
   let (qin, cs) = runState (construct (toEnum 0) e)
                            (ConstructState { edges     = []
