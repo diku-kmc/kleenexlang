@@ -3,7 +3,7 @@ module Tests(tests) where
 import           Test.QuickCheck
 import qualified Distribution.TestSuite as TS
 
-import Coding
+import KMC.Coding
 
 simpleTest :: String -> IO TS.Result -> TS.Test
 simpleTest name' action = TS.Test inst
