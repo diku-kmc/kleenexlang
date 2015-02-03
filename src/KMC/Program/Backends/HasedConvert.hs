@@ -17,7 +17,7 @@ import           KMC.Syntax.External (Regex(..))
 import           KMC.OutputTerm
 import qualified KMC.Program.Backends.HasedParser as H
 
-import System.IO.Unsafe
+-- import System.IO.Unsafe
 
 data Nat = Z | S Nat deriving (Eq, Ord, Show)
 data Skip = Skip | NoSkip deriving (Eq, Ord, Show)
@@ -53,15 +53,18 @@ pos _ []                 = Nothing
 pos x (e:es) | x == e    = return Z
 pos x (_:es) | otherwise = S `fmap` (pos x es)
 
+-- | Get the nth element on the stack, or Nothing.
 getStack :: Nat -> [a] -> Maybe a
 getStack Z     (e : _)  = Just e
 getStack (S n) (_ : es) = getStack n es
 getStack _ _            = Nothing
 
--- | Converts a Hased AST to a simplified mu term.  The given identifier is
--- treated as the top-level bound var, i.e., it becomes the first mu.
-simplify :: H.Identifier -> H.Hased -> SimpleMu 
-simplify i (H.Hased ass) = SMLoop $ go [i] (fromJust $ M.lookup i mp)
+-- | Converts a Hased AST which consists of a set of terms bound to variables
+-- to one simplified mu term, with the terms inlined appropriately.
+-- The given identifier is treated as the top-level bound variable,
+-- i.e., it becomes the first mu.  
+toSimpleMu :: H.Identifier -> H.Hased -> SimpleMu 
+toSimpleMu i (H.Hased ass) = SMLoop $ go [i] (fromJust $ M.lookup i mp)
     where
       mp = M.fromList (map (\(H.HA (k,v)) -> (k, v)) ass)
       go :: [H.Identifier] -> H.HasedTerm -> SimpleMu
@@ -81,9 +84,11 @@ simplify i (H.Hased ass) = SMLoop $ go [i] (fromJust $ M.lookup i mp)
 char2word :: Char -> Word8
 char2word = toEnum . ord
 
-
 toMu :: SimpleMu -> HasedMu a
 toMu = flip simpleToComplexMu' []
+
+hasedToMuTerm :: (H.Identifier, H.Hased) -> HasedMu a
+hasedToMuTerm (i, h) = toMu $ toSimpleMu i h
 
 simpleToComplexMu' :: SimpleMu -> [HasedMu a] -> HasedMu a
 simpleToComplexMu' (SMVar n) st   = maybe (error "stack exceeded") id $ getStack n st
@@ -123,13 +128,13 @@ fromRegex _ (LazyRange _ _ _) = error "Lazy ranges not yet supported"
 test1 = simplify (H.Identifier "x") $ unsafePerformIO $ H.pf' H.t4
 
 
-sstFromFancy :: String
+sstFromHased :: String
              -> SST (PathTree Var Int)
                     (RangeSet Word8)
                     HasedOutTerm
                     Var
                     Bool
-sstFromFancy str =
-  case runParser H.hased parseRegex fancyRegexParser str of
+sstFromHased str =
+  case H.parseHased str of
     Left e -> error e
-    Right (_, re) -> sstFromFST (fromMu (fromRegex re))
+    Right (ident, h) -> sstFromFST $ fromMu $ hasedToMuTerm (ident, h)

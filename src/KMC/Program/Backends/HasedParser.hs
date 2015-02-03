@@ -7,11 +7,12 @@ module KMC.Program.Backends.HasedParser where
 import Control.Applicative ((<$>), (<*>), (<*), (*>))
 import Control.Monad.Identity (Identity)
 import Text.Parsec hiding (parseTest)
+import Text.Parsec.Prim (runParser)
 import Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
-import KMC.Syntax.Parser (anchoredRegexP)
-import KMC.Syntax.External (Regex)
 import KMC.Syntax.Config
+import KMC.Syntax.External (Regex)
+import KMC.Syntax.Parser (anchoredRegexP)
 
 -- | Change the type of a state in a parser.  
 changeState :: forall m s u v a . (Functor m, Monad m)
@@ -66,7 +67,7 @@ hpInitState = HPState { indentLevel = 0 }
 type HasedParser a = Parsec String HPState a
 
 {-- Indentation functions --}
-    
+
 getIndentation :: HasedParser Int
 getIndentation = indentLevel <$> getState
 
@@ -204,9 +205,16 @@ hasedPrimTerm = re <|> skip <|> identifier
 regexP :: HasedParser Regex
 regexP = snd <$> (withHPState $ anchoredRegexP (basicRegexParser { rep_illegal_chars = "!<>" }))
 
+firstName :: Hased -> Identifier
+firstName (Hased (HA (i,_):_)) = i
+firstName (Hased []) = error "firstName: no assignments"
 
-
-
+parseHased :: String -- ^ Input string
+           -> Either String (Identifier, Hased) 
+parseHased str =
+    case runParser (hased <* eof) hpInitState "" str of
+      Left err -> Left (show err)
+      Right h -> Right (firstName h, h)
 
 -----------------------------------------------------------------
 -----------------------------------------------------------------
