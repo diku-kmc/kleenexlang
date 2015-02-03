@@ -81,7 +81,6 @@ simplify i (H.Hased ass) = SMLoop $ go [i] (fromJust $ M.lookup i mp)
 char2word :: Char -> Word8
 char2word = toEnum . ord
 
-test1 = simplify (H.Identifier "x") $ unsafePerformIO $ H.pf' H.t4
 
 toMu :: SimpleMu -> HasedMu a
 toMu = flip simpleToComplexMu' []
@@ -116,3 +115,21 @@ fromRegex _ (Suppress e)    = fromRegex (out []) e
 fromRegex _ (NamedSet _ _) = error "Named sets not yet supported"
 fromRegex _ (Range _ _ _)  = error "Ranges not yet supported"
 fromRegex _ (LazyRange _ _ _) = error "Lazy ranges not yet supported"
+
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+test1 = simplify (H.Identifier "x") $ unsafePerformIO $ H.pf' H.t4
+
+
+sstFromFancy :: String
+             -> SST (PathTree Var Int)
+                    (RangeSet Word8)
+                    HasedOutTerm
+                    Var
+                    Bool
+sstFromFancy str =
+  case runParser H.hased parseRegex fancyRegexParser str of
+    Left e -> error e
+    Right (_, re) -> sstFromFST (fromMu (fromRegex re))

@@ -21,6 +21,6 @@ sstFromFancy str =
   case parseRegex fancyRegexParser str of
     Left e -> error e
     Right (_, re) -> sstFromFST (fromMu (fromRegex re))
-
+                     
 main :: IO ()
 main = return ()
