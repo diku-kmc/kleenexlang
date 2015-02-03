@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -32,17 +33,17 @@ data SimpleMu = SMVar Nat
 
 -- | These mu-terms either output the identity on the input character,
 -- injected into a list, or the output a constant list of characters.
-type HasedOutTerm = Either (InList (Identity Word8)) (ConstFunction [Word8])
+type HasedOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
 
-type HasedMu a = Mu (RangeSet Word8) HasedOutTerm [Word8] a
+type HasedMu a = Mu (RangeSet Word8) HasedOutTerm a
 
 -- | The term that copies the input char to output.
 copyInput :: HasedOutTerm
-copyInput = Left (InList Identity)
+copyInput = Inl (InList Ident)
 
 -- | The term that outputs a fixed string (list of Word8).
 out :: [Word8] -> HasedOutTerm
-out = Right . ConstFunction
+out = Inr . Const
 
 out' :: String -> HasedOutTerm
 out' = out . map char2word
@@ -122,7 +123,7 @@ fromRegex _ (LazyRange _ _ _) = error "Lazy ranges not yet supported"
 
 test1 = simplify (H.Identifier "x") $ unsafePerformIO $ H.pf' H.t4
 
-
+{-
 sstFromFancy :: String
              -> SST (PathTree Var Int)
                     (RangeSet Word8)
@@ -133,3 +134,4 @@ sstFromFancy str =
   case runParser H.hased parseRegex fancyRegexParser str of
     Left e -> error e
     Right (_, re) -> sstFromFST (fromMu (fromRegex re))
+-}
