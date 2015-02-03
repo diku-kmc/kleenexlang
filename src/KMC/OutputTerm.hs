@@ -8,7 +8,7 @@ data Term bool b = Const b
   deriving (Functor, Show, Eq, Ord)
 
 newtype OutputTerm bool b = OutputTerm { unpack :: [Term bool b] }
-  deriving (Show, Functor)
+  deriving (Show, Eq, Ord, Functor)
 
 data ConstFunction a = ConstFunction a
   deriving (Show, Eq, Ord)

@@ -12,7 +12,8 @@ import KMC.RangeSet
 import KMC.Theories
 
 data Mu pred func delta a = Var a
-                          | Loop (forall b. b -> Mu pred func delta b)
+                          -- | Loop (forall b. b -> Mu pred func delta b)
+                          | Loop (a -> Mu pred func delta a)
                           | Alt (Mu pred func delta a) (Mu pred func delta a)
                           | RW pred func (Mu pred func delta a)
                           | W delta (Mu pred func delta a)
