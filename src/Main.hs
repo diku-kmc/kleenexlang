@@ -24,15 +24,10 @@ sstFromFancy :: (Bounded sigma, Enum sigma, Ord sigma) =>
 sstFromFancy str =
   case parseRegex fancyRegexParser str of
     Left e -> error e
-<<<<<<< HEAD
-    Right (_, re) -> sstFromFST (fromMu (fromRegex re))
-                     
-=======
     Right (_, re) -> sstFromFST $ fromMu $ fromRegex re
 
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)
 
->>>>>>> f7bc5fec3109b49c9e3d61110de64ce2b5582a69
 main :: IO ()
 main = return ()
