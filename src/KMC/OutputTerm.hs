@@ -8,13 +8,18 @@ module KMC.OutputTerm where
 import Control.Applicative hiding (Const)
 import Data.Monoid
 
+import KMC.RangeSet (RangeSet)
 import KMC.Theories
 import KMC.Coding
 
+data Ident a = Ident
+data InList f = InList f
 data Enumerator e dom rng = Enumerator e
 data Join f rng = Join [f]
 data Const dom rng = Const rng
 data f :+: g = Inl f | Inr g
+
+type OutputTerm sigma delta = Join (Const sigma [delta] :+: Enumerator (RangeSet sigma) sigma delta) [delta]
 
 {-
 data Func t a b where
@@ -49,6 +54,18 @@ instance (Function t) => Function (Func t a b) where
   isConst (List xs)  = mapM isConst xs
   isConst (Concat f) = concat <$> isConst f
 -}
+
+instance Function (Ident a) where
+  type Dom (Ident a) = a
+  type Rng (Ident a) = a
+  eval Ident = id
+  isConst Ident = Nothing
+
+instance (Function f) => Function (InList f) where
+  type Dom (InList f) = Dom f
+  type Rng (InList f) = [Rng f]
+  eval (InList f) x = [eval f x]
+  isConst (InList f) = (:[]) <$> isConst f
 
 instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   type Dom (Join f rng) = Dom f

@@ -1,26 +1,42 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module KMC.Program.Backends.HasedConvert where
 
 import           Control.Monad.State
 import qualified Data.Map as M
 import           Data.Word (Word8)
-import           Data.Char (ord)
+import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust)
+import qualified Data.GraphViz as GV
 
-import           KMC.Theories
-import           KMC.RangeSet
-import           KMC.Expression (Mu(..))
-import           KMC.Syntax.External (Regex(..))
+import qualified KMC.SSTConstruction as SC    
+import qualified KMC.FSTConstruction as FC
+import           KMC.Syntax.Config
+import           KMC.Syntax.Parser
+import           KMC.Visualization (Pretty(..), mkViz, mkVizToFile, fstToDot, sstToDot)
 import           KMC.OutputTerm
+import           KMC.RangeSet
+import           KMC.SymbolicSST
+import           KMC.SymbolicFST
+import           KMC.Theories
+import           KMC.Expression (Mu (..))
+import           KMC.Syntax.External (Regex (..))
 import qualified KMC.Program.Backends.HasedParser as H
 
--- import System.IO.Unsafe
 
-data Nat = Z | S Nat deriving (Eq, Ord, Show)
-data Skip = Skip | NoSkip deriving (Eq, Ord, Show)
+fromChar :: Enum a => Char -> a
+fromChar = toEnum . ord
+
+toChar :: Enum a => a -> Char
+toChar = chr . fromEnum
+    
+{-- Intermediate internal data type for the mu-terms.  These use de Bruijn-indices. --}
+data Nat = Z | S Nat      deriving (Eq, Ord, Show)
 data SimpleMu = SMVar Nat
               | SMLoop SimpleMu
               | SMAlt SimpleMu SimpleMu
@@ -30,22 +46,27 @@ data SimpleMu = SMVar Nat
               | SMAccept
   deriving (Eq, Ord, Show)
 
--- | These mu-terms either output the identity on the input character,
--- injected into a list, or the output a constant list of characters.
-type HasedOutTerm = Either (InList (Identity Word8)) (ConstFunction [Word8])
+-- | Mu-terms created from Hased programs either output the identity on
+-- the input character, injected into a list, or the output a constant list
+-- of characters.
+type HasedOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
+instance Pretty HasedOutTerm where
+    pretty (Inl (InList _)) = "COPY"
+    pretty (Inr (Const [])) = "SKIP"
+    pretty (Inr (Const ws)) = "\"" ++ map toChar ws ++ "\""
 
-type HasedMu a = Mu (RangeSet Word8) HasedOutTerm [Word8] a
+type HasedMu a = Mu (RangeSet Word8) HasedOutTerm a
 
 -- | The term that copies the input char to output.
 copyInput :: HasedOutTerm
-copyInput = Left (InList Identity)
+copyInput = Inl (InList Ident)
 
 -- | The term that outputs a fixed string (list of Word8).
 out :: [Word8] -> HasedOutTerm
-out = Right . ConstFunction
-
+out = Inr . Const
+-- | Friendlier version of 'out'.
 out' :: String -> HasedOutTerm
-out' = out . map char2word
+out' = out . map fromChar
 
 -- | Get the index of an element in a list, or Nothing.
 pos :: (Eq a) => a -> [a] -> Maybe Nat
@@ -63,10 +84,12 @@ getStack _ _            = Nothing
 -- to one simplified mu term, with the terms inlined appropriately.
 -- The given identifier is treated as the top-level bound variable,
 -- i.e., it becomes the first mu.  
-toSimpleMu :: H.Identifier -> H.Hased -> SimpleMu 
-toSimpleMu i (H.Hased ass) = SMLoop $ go [i] (fromJust $ M.lookup i mp)
+hasedToSimpleMu :: H.Identifier -> H.Hased -> SimpleMu 
+hasedToSimpleMu init (H.Hased ass) = SMLoop $ go [init] (fromJust $ M.lookup init mp)
     where
-      mp = M.fromList (map (\(H.HA (k,v)) -> (k, v)) ass)
+      mp :: M.Map H.Identifier H.HasedTerm
+      mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
+      
       go :: [H.Identifier] -> H.HasedTerm -> SimpleMu
       go vars (H.Constructor n ts) = SMWrite n (foldr1 SMSeq $ map (go vars) ts)
       go vars (H.Var name) =
@@ -81,29 +104,34 @@ toSimpleMu i (H.Hased ass) = SMLoop $ go [i] (fromJust $ M.lookup i mp)
       go _ (H.Skip re) = SMRegex Skip re
       go _ (H.NamedArg _ _) = error "NamedArg not supported!"
 
-char2word :: Char -> Word8
-char2word = toEnum . ord
+-- | A simple mu term is converted to a "real" mu term by converting the
+-- de Bruijn-indexed variables to Haskell variables, and encoding the mu
+-- abstractions as Haskell functions.  This function therefore converts
+-- a de Bruijn representation to a HOAS representation.
+simpleMuToMuTerm :: [HasedMu a] -> SimpleMu -> HasedMu a
+simpleMuToMuTerm st sm =
+    case sm of
+      SMVar n           -> maybe (error "stack exceeded") id $ getStack n st
+      SMLoop sm         -> Loop $ \x -> simpleMuToMuTerm ((Var x) : st) sm
+      SMAlt l r         -> Alt (simpleMuToMuTerm st l) (simpleMuToMuTerm st r)
+      SMSeq l r         -> Seq (simpleMuToMuTerm st l) (simpleMuToMuTerm st r)
+      SMWrite s e       -> W (map fromChar s) (simpleMuToMuTerm st e)
+      SMRegex Skip re   -> fromRegex (out []) re
+      SMRegex NoSkip re -> fromRegex copyInput re
+      SMAccept          -> Accept
 
-toMu :: SimpleMu -> HasedMu a
-toMu = flip simpleToComplexMu' []
-
+-- | Convert a Hased program to a mu-term that encodes the string transformation
+-- expressed in Hased.
 hasedToMuTerm :: (H.Identifier, H.Hased) -> HasedMu a
-hasedToMuTerm (i, h) = toMu $ toSimpleMu i h
+hasedToMuTerm (i, h) = simpleMuToMuTerm [] $ hasedToSimpleMu i h
 
-simpleToComplexMu' :: SimpleMu -> [HasedMu a] -> HasedMu a
-simpleToComplexMu' (SMVar n) st   = maybe (error "stack exceeded") id $ getStack n st
-simpleToComplexMu' (SMLoop sm) st = Loop $ \x -> simpleToComplexMu' sm ((Var x) : st)
-simpleToComplexMu' (SMAlt l r) st = Alt (simpleToComplexMu' l st) (simpleToComplexMu' r st)
-simpleToComplexMu' (SMSeq l r) st = Seq (simpleToComplexMu' l st) (simpleToComplexMu' r st)
-simpleToComplexMu' (SMWrite s e) st = W (map char2word s) (simpleToComplexMu' e st)
-simpleToComplexMu' (SMRegex Skip re) _ = fromRegex (out []) re
-simpleToComplexMu' (SMRegex NoSkip re) _ = fromRegex copyInput re
-simpleToComplexMu' SMAccept _ = Accept
-
+-- | Translates a regular expression into a mu-term that performs the given
+-- action on the matched symbols: It either copies any matched symbols or
+-- ignores them.
 fromRegex :: HasedOutTerm -> Regex -> HasedMu a
 fromRegex _ One            = Accept
 fromRegex o Dot            = RW top o Accept
-fromRegex o (Chr a)        = RW (singleton (char2word a)) o Accept
+fromRegex o (Chr a)        = RW (singleton (fromChar a)) o Accept
 fromRegex o (Group _ e)    = fromRegex o e
 fromRegex o (Concat e1 e2) = Seq (fromRegex o e1) (fromRegex o e2)
 fromRegex o (Branch e1 e2) = Alt (fromRegex o e1) (fromRegex o e2)
@@ -116,7 +144,7 @@ fromRegex o (Plus e)       = Seq (fromRegex o e) (fromRegex o (Star e))
 fromRegex o (LazyPlus e)   = Seq (fromRegex o e) (fromRegex o (LazyStar e))
 fromRegex o (Question e)   = Alt (fromRegex o e) Accept
 fromRegex o (LazyQuestion e) = Alt Accept (fromRegex o e)
-fromRegex _ (Suppress e)    = fromRegex (out []) e
+fromRegex _ (Suppress e)   = fromRegex (out []) e
 fromRegex _ (NamedSet _ _) = error "Named sets not yet supported"
 fromRegex _ (Range _ _ _)  = error "Ranges not yet supported"
 fromRegex _ (LazyRange _ _ _) = error "Lazy ranges not yet supported"
@@ -125,16 +153,44 @@ fromRegex _ (LazyRange _ _ _) = error "Lazy ranges not yet supported"
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
-test1 = simplify (H.Identifier "x") $ unsafePerformIO $ H.pf' H.t4
 
+hasedToFSTDot :: String -> GV.DotGraph Int
+hasedToFSTDot str =
+    case H.parseHased str of
+      Left e -> error e
+      Right ih -> let fst = FC.fromMu (hasedToMuTerm ih)
+                  in fstToDot fst
 
-sstFromHased :: String
-             -> SST (PathTree Var Int)
-                    (RangeSet Word8)
-                    HasedOutTerm
-                    Var
-                    Bool
-sstFromHased str =
-  case H.parseHased str of
-    Left e -> error e
-    Right (ident, h) -> sstFromFST $ fromMu $ hasedToMuTerm (ident, h)
+hasedToSSTDot :: String -> GV.DotGraph Int
+hasedToSSTDot str =
+    case H.parseHased str of
+      Left e -> error e
+      Right ih -> let sst = SC.sstFromFST (FC.fromMu (hasedToMuTerm ih))
+                          :: SST (SC.PathTree SC.Var Int)
+                             (RangeSet Word8)
+                             HasedOutTerm
+                             SC.Var
+                  in sstToDot (optimize $ enumerateStates sst)
+
+-- Opening an Xlib canvas does not work in my cabal sandbox-version of GraphViz.
+vizHasedAsFST :: String -> IO ()
+vizHasedAsFST s = mkVizToFile hasedToFSTDot s "test_fst.pdf"
+
+vizHasedAsSST :: String -> IO ()
+vizHasedAsSST s = mkVizToFile hasedToSSTDot s "test_sst.pdf"
+
+streamToString :: Enum a => Stream [a] -> Stream String
+streamToString (Chunk e es) = Chunk (map toChar e) (streamToString es)
+streamToString Done = Done
+streamToString (Fail s) = Fail s
+
+runHasedSST :: String -> String -> Stream String
+runHasedSST str ws = streamToString $ 
+    case H.parseHased str of
+      Left e -> error e
+      Right ih -> let sst = SC.sstFromFST (FC.fromMu (hasedToMuTerm ih))
+                          :: SST (SC.PathTree SC.Var Int)
+                             (RangeSet Word8)
+                             HasedOutTerm
+                             SC.Var
+                  in KMC.SymbolicSST.run sst (map fromChar ws)

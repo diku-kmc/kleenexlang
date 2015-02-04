@@ -1,3 +1,6 @@
 module Main where
 
-import Visualization
+import KMC.Visualization
+
+main :: IO ()
+main = return ()
