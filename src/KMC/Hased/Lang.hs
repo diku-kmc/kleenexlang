@@ -1,32 +1,25 @@
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module KMC.Program.Backends.HasedConvert where
+module KMC.Hased.Lang where
 
-import           Control.Monad.State
 import qualified Data.Map as M
 import           Data.Word (Word8)
 import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust)
 import qualified Data.GraphViz as GV
 
-import qualified KMC.SSTConstruction as SC    
-import qualified KMC.FSTConstruction as FC
-import           KMC.Syntax.Config
-import           KMC.Syntax.Parser
+import KMC.SSTConstruction (sstFromFST, PathTree, Var)
+import KMC.FSTConstruction (fromMu)
 import           KMC.Visualization (Pretty(..), mkViz, mkVizToFile, fstToDot, sstToDot)
-import           KMC.OutputTerm
+import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
 import           KMC.RangeSet
 import           KMC.SymbolicSST
-import           KMC.SymbolicFST
-import           KMC.Theories
+import           KMC.Theories (top)
 import           KMC.Expression (Mu (..))
 import           KMC.Syntax.External (Regex (..))
-import qualified KMC.Program.Backends.HasedParser as H
+import qualified KMC.Hased.Parser as H
 
 
 fromChar :: Enum a => Char -> a
@@ -42,7 +35,7 @@ data SimpleMu = SMVar Nat
               | SMAlt SimpleMu SimpleMu
               | SMSeq SimpleMu SimpleMu
               | SMWrite String SimpleMu
-              | SMRegex Skip Regex
+              | SMRegex H.Skip Regex
               | SMAccept
   deriving (Eq, Ord, Show)
 
@@ -91,7 +84,7 @@ hasedToSimpleMu init (H.Hased ass) = SMLoop $ go [init] (fromJust $ M.lookup ini
       mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
       
       go :: [H.Identifier] -> H.HasedTerm -> SimpleMu
-      go vars (H.Constructor n ts) = SMWrite n (foldr1 SMSeq $ map (go vars) ts)
+      go vars (H.Constant n ts) = SMWrite n (foldr SMSeq SMAccept $ map (go vars) ts)
       go vars (H.Var name) =
           case name `pos` vars of
             Nothing ->
@@ -100,9 +93,7 @@ hasedToSimpleMu init (H.Hased ass) = SMLoop $ go [init] (fromJust $ M.lookup ini
                   Just t  -> SMLoop $ go (name : vars) t
             Just p  -> SMVar p
       go vars (H.Sum l r) = SMAlt (go vars l) (go vars r)
-      go _ (H.RE re) = SMRegex NoSkip re
-      go _ (H.Skip re) = SMRegex Skip re
-      go _ (H.NamedArg _ _) = error "NamedArg not supported!"
+      go _ (H.RE skip re) = SMRegex skip re
 
 -- | A simple mu term is converted to a "real" mu term by converting the
 -- de Bruijn-indexed variables to Haskell variables, and encoding the mu
@@ -111,14 +102,14 @@ hasedToSimpleMu init (H.Hased ass) = SMLoop $ go [init] (fromJust $ M.lookup ini
 simpleMuToMuTerm :: [HasedMu a] -> SimpleMu -> HasedMu a
 simpleMuToMuTerm st sm =
     case sm of
-      SMVar n           -> maybe (error "stack exceeded") id $ getStack n st
-      SMLoop sm         -> Loop $ \x -> simpleMuToMuTerm ((Var x) : st) sm
-      SMAlt l r         -> Alt (simpleMuToMuTerm st l) (simpleMuToMuTerm st r)
-      SMSeq l r         -> Seq (simpleMuToMuTerm st l) (simpleMuToMuTerm st r)
-      SMWrite s e       -> W (map fromChar s) (simpleMuToMuTerm st e)
-      SMRegex Skip re   -> fromRegex (out []) re
-      SMRegex NoSkip re -> fromRegex copyInput re
-      SMAccept          -> Accept
+      SMVar n             -> maybe (error "stack exceeded") id $ getStack n st
+      SMLoop sm           -> Loop $ \x -> simpleMuToMuTerm ((Var x) : st) sm
+      SMAlt l r           -> Alt (simpleMuToMuTerm st l) (simpleMuToMuTerm st r)
+      SMSeq l r           -> Seq (simpleMuToMuTerm st l) (simpleMuToMuTerm st r)
+      SMWrite s e         -> W (map fromChar s) (simpleMuToMuTerm st e)
+      SMRegex H.Skip re   -> fromRegex (out []) re
+      SMRegex H.NoSkip re -> fromRegex copyInput re
+      SMAccept            -> Accept
 
 -- | Convert a Hased program to a mu-term that encodes the string transformation
 -- expressed in Hased.
@@ -158,18 +149,18 @@ hasedToFSTDot :: String -> GV.DotGraph Int
 hasedToFSTDot str =
     case H.parseHased str of
       Left e -> error e
-      Right ih -> let fst = FC.fromMu (hasedToMuTerm ih)
+      Right ih -> let fst = fromMu (hasedToMuTerm ih)
                   in fstToDot fst
 
 hasedToSSTDot :: String -> GV.DotGraph Int
 hasedToSSTDot str =
     case H.parseHased str of
       Left e -> error e
-      Right ih -> let sst = SC.sstFromFST (FC.fromMu (hasedToMuTerm ih))
-                          :: SST (SC.PathTree SC.Var Int)
+      Right ih -> let sst = sstFromFST (fromMu (hasedToMuTerm ih))
+                          :: SST (PathTree Var Int)
                              (RangeSet Word8)
                              HasedOutTerm
-                             SC.Var
+                             Var
                   in sstToDot (optimize $ enumerateStates sst)
 
 -- Opening an Xlib canvas does not work in my cabal sandbox-version of GraphViz.
@@ -188,9 +179,9 @@ runHasedSST :: String -> String -> Stream String
 runHasedSST str ws = streamToString $ 
     case H.parseHased str of
       Left e -> error e
-      Right ih -> let sst = SC.sstFromFST (FC.fromMu (hasedToMuTerm ih))
-                          :: SST (SC.PathTree SC.Var Int)
+      Right ih -> let sst = sstFromFST (fromMu (hasedToMuTerm ih))
+                          :: SST (PathTree Var Int)
                              (RangeSet Word8)
                              HasedOutTerm
-                             SC.Var
+                             Var
                   in KMC.SymbolicSST.run sst (map fromChar ws)

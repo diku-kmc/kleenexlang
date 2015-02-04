@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module KMC.Program.Backends.HasedParser where
+module KMC.Hased.Parser where
 
 import Control.Applicative ((<$>), (<*>), (<*), (*>))
 import Control.Monad.Identity (Identity)
@@ -141,16 +141,20 @@ hasedIdentifier = Identifier <$>
       legalStartChar = lower
       legalChar = upper <|> lower <|> digit <|> oneOf "_-"
 
-hasedConstant :: HasedParser String
-hasedConstant = between (char '"') (char '"') (many legalChar)
-                       <?> "constructor name"
+-- | Parses a character or an escaped double quote.
+escapedChar :: Parsec String s Char
+escapedChar = satisfy (not . flip elem replacements)
+              <|> escaped
     where
---      legalStartChar = upper
-      legalChar = satisfy (not . flip elem ['"', '\\'])
-                  <|> (char '\\' >> (   (char '\"' >> return '"')
-                                    <|> ((char '\\') >> return '\\')
-                                    ))
---      legalChar = upper <|> lower <|> digit <|> oneOf ""
+      escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
+      escapedChar code replacement = char code >> return replacement
+      codes        = ['\\', '"']
+      replacements = ['\\', '"']
+               
+                  
+hasedConstant :: HasedParser String
+hasedConstant = between (char '"') (char '"') (many escapedChar)
+                <?> "string constant"
 
 hasedBecomesToken :: HasedParser ()
 hasedBecomesToken = between (many spaceOrTab) (many spaceOrTab) (string ":=" >> return ())
@@ -241,14 +245,16 @@ p = parseTest (hasedAssignment <* eof)
 t1 = unlines [ "x := \"CSV \" <ab*> x"
              , "   | \"C1 \" !c! y"
              , "   | \"C3 \" !e!"
-            , "y := \"ABC \" <0*> y"
+            , "y := \"ABC \" <0+> y"
             , "   | \"DEF \" !e*! x"
              ]
-t11 = unlines [ "x :="
-              , " CSV <a|b*> !c*! <def+fed> x"
+t2 = unlines [ "x := \"line start \" <a|b*> ( \"\nelement #1\" <a>"
+               , "                          | \"\nelement #2\" <b>)"
+               , "            <def|fed> x"
+               , "  | \"EOF!\""
               ]
 p2 = parseTest (hasedTerm <* eof)
-t2 = "CSV <a|b*> !c*! <def+fed> x"
+
 t3 = unlines [ "CSV "
              , " <a|b*> "
              , " !c*! "
