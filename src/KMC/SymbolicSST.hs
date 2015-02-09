@@ -35,6 +35,10 @@ data SST st pred func var =
   , sstV :: S.Set var                              -- ^ Output variables. The minimal variable is the designated output variable.
   }
 
+-- | Get the designated output variable of an SST.
+sstOut :: SST st pred func var -> var
+sstOut = S.findMin . sstV
+
 deriving instance (Show var, Show func, Show (Rng func)) => Show (Atom var func)
 deriving instance (Show st, Show pred, Show func, Show var, Show (Rng func))
              => Show (EdgeSet st pred func var)

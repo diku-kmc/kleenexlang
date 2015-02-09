@@ -1,72 +1,63 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GADTs #-}
 module KMC.Program.IL where
 
-import Data.Word
 import qualified Data.Map as M
 
--- | Identifiers for basic blocks
-newtype BlockId  = BlockId { getBlockId :: Int } deriving (Eq, Ord, Show)
--- | Identifiers for lookup tables
-newtype TableId  = TableId { getTableId :: Int } deriving (Eq, Ord, Show)
--- | Identifiers for buffers
-newtype BufferId = BuferId { getBufferId :: Int } deriving (Eq, Ord, Show)
+-- | A representation of a full tabulation of a function 'f' with an enumerable
+-- bounded domain. The table is represented as a list, with the ith entry
+-- corresponding to f(e_i), where e_i is the i'th element of the domain.
+-- Functions may be partial. In the case, the value at an undefined index is
+-- arbitrary.
+data Table delta = Table { tblTable :: [[delta]], tblDigitSize :: Int }
+  deriving (Eq, Ord, Show)
 
-data Table inty tbty =
-  Table
-  { tblGenerator :: inty -> tbty
-  , tblLowerBound :: inty
-  , tblUpperBound :: inty
-  }
+newtype BlockId = BlockId { getBlockId :: Int } deriving (Eq, Ord, Show)
+newtype TableId = TableId { getTableId :: Int } deriving (Eq, Ord, Show)
+newtype BufferId = BufferId { getBufferId :: Int } deriving (Eq, Ord, Show)
 
-data Cast a b where
-  W8W16  :: Cast Word8  Word16
-  W8W32  :: Cast Word8  Word32
-  W8W64  :: Cast Word8  Word64
-  W16W32 :: Cast Word16 Word32
-  W16W64 :: Cast Word16 Word64
-  W32W64 :: Cast Word32 Word64
+data Expr =
+    SymE
+  | ConstE Int
+  | FalseE
+  | TrueE
+  | LteE Expr Expr
+  | LtE  Expr Expr
+  | GteE Expr Expr 
+  | GtE  Expr Expr
+  | EqE  Expr Expr
+  | OrE  Expr Expr
+  | AndE Expr Expr
+  | NotE Expr
+  deriving (Eq, Ord, Show)
 
-data Expr inty tbty b where
-  TrueE  :: Expr inty tbty Bool
-  FalseE :: Expr inty tbty Bool
-  SymE   :: Expr inty tbty inty
-  ConstE :: Ty b -> b -> Expr inty tbty b
-  TblE   :: TableId -> Expr inty tbty tbty
-  CastE  :: Cast b b'           -> Expr inty tbty b    -> Expr inty tbty b'
-  LteE   :: Expr inty tbty b    -> Expr inty tbty b    -> Expr inty tbty Bool
-  LtE    :: Expr inty tbty b    -> Expr inty tbty b    -> Expr inty tbty Bool
-  GteE   :: Expr inty tbty b    -> Expr inty tbty b    -> Expr inty tbty Bool 
-  GtE    :: Expr inty tbty b    -> Expr inty tbty b    -> Expr inty tbty Bool
-  EqE    :: Expr inty tbty b    -> Expr inty tbty b    -> Expr inty tbty Bool
-  OrE    :: Expr inty tbty Bool -> Expr inty tbty Bool -> Expr inty tbty Bool
-  AndE   :: Expr inty tbty Bool -> Expr inty tbty Bool -> Expr inty tbty Bool
-  NotE   :: Expr inty tbty Bool -> Expr inty tbty Bool
+data Instr delta =
+    AcceptI                             -- ^ accept (Program stops)
+  | FailI                               -- ^ fail   (Program stops)
+  | AppendI    BufferId [delta]         -- ^ buf  := buf ++ bs
+  | AppendTblI BufferId TableId         -- ^ bif ::= buf ++ tbl(id)(next)[0 .. sz(id) - 1]
+  | ConcatI    BufferId BufferId        -- ^ buf1 := buf1 ++ buf2; reset(buf2)
+  | ResetI     BufferId                 -- ^ buf1 := []
+  | AlignI     BufferId BufferId        -- ^ align buf1 buf2. assert that buf1 is empty, and
+                                        --   make sure that subsequent writes to buf1 are aligned
+                                        --   such that concatenating buf2 and buf1 with the current
+                                        --   contents of buf2 will be efficient.
+                                        --   This instruction is a hint to the runtime, and does not
+                                        --   affect the final result.
+  | IfI        Expr (Block delta)       -- ^ if (e :: Bool) { ... }
+  | GotoI      BlockId                  -- ^ goto b
+  | NextI      (Block delta)            -- ^ if (!next()) { ... }
+  deriving (Eq, Ord, Show)
 
-data Ty t where
-  W8  :: Ty Word8
-  W16 :: Ty Word16
-  W32 :: Ty Word32
-  W64 :: Ty Word64
+type Block delta = [Instr delta]
 
-data Instr inty tbty where
-  AcceptI :: Instr inty tbty                                         -- ^ accept (Program stops)
-  FailI   :: Instr inty tbty                                         -- ^ fail   (Program stops)
-  AppendI :: BufferId -> Ty t -> Expr inty tbty t -> Instr inty tbty -- ^ buf  := buf ++ (e :: t)
-  ConcatI :: BufferId -> BufferId -> Instr inty tbty                 -- ^ buf1 := buf1 ++ buf2
-  ResetI  :: BufferId -> Instr inty tbty                             -- ^ buf1 := []
-  OffsetI :: BufferId -> Int -> Instr inty tbty                      -- ^ (assert buf1 == []) buf1.offset = i
-  IfI     :: Expr inty tbty Bool -> BlockId -> Instr inty tbty       -- ^ if (e :: Bool) goto b
-  GotoI   :: BlockId -> Instr inty tbty                              -- ^ goto b
-  NextI   :: BlockId -> Instr inty tbty                              -- ^ if (!next()) goto b
-
-type Block inty tbty = [Instr inty tbty]
-
--- | A program
-data Program inty tbty =
+data Program delta =
   Program
-  { progTables       :: M.Map TableId (Table inty tbty)
+  { progTables       :: M.Map TableId (Table delta)
   , progStreamBuffer :: BufferId
   , progBuffers      :: [BufferId]
   , progInitBlock    :: BlockId
-  , progBlocks       :: M.Map BlockId (Block inty tbty)
+  , progBlocks       :: M.Map BlockId (Block delta)
   }

@@ -72,3 +72,5 @@ decodeEnum :: forall b. (Enum b, Bounded b) => [b] -> Int
 decodeEnum ds = decode base (map fromEnum ds)
     where
       base = fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1
+
+data Trit = A | B | C deriving (Eq, Ord, Show, Enum, Bounded)

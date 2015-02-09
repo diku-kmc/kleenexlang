@@ -73,6 +73,7 @@ class Function t where
   type Rng t :: *
   eval    :: t -> Dom t -> Rng t
   isConst :: t -> Maybe (Rng t)
+  inDom   :: Dom t -> t -> Bool
 
 {----------------------------------------------------------------------}
 {- Partial orders                                                     -}
@@ -119,3 +120,13 @@ instance (Ord a, Enum a, Bounded a) => Enumerable (RangeSet a) a where
 instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
     lte = RS.isSubsetOf
     eq = (==)
+
+data Prefix a = Prefix [a] deriving (Eq, Ord, Show)
+
+instance (Eq a) => PartialOrder (Prefix a) where
+    eq = (==)
+    lte (Prefix xs) (Prefix ys) = prefixOf xs ys
+        where
+          prefixOf [] _ = True
+          prefixOf (x:l) (y:r) = (x == y) && prefixOf l r
+          prefixOf _ _ = False
