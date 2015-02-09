@@ -1,0 +1,44 @@
+/* Transformation for the JSON data from Issuu.
+   This is one of the "complex" ones, in the sense that most of the
+   Issuu-specific keywords are reflected here.
+
+   Parser-related observations:
+   - need to handle newlines properly, both in language and in strings
+
+   Other observations:
+   - maybe there should be support for higher-order constructions?
+   - it would be practical to be able to suppress a variable reference as well.
+   - introduce "pure expressions", named REs that do not have any effects at all
+*/
+
+objects := object ~<\n> objects
+         | object ~<\n?>
+
+object := " " <\{> keyValPairs <}> "
+"
+
+keyValPairs := ~keyVal ~<,> " " keyValPairs
+             | keyVal
+
+keyVal := "TS-thing = " ~<"ts":> <[0-9]{10}>
+        | ~<"> <visitor_uuid> ~<":"> " is " <[a-f0-9]{16}> ~<">
+        | ~<"visitor_source":"(external|.*)">
+        | ~<"visitor_device":"browser">
+        | ~<"visitor_useragent":"> ~userAgentString ~<">
+        | ~<"visitor_ip":"[a-z0-9]{16}">
+        | ~<"visitor_country":> " country:" ~<"> <[A-Z]{2}> ~<">
+        | ~<"visitor_referrer":"[a-z0-9]{16}">
+        | ~<"env_type":"reader">
+        | ~<"env_doc_id":> "Document ID: " someString
+        | ~<"event_type":"> eventType ~<">
+        | ~<"subject_type":"doc">
+        | ~<"subject_doc_id":> "Subject doc. ID" someString
+        | ~<"subject_page":[0-9]>
+        | ~<"cause_type":"> "Cause type: " causeType ~<">
+        
+
+useragentstring := <[A-Za-z0-9 .;/,()]*>
+
+someString := ~<"> <[^"]*> ~<">
+eventType := <impression|click|read|download|share|pageread|pagereadtime|continuation_load>
+causeType := <impression|page|ad|related|archive>

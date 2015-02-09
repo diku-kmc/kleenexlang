@@ -11,9 +11,11 @@ import Text.Parsec.Prim (runParser)
 import Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
 import KMC.Syntax.Config
-import KMC.Syntax.External (Regex)
+import KMC.Syntax.External (Regex, unparse)
 import KMC.Syntax.Parser (anchoredRegexP)
 
+import Debug.Trace
+    
 -- | Change the type of a state in a parser.  
 changeState :: forall m s u v a . (Functor m, Monad m)
             => (u -> v) -> (v -> u) -> ParsecT s u m a -> ParsecT s v m a
@@ -35,15 +37,15 @@ changeState forward backward = mkPT . transform . runParsecT
 
 -- Grammar:
 -- parser ::= . | (name ":=" expr) parser
--- expr   ::= "C" expr_0 ... expr_1
+-- expr   ::= "C" expr
 --          | <E>
---          | !E!
+--          | ~E // ignore result of E
 --          | x
+--          | expr expr
 --          | expr "|" expr
-data Skip = Skip | NoSkip deriving (Eq, Ord, Show)
 
-newtype Identifier = Identifier String deriving (Show, Eq, Ord)
--- type ConsName   = String
+-- | An Identifier is a String that always starts with a lower-case char.
+newtype Identifier = Identifier String deriving (Eq, Ord)
 
 mkIdent :: String -> Identifier
 mkIdent str =
@@ -53,50 +55,58 @@ mkIdent str =
 fromIdent :: Identifier -> String
 fromIdent (Identifier s) = s
 
--- | An assignment is just a name/term pair.
-data HasedAssignment  = HA (Identifier, HasedTerm) deriving (Show, Eq, Ord)
-
 -- | A Hased program is a list of assignments.
-data Hased            = Hased [HasedAssignment] deriving (Show, Eq, Ord)
+data Hased            = Hased [HasedAssignment] deriving (Eq, Ord)
+
+-- | Assigns the term to the name.
+data HasedAssignment  = HA (Identifier, HasedTerm) deriving (Eq, Ord)
 
 -- | The terms describe how regexps are mapped to strings.
-data HasedTerm = Constant String [HasedTerm] -- ^ Write constant if the list matches
-               | RE Skip Regex
+data HasedTerm = Constant String -- ^ A constant output.
+               | RE Regex
                | Var Identifier
+               | Seq HasedTerm HasedTerm
                | Sum HasedTerm HasedTerm
-  deriving (Show, Eq, Ord)
+               | Ignore HasedTerm -- ^ Suppress any output from the subterm.
+               | One
+  deriving (Eq, Ord)
 
-data HPState = HPState { indentLevel :: Int } deriving (Show)
+-- Some more friendly Show instances.
+instance Show Hased where
+    show (Hased l) = "Hased: {" ++ (concat $ map ("\n  " ++) (map show l)) ++ "\n}"
+instance Show HasedAssignment where
+    show (HA (ident, term)) = show ident ++ " ::== " ++ show term
+instance Show Identifier where
+    show = fromIdent
+instance Show HasedTerm where
+    show One = "1"
+    show (Sum l r) = "(" ++ show l ++ ") | (" ++ show r ++ ")"
+    show (Seq l r) = show l ++ " " ++ show r
+    show (Var i)   = show i
+    show (RE re) = "<" ++ unparse re ++ ">"
+    show (Constant s) = show s
+    show (Ignore e) = "drop:[" ++ show e ++ "]"
+
+type HPState = ()
 
 hpInitState :: HPState
-hpInitState = HPState { indentLevel = 0 }
+hpInitState = ()
 
 type HasedParser a = Parsec String HPState a
 
-{-- Indentation functions --}
-
-getIndentation :: HasedParser Int
-getIndentation = indentLevel <$> getState
-
-setIndentation :: Int -> HasedParser ()
-setIndentation ind = modifyState (\s -> s {indentLevel = ind })
-
-resetIndentation :: HasedParser ()
-resetIndentation = setIndentation 0
 
 withHPState :: Parsec s () a -> Parsec s HPState a
 withHPState p = getState >>= \hps -> changeState (const hps) (const ()) p
 
-
 separator :: HasedParser ()
-separator = ignore (spaceOrTab <|> try (lookAhead newline))
+separator = spaceOrTab <|> ignore (try (lookAhead newline))
   
 end :: HasedParser ()
 end = separator <|> eof
 
 -- Parse one space or tab character.
-spaceOrTab :: HasedParser Char
-spaceOrTab = char ' ' <|> char '\t'
+spaceOrTab :: HasedParser ()
+spaceOrTab = ignore (char ' ' <|> char '\t')
 
 ignore :: Parsec s u a -> Parsec s u ()
 ignore p = p >> return ()
@@ -104,33 +114,8 @@ ignore p = p >> return ()
 parens :: HasedParser a -> HasedParser a
 parens = between (char '(') (char ')')
 
-indent :: HasedParser ()
-indent = try (newline >> spaceOrTab) >>
-         do
-           lvl <- getIndentation
-           -- Already read one whitespace above, so add one.
-           n <- (+ 1) . length <$> many spaceOrTab 
-           setIndentation n
-
 spaceAround :: HasedParser a -> HasedParser a
 spaceAround = between (many spaceOrTab) (many spaceOrTab)
-
--- | Runs the given parser if the predicate on the indentation level is satisfied.
-atIndentation :: (Int -> Bool) -> HasedParser a -> HasedParser a
-atIndentation pred parser =
-    do
-      indent
-      lvl <- getIndentation
-      case pred lvl of
-        True  -> parser
-        False -> fail $ "at indent level " ++ show lvl -- parserZero
-
-subIndentation :: HasedParser a -> HasedParser a
-subIndentation parser = do
-  i <- getIndentation
-  r <- parser
-  setIndentation i
-  return r
 
 -- | Identifiers are only allowed to start with lower-case characters.
 hasedIdentifier :: HasedParser Identifier
@@ -151,61 +136,77 @@ escapedChar = satisfy (not . flip elem replacements)
       codes        = ['\\', '"']
       replacements = ['\\', '"']
                
-                  
+-- | A "constant" is a string enclosed in quotes.
 hasedConstant :: HasedParser String
-hasedConstant = between (char '"') (char '"') (many escapedChar)
+hasedConstant = (char '"') *> (many escapedChar) <* (char '"')
                 <?> "string constant"
 
 hasedBecomesToken :: HasedParser ()
-hasedBecomesToken = between (many spaceOrTab) (many spaceOrTab) (string ":=" >> return ())
+hasedBecomesToken = spaceAround (string ":=" >> return ())
 
 hasedAssignment :: HasedParser HasedAssignment
 hasedAssignment = do
-  resetIndentation
+  skipComments
   ident <- hasedIdentifier
   hasedBecomesToken
-  term <- (atIndentation (> 0) hasedTerm) <|> hasedTerm
+  term <- hasedTerm
   return $ HA (ident, term)
 
-hased :: HasedParser Hased
-hased = Hased <$> hasedAssignment `sepEndBy` newline
+foldr1ifEmpty :: (a -> a -> a) -> a -> [a] -> a
+foldr1ifEmpty _ e [] = e
+foldr1ifEmpty f _ l  = foldr1 f l
 
-hasedSingleTerm :: HasedParser HasedTerm
-hasedSingleTerm =     hasedConstructorTerm
-                  <|> hasedPrimTerm
-                  <|> parens hasedTerm
+skipComments :: HasedParser ()
+skipComments = ignore $ spaces >> skipComment `sepEndBy` spaces
+
+skipComment :: HasedParser ()
+skipComment = ignore $ try (char '/' >> (singleLine <|> multiLine))
+    where
+      singleLine = char '/' >> manyTill anyChar newline       >> return ()
+      multiLine  = char '*' >> manyTill anyChar (string "*/") >> return ()
+              
+
+hased :: HasedParser Hased
+hased = Hased <$> hasedAssignment `sepEndBy` spaces
 
 hasedTerm :: HasedParser HasedTerm
-hasedTerm = buildExpressionParser table (spaceAround hasedSingleTerm)
+hasedTerm = buildExpressionParser table (spaceAround hasedPrimTerm)
     where
       table = [ [Infix (char '|' >> return Sum) AssocRight] ]
 
-            
-hasedConstructorTerm :: HasedParser HasedTerm
-hasedConstructorTerm = do
-  string <- hasedConstant
-  i <- getIndentation
-  argTerms <- subIndentation $
-              do
-                l1 <- hasedTerm `sepEndBy` (many spaceOrTab)
-                l2 <- concat <$> many (atIndentation (> i)
-                                       (hasedTerm `sepEndBy` (many spaceOrTab)))
-                return $ l1 ++ l2
-  return $ Constant string argTerms
+indentedNewline :: HasedParser ()
+indentedNewline = ignore $ (many1 newline) >> (many1 spaceOrTab)
 
+start :: HasedParser ()
+start = optional (i <|> c) <?> "start"
+    where
+      i = do
+        many1 newline
+        choice [many1 spaceOrTab, skipComment `sepEndBy` (many spaceOrTab)]
+        return ()
+      c = ignore $ skipComment `sepEndBy` (many spaceOrTab)
 
 hasedPrimTerm :: HasedParser HasedTerm
-hasedPrimTerm = re <|> skip <|> identifier
+hasedPrimTerm = start
+                >> elms `sepEndBy` sep
+                >>= return . foldr1ifEmpty Seq One
     where
-      re         = RE NoSkip <$> between (char '<') (char '>') regexP
+      elms = choice [re, identifier, constant, ignored, parens hasedTerm]
+      sep = many $ spaceOrTab 
+                   <|> try indentedNewline 
+                   <|>  ignore (skipComment >> many spaceOrTab)
+      constant   = Constant <$> hasedConstant
+                   <?> "Constant"
+      re         = RE <$> between (char '<') (char '>') regexP
                    <?> "RE"
-      skip       = RE Skip   <$> between (char '!') (char '!') regexP
-                   <?> "Skip"
-      identifier = Var       <$> try (hasedIdentifier <* notFollowedBy hasedBecomesToken)
+      identifier = Var <$> try (hasedIdentifier <* notFollowedBy hasedBecomesToken)
                    <?> "Var"
+      ignored    = Ignore <$> (char '~' *> elms)
+                   <?> "Ignore"
 
 regexP :: HasedParser Regex
-regexP = snd <$> (withHPState $ anchoredRegexP (basicRegexParser { rep_illegal_chars = "!<>" }))
+regexP = snd <$> (withHPState $
+                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!<>" })
 
 firstName :: Hased -> Identifier
 firstName (Hased (HA (i,_):_)) = i
@@ -217,6 +218,9 @@ parseHased str =
     case runParser (hased <* eof) hpInitState "" str of
       Left err -> Left (show err)
       Right h -> Right (firstName h, h)
+
+parseHasedFile :: FilePath -> IO (Either String (Identifier, Hased))
+parseHasedFile fp = readFile fp >>= return . parseHased
 
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -243,46 +247,36 @@ parseTest' p input
 
 p = parseTest (hasedAssignment <* eof)
 t1 = unlines [ "x := \"CSV \" <ab*> x"
-             , "   | \"C1 \" !c! y"
+             , "   | !c! \" hej \" y"
              , "   | \"C3 \" !e!"
-            , "y := \"ABC \" <0+> y"
-            , "   | \"DEF \" !e*! x"
+             , "y := \"ABC \" <0+> y"
+             , "   | !e*! x"
              ]
-t2 = unlines [ "x := \"line start \" <a|b*> ( \"\nelement #1\" <a>"
+t2 = unlines [ "x := \"line start \" <a|b*> (\"\nelement #1\" <a>"
                , "                          | \"\nelement #2\" <b>)"
                , "            <def|fed> x"
                , "  | \"EOF!\""
               ]
 p2 = parseTest (hasedTerm <* eof)
 
-t3 = unlines [ "CSV "
-             , " <a|b*> "
-             , " !c*! "
-             , " <def+fed> x"]
-t4 = unlines [ "x := CSV <a|b*> !c*! "
+t4 = unlines [ "x := \"CSV\" <a|b*> !c*! "
              , "   <def+fed> y"
-             , "y := Abc <(d|e)*> x"
+             , "y := \"Abc\" <(d|e)*> x"
              ]
-t5 = unlines [ "x := CSV <a|b*> "
+t5 = unlines [ "x := \"CSV\" <a|b*> "
              , "    !c*! "
              , "    <def+fed> y"
-             , "    Abc <(d|e)*> x"
-             , "y :="
-             , " Cons !re!"
+             , "    \"Abc\" <(d|e)*> x"
+             , "y := "
+             , "    \"Cons\" !re!"
              ]
-
-t6 = unlines [ "x := Cons <E> x "
-             , "   | Nil !F!"
-             , "y := Cons <E> y"
-             , "   | Nil !F!"
-             , "y := Snoc { name = <(ab)*> } "
-             , "          {address = <E|F>} "
-             , " | Nul !(c|e)*!"
-             , "newThing := Elm "
-             , "   | Elm2 "
-             , "  | Elm3 !Q! "
+-- use ~ as ignore syntax
+t6 = unlines [ "x := ~\"test, x \" <a*> ~~(~<b*> | <e>) ~y z"
+             , "y := ~<c*>"
+             , "z := <d*>"
              ]
-t7 = unlines [ "x := CSB {name = <E{1,4}>} {address = <F>}"]
 
 pf = parseTest (hased <* eof)
 pf' = parseTest' (hased <* eof)
+
+f' = readFile "test/issuu.has" >>= pf
