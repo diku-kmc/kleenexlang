@@ -143,6 +143,12 @@ mkViz f x = do
     _ <- forkIO $ GC.runGraphvizCanvas GC.Dot (f x) GC.Xlib
     return ()
 
+mkVizToFile :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> FilePath -> IO ()
+mkVizToFile f x p = do
+    fp <- GC.runGraphvizCommand GC.Dot (f x) GC.Pdf p
+    putStrLn $ "Wrote file " ++ fp
+    
+
 vizFancyAsFST :: String -> IO ()
 vizFancyAsFST str = mkViz fancyToDot str
 

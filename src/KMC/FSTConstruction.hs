@@ -59,7 +59,7 @@ construct qf (Seq e1 e2) = do
   construct q2 e1
 
 fromMu :: (Enum st, Ord st, Monoid (Rng func)) =>
-          (forall a. Mu pred func a)
+          Mu pred func st
        -> FST st pred func
 fromMu e =
   let (qin, cs) = runState (construct (toEnum 0) e)

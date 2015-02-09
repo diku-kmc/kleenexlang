@@ -2,16 +2,17 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module KMC.Program.Backends.HasedParser where
+module KMC.Hased.Parser where
 
 import Control.Applicative ((<$>), (<*>), (<*), (*>))
 import Control.Monad.Identity (Identity)
 import Text.Parsec hiding (parseTest)
+import Text.Parsec.Prim (runParser)
 import Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
-import KMC.Syntax.Parser (anchoredRegexP)
-import KMC.Syntax.External (Regex)
 import KMC.Syntax.Config
+import KMC.Syntax.External (Regex)
+import KMC.Syntax.Parser (anchoredRegexP)
 
 -- | Change the type of a state in a parser.  
 changeState :: forall m s u v a . (Functor m, Monad m)
@@ -34,14 +35,23 @@ changeState forward backward = mkPT . transform . runParsecT
 
 -- Grammar:
 -- parser ::= . | (name ":=" expr) parser
--- expr   ::= C expr_0 ... expr_1
+-- expr   ::= "C" expr_0 ... expr_1
 --          | <E>
 --          | !E!
 --          | x
 --          | expr "|" expr
+data Skip = Skip | NoSkip deriving (Eq, Ord, Show)
 
-data Identifier = Identifier String deriving (Show, Eq, Ord)
-type ConsName      = String
+newtype Identifier = Identifier String deriving (Show, Eq, Ord)
+-- type ConsName   = String
+
+mkIdent :: String -> Identifier
+mkIdent str =
+    case runParser hasedIdentifier hpInitState "" str of
+      Left e  -> error (show e)
+      Right i -> i
+fromIdent :: Identifier -> String
+fromIdent (Identifier s) = s
 
 -- | An assignment is just a name/term pair.
 data HasedAssignment  = HA (Identifier, HasedTerm) deriving (Show, Eq, Ord)
@@ -49,12 +59,10 @@ data HasedAssignment  = HA (Identifier, HasedTerm) deriving (Show, Eq, Ord)
 -- | A Hased program is a list of assignments.
 data Hased            = Hased [HasedAssignment] deriving (Show, Eq, Ord)
 
--- | The terms describe how regexps are mapped to data.
-data HasedTerm = Constructor String [HasedTerm]
-               | RE Regex
-               | Skip Regex
+-- | The terms describe how regexps are mapped to strings.
+data HasedTerm = Constant String [HasedTerm] -- ^ Write constant if the list matches
+               | RE Skip Regex
                | Var Identifier
-               | NamedArg Identifier HasedTerm
                | Sum HasedTerm HasedTerm
   deriving (Show, Eq, Ord)
 
@@ -66,7 +74,7 @@ hpInitState = HPState { indentLevel = 0 }
 type HasedParser a = Parsec String HPState a
 
 {-- Indentation functions --}
-    
+
 getIndentation :: HasedParser Int
 getIndentation = indentLevel <$> getState
 
@@ -124,6 +132,7 @@ subIndentation parser = do
   setIndentation i
   return r
 
+-- | Identifiers are only allowed to start with lower-case characters.
 hasedIdentifier :: HasedParser Identifier
 hasedIdentifier = Identifier <$> 
                   ((:) <$> legalStartChar <*> manyTill legalChar end)
@@ -132,12 +141,20 @@ hasedIdentifier = Identifier <$>
       legalStartChar = lower
       legalChar = upper <|> lower <|> digit <|> oneOf "_-"
 
-hasedConstructorName :: HasedParser ConsName
-hasedConstructorName = (:) <$> legalStartChar <*> manyTill legalChar end
-                       <?> "constructor name"
+-- | Parses a character or an escaped double quote.
+escapedChar :: Parsec String s Char
+escapedChar = satisfy (not . flip elem replacements)
+              <|> escaped
     where
-      legalStartChar = upper
-      legalChar = upper <|> lower <|> digit <|> char '_'
+      escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
+      escapedChar code replacement = char code >> return replacement
+      codes        = ['\\', '"']
+      replacements = ['\\', '"']
+               
+                  
+hasedConstant :: HasedParser String
+hasedConstant = between (char '"') (char '"') (many escapedChar)
+                <?> "string constant"
 
 hasedBecomesToken :: HasedParser ()
 hasedBecomesToken = between (many spaceOrTab) (many spaceOrTab) (string ":=" >> return ())
@@ -156,7 +173,6 @@ hased = Hased <$> hasedAssignment `sepEndBy` newline
 hasedSingleTerm :: HasedParser HasedTerm
 hasedSingleTerm =     hasedConstructorTerm
                   <|> hasedPrimTerm
-                  <|> hasedNamedArg
                   <|> parens hasedTerm
 
 hasedTerm :: HasedParser HasedTerm
@@ -167,7 +183,7 @@ hasedTerm = buildExpressionParser table (spaceAround hasedSingleTerm)
             
 hasedConstructorTerm :: HasedParser HasedTerm
 hasedConstructorTerm = do
-  name <- hasedConstructorName
+  string <- hasedConstant
   i <- getIndentation
   argTerms <- subIndentation $
               do
@@ -175,38 +191,32 @@ hasedConstructorTerm = do
                 l2 <- concat <$> many (atIndentation (> i)
                                        (hasedTerm `sepEndBy` (many spaceOrTab)))
                 return $ l1 ++ l2
-              
-  -- i <- getIndentation
-  -- argTerms <- do
-  --   l1 <- hasedTerm `sepEndBy` (many spaceOrTab)
-  --   l2 <- concat <$> many (atIndentation (> i)
-  --                          (hasedTerm `sepEndBy` (many spaceOrTab)))
-  --   setIndentation i
-  --   return $ l1 ++ l2
-  return $ Constructor name argTerms
+  return $ Constant string argTerms
 
-hasedNamedArg :: HasedParser HasedTerm
-hasedNamedArg = between (char '{') (char '}') $ do
-                  many spaceOrTab
-                  name <- hasedIdentifier
-                  char '='
-                  many spaceOrTab
-                  arg <- hasedTerm
-                  return $ NamedArg name arg
 
 hasedPrimTerm :: HasedParser HasedTerm
 hasedPrimTerm = re <|> skip <|> identifier
     where
-      re         = RE   <$> between (char '<') (char '>') regexP        <?> "RE"
-      skip       = Skip <$> between (char '!') (char '!') regexP        <?> "Skip"
-      identifier = Var  <$> try (hasedIdentifier <* notFollowedBy hasedBecomesToken) <?> "Var"
+      re         = RE NoSkip <$> between (char '<') (char '>') regexP
+                   <?> "RE"
+      skip       = RE Skip   <$> between (char '!') (char '!') regexP
+                   <?> "Skip"
+      identifier = Var       <$> try (hasedIdentifier <* notFollowedBy hasedBecomesToken)
+                   <?> "Var"
 
 regexP :: HasedParser Regex
 regexP = snd <$> (withHPState $ anchoredRegexP (basicRegexParser { rep_illegal_chars = "!<>" }))
 
+firstName :: Hased -> Identifier
+firstName (Hased (HA (i,_):_)) = i
+firstName (Hased []) = error "firstName: no assignments"
 
-
-
+parseHased :: String -- ^ Input string
+           -> Either String (Identifier, Hased) 
+parseHased str =
+    case runParser (hased <* eof) hpInitState "" str of
+      Left err -> Left (show err)
+      Right h -> Right (firstName h, h)
 
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -232,12 +242,19 @@ parseTest' p input
         Right x  -> return x
 
 p = parseTest (hasedAssignment <* eof)
-t1 = "x := CSV <a|b*> !c*! <def+fed> x"
-t11 = unlines [ "x :="
-              , " CSV <a|b*> !c*! <def+fed> x"
+t1 = unlines [ "x := \"CSV \" <ab*> x"
+             , "   | \"C1 \" !c! y"
+             , "   | \"C3 \" !e!"
+            , "y := \"ABC \" <0+> y"
+            , "   | \"DEF \" !e*! x"
+             ]
+t2 = unlines [ "x := \"line start \" <a|b*> ( \"\nelement #1\" <a>"
+               , "                          | \"\nelement #2\" <b>)"
+               , "            <def|fed> x"
+               , "  | \"EOF!\""
               ]
 p2 = parseTest (hasedTerm <* eof)
-t2 = "CSV <a|b*> !c*! <def+fed> x"
+
 t3 = unlines [ "CSV "
              , " <a|b*> "
              , " !c*! "
