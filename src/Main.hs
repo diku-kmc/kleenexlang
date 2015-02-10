@@ -38,11 +38,11 @@ progFromFancy str = compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
 
 cFromFancy :: String -> String
 cFromFancy str =
-  renderProgram $ compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
+  renderProgram UInt8T $ compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
 
 compileFancy :: String -> IO ExitCode
 compileFancy str =
-  compileProgram (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match" Nothing
+  compileProgram UInt8T (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match" Nothing
 
 sstFromHased :: String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
 sstFromHased str = 
@@ -54,7 +54,7 @@ progFromHased :: String -> Program Word8
 progFromHased = compileAutomaton . sstFromHased
 
 cFromHased :: String -> String
-cFromHased = renderProgram . progFromHased 
+cFromHased = renderProgram UInt8T . progFromHased 
                  
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)
@@ -71,4 +71,4 @@ main = do
   let binFile = snd $ splitFileName $ dropExtension hasedFile
   let cFile   = replaceExtension hasedFile "c"
   putStrLn $ "Writing binary " ++ binFile ++ " and C source " ++ cFile
-  compileProgram (progFromHased hased) binFile (Just cFile)
+  compileProgram UInt8T (progFromHased hased) binFile (Just cFile)
