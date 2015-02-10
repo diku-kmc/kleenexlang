@@ -304,7 +304,7 @@ compileProgram prog outPath cCodeOutPath = do
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> writeFile p cstr
-  (Just hin, _, _, hproc) <- createProcess (proc "gcc" ["-O3", "-xc", "-o", outPath, "-"])
+  (Just hin, _, _, hproc) <- createProcess (proc "gcc" ["-O2", "-xc", "-o", outPath, "-"])
                                            { std_in = CreatePipe }
   hPutStrLn hin cstr
   hClose hin
