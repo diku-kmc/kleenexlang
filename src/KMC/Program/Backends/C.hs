@@ -245,7 +245,7 @@ prettyTableDecl :: (Enum delta, Bounded delta) =>
                 -> Doc
 prettyTableDecl tbltype prog =
   if null tables then text "/* no tables */" else
-    ctyp tbltype <> brackets (int (length tables)) <> brackets (int tableSize) <+> text "="
+    ctyp tbltype <> brackets (int (length tables)) <> brackets (int tableSize) <+> text "tbl ="
     $$ lbrace <> hcat (punctuate comma (map (prettyTableExpr tbltype) tables)) <> rbrace <> semi
   where
     tables    = M.elems $ progTables prog
