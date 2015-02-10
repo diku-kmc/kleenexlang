@@ -37,11 +37,11 @@ progFromFancy str = compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
 
 cFromFancy :: String -> String
 cFromFancy str =
-  renderProgram $ compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
+  renderProgram UInt8T $ compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
 
 compileFancy :: String -> IO ExitCode
 compileFancy str =
-  compileProgram (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match" Nothing
+  compileProgram UInt8T (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match" Nothing
 
 sstFromHased :: String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
 sstFromHased str = 
@@ -53,7 +53,7 @@ progFromHased :: String -> Program Word8
 progFromHased = compileAutomaton . sstFromHased
 
 cFromHased :: String -> String
-cFromHased = renderProgram . progFromHased 
+cFromHased = renderProgram UInt8T . progFromHased 
                  
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)
@@ -67,4 +67,4 @@ main = do
     exitWith $ ExitFailure 1
   let [hasedFile] = args
   hased <- readFile hasedFile
-  compileProgram (progFromHased hased) ("hasedprog") (Just $ hasedFile ++ ".c")
+  compileProgram UInt8T (progFromHased hased) ("hasedprog") (Just $ hasedFile ++ ".c")

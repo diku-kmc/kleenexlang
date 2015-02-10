@@ -8,7 +8,7 @@
 #define OUTBUFFER_SIZE 4096
 #define INITIAL_BUFFER_SIZE (4096*8)
 
-typedef uint64_t buffer_unit_t;
+typedef %%BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
   buffer_unit_t *data;
   size_t size; /* size in bytes */
@@ -17,8 +17,6 @@ typedef struct {
 
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
 #define BUFFER_UNIT_BITS (BUFFER_UNIT_SIZE * 8)
-
-#define SHIFT_TO_BUFFER_UNIT(x) (((buffer_unit_t)x) << (BUFFER_UNIT_BITS - 8))
 
 int next;
 buffer_t outbuf;

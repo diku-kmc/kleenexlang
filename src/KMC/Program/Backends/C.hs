@@ -51,6 +51,7 @@ data CProg =
   , cDeclarations :: Doc
   , cProg         :: Doc
   , cInit         :: Doc
+  , cBufferUnit   :: Doc
   }
 
 -- | The number of bits each C type can hold
@@ -275,32 +276,33 @@ prettyProg buftype tbltype prog =
       blck blid <> char ':'
                 <+> prettyBlock buftype tbltype prog is
 
-programToC :: (Enum delta, Bounded delta) => Program delta -> CProg
-programToC prog =
+programToC :: (Enum delta, Bounded delta) => CType -> Program delta -> CProg
+programToC buftype prog =
   CProg
   { cTables       = prettyTableDecl tbltype prog
   , cDeclarations = prettyBufferDecls prog
   , cInit         = prettyInit prog
   , cProg         = prettyProg buftype tbltype prog
+  , cBufferUnit   = ctyp buftype
   }
   where
     tbltype = UInt8T
-    buftype = UInt64T
 
 renderCProg :: CProg -> String
 renderCProg cprog =
-    replace "%%TABLES" (render $ cTables cprog)
-  . replace "%%DECLS"  (render $ cDeclarations cprog)
-  . replace "%%INIT"   (render $ cInit cprog)
-  . replace "%%PROG"   (render $ cProg cprog)
+    replace "%%TABLES"        (render $ cTables cprog)
+  . replace "%%DECLS"         (render $ cDeclarations cprog)
+  . replace "%%INIT"          (render $ cInit cprog)
+  . replace "%%PROG"          (render $ cProg cprog)
+  . replace "%%BUFFER_UNIT_T" (render $ cBufferUnit cprog)
   $ crt
 
-renderProgram :: (Enum delta, Bounded delta) => Program delta -> String
-renderProgram = renderCProg . programToC
+renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
+renderProgram buftype = renderCProg . programToC buftype
 
-compileProgram :: (Enum delta, Bounded delta) => Program delta -> FilePath -> Maybe FilePath -> IO ExitCode
-compileProgram prog outPath cCodeOutPath = do
-  let cstr = renderCProg . programToC $ prog
+compileProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> FilePath -> Maybe FilePath -> IO ExitCode
+compileProgram buftype prog outPath cCodeOutPath = do
+  let cstr = renderCProg . programToC buftype $ prog
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> writeFile p cstr
