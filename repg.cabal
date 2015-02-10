@@ -21,6 +21,7 @@ executable repg
   -- other-extensions:    
   build-depends:       base >=4.6
                      , containers >= 0.5.0.0
+                     , filepath >= 1.3.0.2
                      , free >= 4.9
                      , graphviz >= 2999.17.0.2
                      , kmc-regexps-syntax
