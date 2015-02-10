@@ -189,5 +189,7 @@ int main(int argc, char *argv[])
 
   match();
 
-  writeconst(0, BUFFER_UNIT_BITS); buf_flush(&outbuf);
+  if (buf->bitpos % BUFFER_UNIT_BITS != 0)
+    writeconst(0, BUFFER_UNIT_BITS);
+  buf_flush(&outbuf);
 }
