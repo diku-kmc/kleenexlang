@@ -101,9 +101,6 @@ withHPState p = getState >>= \hps -> changeState (const hps) (const ()) p
 separator :: HasedParser ()
 separator = spaceOrTab <|> ignore (try (lookAhead newline))
   
-end :: HasedParser ()
-end = separator <|> eof
-
 -- Parse one space or tab character.
 spaceOrTab :: HasedParser ()
 spaceOrTab = ignore (char ' ' <|> char '\t')
@@ -120,7 +117,7 @@ spaceAround = between (many spaceOrTab) (many spaceOrTab)
 -- | Identifiers are only allowed to start with lower-case characters.
 hasedIdentifier :: HasedParser Identifier
 hasedIdentifier = Identifier <$> 
-                  ((:) <$> legalStartChar <*> manyTill legalChar end)
+                  ((:) <$> legalStartChar <*> many legalChar)
                   <?> "identifier"
     where
       legalStartChar = lower
@@ -274,6 +271,10 @@ t5 = unlines [ "x := \"CSV\" <a|b*> "
 t6 = unlines [ "x := ~\"test, x \" <a*> ~~(~<b*> | <e>) ~y z"
              , "y := ~<c*>"
              , "z := <d*>"
+             ]
+-- TODO:  Implement macros!
+t7 = unlines [ "x := p(<a>)"
+             , "p(x) := <\"> x <\"> "
              ]
 
 pf = parseTest (hased <* eof)
