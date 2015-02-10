@@ -5,6 +5,7 @@ import Control.Monad (when)
 import Data.Word
 import System.Environment
 import System.Exit (ExitCode(..), exitWith)
+import System.FilePath (splitFileName, dropExtension, replaceExtension)
     
 import KMC.Expression hiding (Var)
 import KMC.FSTConstruction hiding (Var)
@@ -67,4 +68,7 @@ main = do
     exitWith $ ExitFailure 1
   let [hasedFile] = args
   hased <- readFile hasedFile
-  compileProgram (progFromHased hased) ("hasedprog") (Just $ hasedFile ++ ".c")
+  let binFile = snd $ splitFileName $ dropExtension hasedFile
+  let cFile   = replaceExtension hasedFile "c"
+  putStrLn $ "Writing binary " ++ binFile ++ " and C source " ++ cFile
+  compileProgram (progFromHased hased) binFile (Just cFile)
