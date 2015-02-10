@@ -6,39 +6,69 @@
    - need to handle newlines properly, both in language and in strings
 
    Other observations:
-   - maybe there should be support for higher-order constructions?
+   - maybe there should be support for "higher-order" constructions?
    - it would be practical to be able to suppress a variable reference as well.
    - introduce "pure expressions", named REs that do not have any effects at all
+   - Macros: TODO
+     p(x1, x2) := <"> x1 <"> x2
 */
 
 objects := object ~<\n> objects
          | object ~<\n?>
 
-object := " " <\{> keyValPairs <}> "
-"
+object := <\{> sep keyValPairs nl <}> nl
 
-keyValPairs := ~keyVal ~<,> " " keyValPairs
+keyValPairs := keyVal ~<,> keyValPairs
              | keyVal
 
-keyVal := "TS-thing = " ~<"ts":> <[0-9]{10}>
-        | ~<"> <visitor_uuid> ~<":"> " is " <[a-f0-9]{16}> ~<">
-        | ~<"visitor_source":"(external|.*)">
-        | ~<"visitor_device":"browser">
-        | ~<"visitor_useragent":"> ~userAgentString ~<">
-        | ~<"visitor_ip":"[a-z0-9]{16}">
-        | ~<"visitor_country":> " country:" ~<"> <[A-Z]{2}> ~<">
-        | ~<"visitor_referrer":"[a-z0-9]{16}">
-        | ~<"env_type":"reader">
-        | ~<"env_doc_id":> "Document ID: " someString
-        | ~<"event_type":"> eventType ~<">
-        | ~<"subject_type":"doc">
-        | ~<"subject_doc_id":> "Subject doc. ID" someString
-        | ~<"subject_page":[0-9]>
-        | ~<"cause_type":"> "Cause type: " causeType ~<">
-        
+sep := "
+   "
+nl := "
+"
 
-useragentstring := <[A-Za-z0-9 .;/,()]*>
+keyVal := ~<"ts":> "Timestamp=" someNumber sep
+        | ~<"visitor_uuid":> "vistor-id: " ~<"> hash16 ~<"> sep
+        | ~( <"visitor_source":> <"> visitorSource <"> )
+        | ~<"visitor_device":> "visitor device: " ~<"> visitorDevice ~<"> sep
+        | ~( <"visitor_useragent":> someString )
+        | ~( <"visitor_ip":> <"> hash16 <"> )
+        | ~<"visitor_country":> "Country:" ~<"> <[A-Z]{2}> ~<"> sep
+        | ~( <"visitor_referrer":> <"> hash16 <"> )
+        | ~( <"env_type":> <"> envType <"> )
+        | ~<"env_doc_id":> "Document ID: " someString sep
+        | ~( <"event_type":> <"> eventType <"> )
+        | ~( <"subject_type":> <"> subjectType <"> )
+        | ~<"subject_doc_id":> "Subject doc. ID" someString sep
+        | ~( <"subject_page":> someNumber)
+        | ~<"cause_type":> "Cause type: " ~<"> causeType ~<"> sep
+        | ~( <"env_ranking":> someNumber )
+        | ~( <"event_readtime":> someNumber )
+        | ~( <"visitor_username":> (<"> hash16 <"> | <null>) )
+        | ~( <"env_adid":> <"> hash16 <"> )
+        | ~( <"env_ranking":> someNumber )
+        | ~( <"event_service":> <"> serviceName <"> )
+        | ~( <"event_readtime":> someNumber )
+        | ~( <"event_index":> someNumber )
+        | ~( <"subject_infoboxid":> someString )
+        | ~( <"subject_url":> someString )
+        | ~( <"subject_link_position":> someString )
+        | ~( <"cause_position":> someNumber )
+        | ~( <"cause_adid":> <"> hash16 <">)
+        | ~( <"cause_embedid":> someNumber ) /* undocumented */
+        | ~( <"cause_token":> someString ) /* undocumented */
+        | "Unknown key/Val: " someString ~<:> "/" (someString | someNumber) sep
+//        | ~( <"env_build":> )
+//        | ~( <"env_name":> )
+//        | ~( <"env_component":>
 
+hash16 := <[a-f0-9]{16}>
 someString := ~<"> <[^"]*> ~<">
-eventType := <impression|click|read|download|share|pageread|pagereadtime|continuation_load>
-causeType := <impression|page|ad|related|archive>
+someNumber := <[0-9]+>
+
+eventType  := <impression|click|read|download|share|pageread|pagereadtime|continuation_load>
+causeType  := <impression|page|ad|related|archive>
+envType    := <reader|stream|website>
+visitorSource := <external|internal>
+visitorDevice := <browser|android>
+subjectType := <doc|infobox|link>
+serviceName := <email|facebook|twitter|google|tumblr|linkedin>
