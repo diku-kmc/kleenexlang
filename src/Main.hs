@@ -51,3 +51,20 @@ sstFromHased str =
 
 progFromHased :: String -> Program Word8
 progFromHased = compileAutomaton . sstFromHased
+
+cFromHased :: String -> String
+cFromHased = renderProgram . progFromHased 
+                 
+runSST :: String -> [Char] -> Stream [Bool]
+runSST str = run (sstFromFancy str)
+
+main :: IO ExitCode
+main = do
+  args <- getArgs
+  when (length args /= 1) $ do
+    prog <- getProgName
+    putStrLn $ "Usage: " ++ prog ++ " <hased_file>"
+    exitWith $ ExitFailure 1
+  let [hasedFile] = args
+  hased <- readFile hasedFile
+  compileProgram (progFromHased hased) (hasedFile ++ ".c")
