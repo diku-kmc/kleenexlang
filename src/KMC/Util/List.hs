@@ -1,6 +1,4 @@
-module KMC.List where
-
-import Data.Monoid
+module KMC.Util.List where
 
 -- | Replace all sublists of a given form with another list.
 replace :: (Eq a) => [a] -> [a] -> [a] -> [a]

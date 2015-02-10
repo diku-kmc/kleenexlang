@@ -87,6 +87,9 @@ edgesFromList xs = EdgeSet { eForward  = M.fromListWith (++) [ (q,  [(p, u, q')]
 edgesToList :: EdgeSet st pred func var -> [(st, pred, RegisterUpdate var func, st)]
 edgesToList es = [ (q,p,u,q') | (q, xs) <- M.toList (eForward es), (p,u,q') <- xs ]
 
+eForwardLookup :: (Ord st) => EdgeSet st pred func var -> st -> [(pred, RegisterUpdate var func, st)]
+eForwardLookup es st = maybe [] id (M.lookup st (eForward es))
+
 mapEdges :: (Ord st)
          => ((st, pred, RegisterUpdate var func, st) -> (st, pred, RegisterUpdate var func, st))
          -> EdgeSet st pred func var

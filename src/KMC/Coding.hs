@@ -59,18 +59,16 @@ codeFixedWidthEnumSized size ndata = map toEnum $ codeFixedWidth base width ndat
       width = bitWidth base size
 
 -- | Decode a value encoded as digits in a given base
-decode :: Int   -- ^ Base
-       -> [Int] -- ^ Digits
-       -> Int
+decode :: (Num a) => a   -- ^ Base
+       -> [a]            -- ^ Digits
+       -> a
 decode base ds = go (length ds) ds
     where
       go _ [] = 0
       go n (d:ds') = base^(n-1) * d + go (n-1) ds'
 
 -- | Decode a value encoded as digits in an enumerable bounded base.
-decodeEnum :: forall b. (Enum b, Bounded b) => [b] -> Int
-decodeEnum ds = decode base (map fromEnum ds)
+decodeEnum :: forall a b. (Enum b, Bounded b, Enum a, Num a) => [b] -> a
+decodeEnum ds = decode base (map (toEnum . fromEnum) ds)
     where
-      base = fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1
-
-data Trit = A | B | C deriving (Eq, Ord, Show, Enum, Bounded)
+      base = toEnum (fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1)

@@ -24,8 +24,8 @@ instance (Enum a) => PredicateToExpr (RS.RangeSet a) where
                     [] -> FalseE
                     xs -> foldr1 OrE xs
       where
-        rangeTest (l, h) = AndE (LtE (ConstE $ fromEnum l) SymE)
-                                (LtE SymE (ConstE $ fromEnum h))
+        rangeTest (l, h) = AndE (LteE (ConstE $ fromEnum l) SymE)
+                                (LteE SymE (ConstE $ fromEnum h))
 
 -- | The output functions of FSTs generated from Mu-expressions are a strict
 -- subset of the update string functions of SSTs. We can therefore "join" any
@@ -55,10 +55,10 @@ tabulate :: (Function t,Enum (Dom t),Bounded (Dom t)
          => t -> Table delta
 tabulate f = Table bitTable bitSize
   where
-    bitTable = map (eval f) [minBound .. maxBound]
-    bitSize = case bitTable of
-                [] -> 0
-                (x:_) -> length x
+    bitTable = map eval' [minBound .. maxBound]
+    bitSize = foldr max 0 (map length bitTable)
+    eval' x | inDom x f = eval f x
+            | otherwise = []
 
 -- | Compile a single variable update into a sequence of instructions.
 -- The following is assumed:
@@ -152,7 +152,7 @@ compileAutomaton sst =
   , progBlocks       =
       M.fromList [ (blck
                    ,compileState bmap tmap smap (sstOut sst)
-                                 (eForward (sstE sst) M.! st)
+                                 (eForwardLookup (sstE sst) st)
                                  (M.lookup st (sstF sst)))
                        | (st, blck) <- M.toList smap ]
   }
