@@ -1,6 +1,11 @@
 {-# LANGUAGE TypeOperators #-}
 module Main where
 
+import Control.Monad (when)
+import Data.Word
+import System.Environment
+import System.Exit (ExitCode(..), exitWith)
+    
 import KMC.Expression hiding (Var)
 import KMC.FSTConstruction hiding (Var)
 import KMC.OutputTerm
@@ -12,9 +17,10 @@ import KMC.SSTConstruction
 import KMC.SymbolicSST
 import KMC.Syntax.Config
 import KMC.Syntax.Parser
+import KMC.Hased.Parser
+import KMC.Hased.Lang
 
-import Data.Word
-import System.Exit (ExitCode)
+
 
 type DFST sigma delta = SST (PathTree Var Int) (RangeSet sigma) (OutputTerm sigma delta) Var
 
@@ -25,7 +31,7 @@ sstFromFancy str =
   case parseRegex fancyRegexParser str of
     Left e -> error e
     Right (_, re) -> optimize $ sstFromFST $ fromMu $ fromRegex re
-
+                  
 progFromFancy :: String -> Program Bool
 progFromFancy str = compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
 
@@ -37,8 +43,11 @@ compileFancy :: String -> IO ExitCode
 compileFancy str =
   compileProgram (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match"
 
-runSST :: String -> [Char] -> Stream [Bool]
-runSST str = run (sstFromFancy str)
+sstFromHased :: String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
+sstFromHased str = 
+    case parseHased str of
+      Left e -> error e
+      Right ih -> optimize $ sstFromFST (fromMu (hasedToMuTerm ih))
 
-main :: IO ()
-main = return ()
+progFromHased :: String -> Program Word8
+progFromHased = compileAutomaton . sstFromHased
