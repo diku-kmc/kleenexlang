@@ -48,7 +48,7 @@ sstFromHased :: String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm V
 sstFromHased str = 
     case parseHased str of
       Left e -> error e
-      Right ih -> optimize $ sstFromFST (fromMu (hasedToMuTerm ih))
+      Right ih -> {-  optimize $ -}  sstFromFST (fromMu (hasedToMuTerm ih))
 
 progFromHased :: String -> Program Word8
 progFromHased = compileAutomaton . sstFromHased
