@@ -1,0 +1,4 @@
+// Converts all as to bs and vice versa
+x := "b" ~<a> x
+   | "a" ~<b> x
+   | ~<.>
