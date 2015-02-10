@@ -12,66 +12,35 @@ import KMC.RangeSet (RangeSet)
 import KMC.Theories
 import KMC.Coding
 
-data Ident a = Ident
-data InList f = InList f
-data Enumerator e dom rng = Enumerator e
-data Join f rng = Join [f]
-data Const dom rng = Const rng
-data f :+: g = Inl f | Inr g
+data Ident a = Ident deriving (Eq, Ord)
+data InList f = InList f deriving (Eq, Ord)
+data Enumerator e dom rng = Enumerator e deriving (Eq, Ord)
+data Join f rng = Join [f] deriving (Eq, Ord)
+data Const dom rng = Const rng deriving (Eq, Ord, Show)
+data f :+: g = Inl f | Inr g deriving (Eq, Ord)
 
 type OutputTerm sigma delta = Join (Const sigma [delta] :+: Enumerator (RangeSet sigma) sigma delta) [delta]
-
-{-
-data Func t a b where
-  Func   :: t -> Func t (Dom t) (Rng t)
-  Id     :: Func t a a
-  ConstF :: b -> Func t a b
-
-  Inl    :: Func t a b -> Func t a (Either b c)
-  Inr    :: Func t a c -> Func t a (Either b c)
-  List   :: [Func t a b] -> Func t a [b]
-
-  Concat :: Func t a [[b]] -> Func t a [b]
-
-instance (Function t) => Function (Func t a b) where
-  type Dom (Func t a b) = a
-  type Rng (Func t a b) = b
-
-  eval (Func f)     = eval f
-  eval Id           = id
-  eval (ConstF x)   = const x
-
-  eval (Inl f)      = Left . eval f
-  eval (Inr f)      = Right . eval f
-  eval (List xs)    = \x -> map (flip eval x) xs
-  eval (Concat f)   = concat . eval f
-
-  isConst (Func f)   = isConst f
-  isConst Id         = Nothing
-  isConst (ConstF x) = Just x
-  isConst (Inl f)    = Left <$> isConst f
-  isConst (Inr f)    = Right <$> isConst f
-  isConst (List xs)  = mapM isConst xs
-  isConst (Concat f) = concat <$> isConst f
--}
 
 instance Function (Ident a) where
   type Dom (Ident a) = a
   type Rng (Ident a) = a
   eval Ident = id
   isConst Ident = Nothing
+  inDom _ _ = True
 
 instance (Function f) => Function (InList f) where
   type Dom (InList f) = Dom f
   type Rng (InList f) = [Rng f]
   eval (InList f) x = [eval f x]
   isConst (InList f) = (:[]) <$> isConst f
+  inDom x (InList f) = inDom x f
 
 instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   type Dom (Join f rng) = Dom f
   type Rng (Join f rng) = rng
   eval (Join fs) x = mconcat $ map (flip eval x) fs
   isConst (Join fs) = mconcat <$> mapM isConst fs
+  inDom x (Join fs) = all (inDom x) fs
 
 instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :+: g) where
   type Dom (f :+: g) = Dom f
@@ -80,12 +49,15 @@ instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :
   eval (Inr g) x = eval g x
   isConst (Inl f) = isConst f
   isConst (Inr g) = isConst g
+  inDom x (Inl f) = inDom x f
+  inDom x (Inr g) = inDom x g
 
 instance Function (Const dom rng) where
   type Dom (Const dom rng) = dom
   type Rng (Const dom rng) = rng
   eval (Const x) = const x
   isConst (Const x) = Just x
+  inDom _ _ = True
 
 instance (Enumerable e dom, Enum rng, Bounded rng) => Function (Enumerator e dom rng) where
   type Dom (Enumerator e dom rng) = dom
@@ -95,3 +67,4 @@ instance (Enumerable e dom, Enum rng, Bounded rng) => Function (Enumerator e dom
                                Just $ eval (Enumerator e) (lookupIndex 0 e)
                            else
                                Nothing
+  inDom x (Enumerator e) = member x e
