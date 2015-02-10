@@ -32,12 +32,15 @@ data SST st pred func var =
   , sstE :: EdgeSet st pred func var               -- ^ Symbolic transition relation
   , sstI :: st                                     -- ^ Initial state
   , sstF :: M.Map st (UpdateString var (Rng func)) -- ^ Final states with final output
-  , sstV :: S.Set var                              -- ^ Output variables. The minimal variable is the designated output variable.
   }
 
 -- | Get the designated output variable of an SST.
-sstOut :: SST st pred func var -> var
+sstOut :: (Ord var) => SST st pred func var -> var
 sstOut = S.findMin . sstV
+
+-- | Output variables. The minimal variable is the designated output variable.
+sstV :: (Ord var) => SST st pred func var -> S.Set var
+sstV sst = S.unions [ M.keysSet upd | (_,_,upd,_) <- edgesToList $ sstE sst ]
 
 deriving instance (Show var, Show func, Show (Rng func)) => Show (Atom var func)
 deriving instance (Show st, Show pred, Show func, Show var, Show (Rng func))
@@ -108,7 +111,6 @@ construct qin es os =
   , sstE = edgesFromList [ (q, p, ru us, q') | (q, p, us, q') <- es ]
   , sstI = qin
   , sstF = outf [(q, normalizeUpdateString us) | (q, us) <- os]
-  , sstV = S.fromList [ v | (_,_,xs,_) <- es, (v,_) <- xs ]
   }
   where
     outf = M.fromListWith (error "Inconsistent output function: Same state has more than one update.")
@@ -126,7 +128,6 @@ construct' qin es os =
   , sstE = edgesFromList [ (q, p, normalizeRegisterUpdate ru, q') | (q, p, ru, q') <- es ]
   , sstI = qin
   , sstF = outf [(q, normalizeUpdateString us) | (q, us) <- os]
-  , sstV = S.fromList [ v | (_,_,ru,_) <- es, v <- M.keys ru ]
   }
   where
     outf = M.fromListWith (error "Inconsistent output function: Same state has more than one update.")
@@ -248,7 +249,6 @@ enumerateStates sst =
     , sstE = edgesFromList [ (aux q, p, f, aux q') | (q, p, f, q') <- edgesToList (sstE sst) ]
     , sstI = aux . sstI $ sst
     , sstF = M.fromList [ (aux q, o) | (q, o) <- M.toList (sstF sst) ]
-    , sstV = sstV sst
     }
     where
       states = M.fromList (zip (S.toList (sstS sst)) [(0::Int)..])
