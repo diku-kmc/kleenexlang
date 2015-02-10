@@ -298,9 +298,12 @@ renderCProg cprog =
 renderProgram :: (Enum delta, Bounded delta) => Program delta -> String
 renderProgram = renderCProg . programToC
 
-compileProgram :: (Enum delta, Bounded delta) => Program delta -> FilePath -> IO ExitCode
-compileProgram prog outPath = do
+compileProgram :: (Enum delta, Bounded delta) => Program delta -> FilePath -> Maybe FilePath -> IO ExitCode
+compileProgram prog outPath cCodeOutPath = do
   let cstr = renderCProg . programToC $ prog
+  case cCodeOutPath of
+    Nothing -> return ()
+    Just p  -> writeFile p cstr
   (Just hin, _, _, hproc) <- createProcess (proc "gcc" ["-O3", "-xc", "-o", outPath, "-"])
                                            { std_in = CreatePipe }
   hPutStrLn hin cstr

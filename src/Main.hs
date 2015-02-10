@@ -41,7 +41,7 @@ cFromFancy str =
 
 compileFancy :: String -> IO ExitCode
 compileFancy str =
-  compileProgram (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match"
+  compileProgram (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match" Nothing
 
 sstFromHased :: String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
 sstFromHased str = 
@@ -67,4 +67,4 @@ main = do
     exitWith $ ExitFailure 1
   let [hasedFile] = args
   hased <- readFile hasedFile
-  compileProgram (progFromHased hased) (hasedFile ++ ".c")
+  compileProgram (progFromHased hased) ("hasedprog") (Just $ hasedFile ++ ".c")
