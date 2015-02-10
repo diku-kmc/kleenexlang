@@ -12,8 +12,8 @@
 
 (defconst hased-font-lock-keywords-1
   (list
-   '("<\\([^<>]*\\)>"  . font-lock-keyword-face)
-   '("\"[^\"]*\"" . font-lock-constant-face)
+   '("<\\([^<>]*\\)>" . 1)
+   '("\"[^\"]*\"" . font-lock-string-face)
    '("\\<\\([a-z][a-zA-Z0-9_-]*\\)\\>" . font-lock-function-name-face)
    )
   "Minimal highlighting expressions for Hased mode")
