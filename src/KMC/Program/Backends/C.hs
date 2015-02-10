@@ -195,7 +195,7 @@ prettyInstr buftype tbltype prog instr =
                                  <> parens (hcat [buf bid, comma, arg, comma, lendoc])
                                  <> semi
     ConcatI bid1 bid2  -> if bid1 == streamBuf then
-                              text "writebuf" <> parens (buf bid2) <> semi
+                              text "write" <> parens (buf bid2) <> semi
                           else
                               text "concat"
                               <> parens (hcat [buf bid1, comma, buf bid2])
