@@ -2,29 +2,6 @@
 ** DONE (Ulrik) The optimizer does not propagate constants to output functions.
 *** TODO Test that this works now.
 
-** TODO (Ulrik) Propagation of constants (probably) too naive.
-*** Description:
-   I _think_ that this is a bug that just hasn't manifested itself. It just
-   dawned on me: Abstract environments are applied using the simplistic
-   assumption that local variable updates in a block are not used later in the
-   same block. Either this is actually true for the programs that we generate,
-   or there are parsers that will produce wrong result when optimized.
-
-   Example: Consider this block of code:
-
-   x <- x 1
-   write(x)
-   goto ...
-
-   If we know that x always have the value `0' upon entry, the program will
-   currently be rewritten as
-
-   x <- 0 1
-   write(0)
-   goto ...
-
-   which is _wrong_, the second line should be write(01). The fix is simple:
-   When applying the abstract environment, update it after each instruction.
 
 * Features
 ** TODO [#B] Limit constant propagation
