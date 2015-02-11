@@ -1,0 +1,13 @@
+// Pathological case for SST
+
+evil := x <b> <\n>
+      | y <a> <\n>
+
+x := ~<a> "b" x
+   | ~<b> "a" x
+   | ""
+
+y := ~<a> "B" y
+   | ~<b> "A" y
+   | ""
+

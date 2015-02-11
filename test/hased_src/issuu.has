@@ -13,10 +13,10 @@
      p(x1, x2) := <"> x1 <"> x2
 */
 
-objects := object ~<\n> objects
+objects := object <\n> objects
          | object ~<\n?>
 
-object := <\{> sep keyValPairs nl <}> nl
+object := ~<\{> sep keyValPairs ~<}>
 
 keyValPairs := keyVal ~<,> keyValPairs
              | keyVal
@@ -29,7 +29,8 @@ nl := "
 keyVal := ~<"ts":> "Timestamp=" someNumber sep
         | ~<"visitor_uuid":> "vistor-id: " ~<"> hash16 ~<"> sep
         | ~( <"visitor_source":> <"> visitorSource <"> )
-        | ~<"visitor_device":> "visitor device: " ~<"> visitorDevice ~<"> sep
+        | ~<"visitor_device":> ( ~("From a browser" ~<"browser">)
+                               | "From a mobile phone" ~<"android"> sep)
         | ~( <"visitor_useragent":> someString )
         | ~( <"visitor_ip":> <"> hash16 <"> )
         | ~<"visitor_country":> "Country:" ~<"> <[A-Z]{2}> ~<"> sep
@@ -46,7 +47,7 @@ keyVal := ~<"ts":> "Timestamp=" someNumber sep
         | ~( <"visitor_username":> (<"> hash16 <"> | <null>) )
         | ~( <"env_adid":> <"> hash16 <"> )
         | ~( <"env_ranking":> someNumber )
-        | ~( <"event_service":> <"> serviceName <"> )
+        | ~<"event_service":> "Name of service: " ~<"> serviceName ~<">
         | ~( <"event_readtime":> someNumber )
         | ~( <"event_index":> someNumber )
         | ~( <"subject_infoboxid":> someString )
@@ -56,10 +57,10 @@ keyVal := ~<"ts":> "Timestamp=" someNumber sep
         | ~( <"cause_adid":> <"> hash16 <">)
         | ~( <"cause_embedid":> someNumber ) /* undocumented */
         | ~( <"cause_token":> someString ) /* undocumented */
-        | "Unknown key/Val: " someString ~<:> "/" (someString | someNumber) sep
-//        | ~( <"env_build":> )
-//        | ~( <"env_name":> )
-//        | ~( <"env_component":>
+        | ~( <"env_build":> someString )
+        | ~( <"env_name":> someString )
+        | ~( <"env_component":> someString )
+        // | "Unknown key/Val: " someString ~<:> "/" (someString | someNumber) sep
 
 hash16 := <[a-f0-9]{16}>
 someString := ~<"> <[^"]*> ~<">
