@@ -1,0 +1,65 @@
+* Bugs
+** TODO (Ulrik) The optimizer does not propagate constants to output functions.
+** TODO (Ulrik) Propagation of constants (probably) too naive.
+*** Description:
+   I _think_ that this is a bug that just hasn't manifested itself. It just
+   dawned on me: Abstract environments are applied using the simplistic
+   assumption that local variable updates in a block are not used later in the
+   same block. Either this is actually true for the programs that we generate,
+   or there are parsers that will produce wrong result when optimized.
+
+   Example: Consider this block of code:
+
+   x <- x 1
+   write(x)
+   goto ...
+
+   If we know that x always have the value `0' upon entry, the program will
+   currently be rewritten as
+
+   x <- 0 1
+   write(0)
+   goto ...
+
+   which is _wrong_, the second line should be write(01). The fix is simple:
+   When applying the abstract environment, update it after each instruction.
+
+* Features
+** TODO [#B] Limit constant propagation
+*** Description:
+   Propagating constants seem to introduce a lot of copying in cases such as
+   ``abcd|[a-z]*''. Essentially, the bit-codes for a, ab, and abc parsed using
+   ``[a-z]*'' are included as constants in the "optimized" SST.  Maybe the
+   static analyzer is too eager. An alternative approach could work as follows:
+
+   When the analyzer currently encounters an assignment of the form x <- C[x]
+   where C[.]  is a constant context and the value of x is statically known to
+   be some `v', the static value of x is updated to C[v]. This might be too
+   eager, consider the following:
+
+   1 : x <- 1010
+       y <- 1
+       goto 2
+   2 : x <- x y 0
+       y <- 0
+       if .. { write(x); accept() } else goto 3
+   3 : x <- x y 1
+       if .. { write(x); accept() } else goto 4
+   4 : ...
+
+   Assuming that block 1 is not reachable from block 4, this will be "optimized"
+   to
+
+   1 : goto 2
+   2 : if .. { write(101010); accept() } else goto 3
+   3 : if .. { write(10101001); accept() } else goto 4
+   4 : ...
+
+   We eliminated both x and y, but we have repeated the value "10101". This is
+   exactly what happens for expressions of the form ``w|[a-z]*'', and will lead
+   to |w| constants in the program, each a prefix of the next.
+
+   We should try to change the static analysis such that dynamic updates are not
+   eliminated, but assign-once constants are. This means that in the above
+   example, the x buffer will be left intact, but the y buffer is eliminated,
+   since it is only assigned once and never updated using itself as input.
