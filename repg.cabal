@@ -31,14 +31,13 @@ executable repg
                      , process >= 1.1.0.2
                      , text >= 1.1.0.0
                      , transformers >= 0.4.2.0
+                     , template-haskell
+                     , options >= 1.2.1.1
 
                      -- Remove before distributing: Only needed because haskell-mode
                      -- is too stupid to figure out build-depends for the test suite.
                      , Cabal >= 1.22.0.0
                      , QuickCheck >= 2.7.6
-                     , template-haskell
---                     , Cabal >= 1.22.0.0
---                     , QuickCheck >= 2.7.6
 
   hs-source-dirs:      src
   default-language:    Haskell2010

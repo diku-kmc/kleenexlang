@@ -4,7 +4,9 @@
 
 module KMC.Program.Backends.C where
 
+import           Control.Monad (when)
 import           Data.Bits
+import           Data.List (intercalate)
 import qualified Data.Map as M
 import           Numeric
 import           System.Exit (ExitCode)
@@ -300,13 +302,18 @@ renderCProg cprog =
 renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
 renderProgram buftype = renderCProg . programToC buftype
 
-compileProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> FilePath -> Maybe FilePath -> IO ExitCode
-compileProgram buftype prog outPath cCodeOutPath = do
+compileProgram :: (Enum delta, Bounded delta) => CType -> Int -> Bool -> Program delta -> FilePath -> Maybe FilePath -> IO ExitCode
+compileProgram buftype optLevel optQuiet prog outPath cCodeOutPath = do
   let cstr = renderCProg . programToC buftype $ prog
   case cCodeOutPath of
     Nothing -> return ()
-    Just p  -> writeFile p cstr
-  (Just hin, _, _, hproc) <- createProcess (proc "gcc" ["-O2", "-xc", "-o", outPath, "-"])
+    Just p  -> do
+      when (not optQuiet) $ putStrLn $ "Writing C source to " ++ p
+      writeFile p cstr
+  let opts = ["-O" ++ show optLevel, "-xc", "-o", outPath, "-"]
+  when (not optQuiet) $
+    putStrLn $ "Running CC with options '" ++ intercalate " " opts ++ "'"
+  (Just hin, _, _, hproc) <- createProcess (proc "gcc" opts)
                                            { std_in = CreatePipe }
   hPutStrLn hin cstr
   hClose hin
