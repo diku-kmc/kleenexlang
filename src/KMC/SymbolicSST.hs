@@ -175,7 +175,7 @@ updateAbstractValuation :: (Ord var, Function func, Rng func ~ [delta]) =>
                         -> AbstractValuation var delta
 updateAbstractValuation rho kappa = M.union (M.mapMaybe (liftAbstractValuation rho) kappa) rho
 
-applyAbstractValuation :: (Ord var, Function func, Rng func ~ [delta]) => 
+applyAbstractValuation :: (Ord var, {- necessary? -} Function func, Rng func ~ [delta]) => 
                           AbstractValuation var delta
                        -> UpdateStringFunc var func
                        -> UpdateStringFunc var func
@@ -183,6 +183,16 @@ applyAbstractValuation rho = normalizeUpdateStringFunc . map subst
     where
       subst (VarA v) | Just (Exact ys) <- M.lookup v rho = ConstA ys
                      | otherwise = VarA v
+      subst a = a
+
+applyAbstractValuationUS :: (Ord var) =>
+                            AbstractValuation var delta
+                         -> UpdateString var [delta]
+                         -> UpdateString var [delta]
+applyAbstractValuationUS rho = normalizeUpdateString . map subst
+    where
+      subst (Left v) | Just (Exact ys) <- M.lookup v rho = Right ys
+                     | otherwise = Left v
       subst a = a
 
 updateAbstractEnvironment :: (Ord st, Ord var, Eq delta
@@ -229,13 +239,22 @@ applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta])
                          -> SST st pred func var
                          -> SST st pred func var
 applyAbstractEnvironment gamma sst =
-  sst { sstE = mapEdges apply (sstE sst) }
+  sst { sstE = mapEdges apply (sstE sst)
+      , sstF = M.mapWithKey applyFinal (sstF sst)
+      }
   where
     apply (q, p, kappa, q') =
-      let srcRho = maybe M.empty id (M.lookup q gamma)
+      let -- The static environment when exiting the source state
+          srcRho = maybe M.empty id (M.lookup q gamma)
+          -- Get the list of variables that are statically known in the destination state
           exactKeys = M.keys $ M.filter isExact $ maybe M.empty id (M.lookup q' gamma)
+          -- Apply the static environment of the source state and delete all static updates
           kappa' = M.map (applyAbstractValuation srcRho) $ foldr M.delete kappa exactKeys
       in (q, p, kappa', q')
+
+    applyFinal q us =
+      let rho = maybe M.empty id (M.lookup q gamma)
+      in normalizeUpdateString $ applyAbstractValuationUS rho us
 
 optimize :: (Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
             SST st pred func var

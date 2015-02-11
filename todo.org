@@ -1,5 +1,7 @@
 * Bugs
-** TODO (Ulrik) The optimizer does not propagate constants to output functions.
+** DONE (Ulrik) The optimizer does not propagate constants to output functions.
+*** TODO Test that this works now.
+
 ** TODO (Ulrik) Propagation of constants (probably) too naive.
 *** Description:
    I _think_ that this is a bug that just hasn't manifested itself. It just
