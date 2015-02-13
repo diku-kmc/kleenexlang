@@ -4,7 +4,7 @@
 
 
 * Features
-** TODO [#B] Limit constant propagation
+** DONE [#B] Limit constant propagation
 *** Description:
    Propagating constants seem to introduce a lot of copying in cases such as
    ``abcd|[a-z]*''. Essentially, the bit-codes for a, ab, and abc parsed using
@@ -42,3 +42,6 @@
    eliminated, but assign-once constants are. This means that in the above
    example, the x buffer will be left intact, but the y buffer is eliminated,
    since it is only assigned once and never updated using itself as input.
+*** Status:
+  When optimizing at level < 3, the static analyzer will consider all variables
+  depending on themselves as ambiguous.
