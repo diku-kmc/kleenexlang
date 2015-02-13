@@ -6,7 +6,7 @@ import Control.Applicative
 import Data.Word
 import System.Environment
 import System.Exit (ExitCode(..), exitWith)
-import System.FilePath (splitFileName, dropExtension, replaceExtension)
+import System.FilePath (splitFileName, dropExtension)
 import Options
 
 import KMC.Expression hiding (Var)
@@ -32,7 +32,26 @@ data CompileOptions =
     CompileOptions
     { optOptimizeSST     :: Bool
     , optOptimizeLevelCC :: Int
+    , optOutFile         :: Maybe FilePath
+    , optCFile           :: Maybe FilePath
+    , optWordSize        :: CType
     }
+
+ctypeOptionType :: OptionType CType
+ctypeOptionType =
+  optionType "8|16|32|64"
+             UInt8T
+             (\s -> case s of
+                      "8" -> Right UInt8T
+                      "16" -> Right UInt16T
+                      "32" -> Right UInt32T
+                      "64" -> Right UInt64T
+                      _ -> Left $ "\"" ++ s ++ "\" is not a valid word size")
+             (\c -> case c of
+                      UInt8T -> "8"
+                      UInt16T -> "16"
+                      UInt32T -> "32"
+                      UInt64T -> "64")
 
 instance Options MainOptions where
     defineOptions =
@@ -44,6 +63,13 @@ instance Options CompileOptions where
       CompileOptions
       <$> simpleOption "opt" False "Enable SST optimization"
       <*> simpleOption "copt" 3 "C compiler optimization level"
+      <*> simpleOption "out" Nothing "Output file"
+      <*> simpleOption "srcout" Nothing "Write intermediate C program to given file path"
+      <*> defineOption ctypeOptionType
+              (\o -> o { optionLongFlags   = ["wordsize"]
+                       , optionDefault     = UInt8T
+                       , optionDescription = "Buffer word size"
+                       })
 
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
 compile mainOpts compileOpts args = do
@@ -53,15 +79,16 @@ compile mainOpts compileOpts args = do
      exitWith $ ExitFailure 1
    let [hasedFile] = args
    hasedSrc <- readFile hasedFile
-   let binFile = snd $ splitFileName $ dropExtension hasedFile
-   let cFile   = replaceExtension hasedFile "c"
-   when (not $ optQuiet mainOpts) $
-     putStrLn $ "Writing binary " ++ binFile ++ " and C source " ++ cFile
-   compileProgram UInt8T (optOptimizeLevelCC compileOpts)
-                         (optQuiet mainOpts)
-                         (progFromHased (optOptimizeSST compileOpts) hasedSrc)
-                         binFile
-                         (Just cFile)
+   let binFile = maybe (snd $ splitFileName $ dropExtension hasedFile)
+                       id
+                       (optOutFile compileOpts)
+   when (not $ optQuiet mainOpts) $ putStrLn $ "Writing binary " ++ binFile
+   compileProgram (optWordSize compileOpts)
+                  (optOptimizeLevelCC compileOpts)
+                  (optQuiet mainOpts)
+                  (progFromHased (optOptimizeSST compileOpts) hasedSrc)
+                  binFile
+                  (optCFile compileOpts)
 
 main :: IO ExitCode
 main = runSubcommand

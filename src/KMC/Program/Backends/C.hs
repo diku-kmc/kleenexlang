@@ -302,7 +302,14 @@ renderCProg cprog =
 renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
 renderProgram buftype = renderCProg . programToC buftype
 
-compileProgram :: (Enum delta, Bounded delta) => CType -> Int -> Bool -> Program delta -> FilePath -> Maybe FilePath -> IO ExitCode
+compileProgram :: (Enum delta, Bounded delta) =>
+                  CType
+               -> Int
+               -> Bool
+               -> Program delta
+               -> FilePath
+               -> Maybe FilePath
+               -> IO ExitCode
 compileProgram buftype optLevel optQuiet prog outPath cCodeOutPath = do
   let cstr = renderCProg . programToC buftype $ prog
   case cCodeOutPath of
