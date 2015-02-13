@@ -30,7 +30,7 @@ data MainOptions =
 
 data CompileOptions =
     CompileOptions
-    { optOptimizeSST     :: Bool
+    { optOptimizeSST     :: Int
     , optOptimizeLevelCC :: Int
     , optOutFile         :: Maybe FilePath
     , optCFile           :: Maybe FilePath
@@ -61,8 +61,8 @@ instance Options MainOptions where
 instance Options CompileOptions where
     defineOptions =
       CompileOptions
-      <$> simpleOption "opt" False "Enable SST optimization"
-      <*> simpleOption "copt" 3 "C compiler optimization level"
+      <$> simpleOption "opt" 0 "SST optimization level (1-3)"
+      <*> simpleOption "copt" 3 "C compiler optimization level (1-3)"
       <*> simpleOption "out" Nothing "Output file"
       <*> simpleOption "srcout" Nothing "Write intermediate C program to given file path"
       <*> defineOption ctypeOptionType
@@ -97,14 +97,29 @@ main = runSubcommand
 
 type DFST sigma delta = SST (PathTree Var Int) (RangeSet sigma) (OutputTerm sigma delta) Var
 
+sstFromHased :: Int -> String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
+sstFromHased opt str = 
+    case parseHased str of
+      Left e -> error e
+      Right ih -> optimize opt $ sstFromFST (fromMu (hasedToMuTerm ih))
+
+progFromHased :: Int -> String -> Program Word8
+progFromHased opt = compileAutomaton . sstFromHased opt
+
+cFromHased :: Int -> String -> String
+cFromHased opt = renderProgram UInt8T . progFromHased opt
+
+
+{-------------------------------------------}
+
 sstFromFancy :: (Bounded sigma, Enum sigma, Ord sigma) =>
                 String
                 -> DFST sigma Bool
 sstFromFancy str =
   case parseRegex fancyRegexParser str of
     Left e -> error e
-    Right (_, re) -> optimize $ sstFromFST $ fromMu $ fromRegex re
-                  
+    Right (_, re) -> optimize 3 $ sstFromFST $ fromMu $ fromRegex re
+
 progFromFancy :: String -> Program Bool
 progFromFancy str = compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
 
@@ -116,17 +131,5 @@ compileFancy :: String -> IO ExitCode
 compileFancy str =
   compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match" Nothing
 
-sstFromHased :: Bool -> String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
-sstFromHased opt str = 
-    case parseHased str of
-      Left e -> error e
-      Right ih -> (if opt then optimize else id) $ sstFromFST (fromMu (hasedToMuTerm ih))
-
-progFromHased :: Bool -> String -> Program Word8
-progFromHased opt = compileAutomaton . sstFromHased opt
-
-cFromHased :: Bool -> String -> String
-cFromHased opt = renderProgram UInt8T . progFromHased opt
-                 
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)

@@ -175,6 +175,19 @@ updateAbstractValuation :: (Ord var, Function func, Rng func ~ [delta]) =>
                         -> AbstractValuation var delta
 updateAbstractValuation rho kappa = M.union (M.mapMaybe (liftAbstractValuation rho) kappa) rho
 
+-- | Weaker version of the above. Variables will be considered ambiguous if they
+-- depend on their own value.
+updateAbstractValuationWeak :: (Ord var, Function func, Rng func ~ [delta]) =>
+                           AbstractValuation var delta
+                        -> RegisterUpdate var func
+                        -> AbstractValuation var delta
+updateAbstractValuationWeak rho kappa =
+  let rho' = M.mapMaybeWithKey
+               (\k usf ->
+                 liftAbstractValuation (M.insert k Ambiguous rho) usf)
+               kappa
+  in M.union rho' rho
+
 applyAbstractValuation :: (Ord var, {- necessary? -} Function func, Rng func ~ [delta]) => 
                           AbstractValuation var delta
                        -> UpdateStringFunc var func
@@ -197,11 +210,12 @@ applyAbstractValuationUS rho = normalizeUpdateString . map subst
 
 updateAbstractEnvironment :: (Ord st, Ord var, Eq delta
                              ,Function func, Rng func ~ [delta]) =>
-                             SST st pred func var
+                             Bool
+                          -> SST st pred func var
                           -> [st]
                           -> AbstractEnvironment st var delta
                           -> (AbstractEnvironment st var delta, [st])
-updateAbstractEnvironment sst states gamma =
+updateAbstractEnvironment weak sst states gamma =
   (M.union updates gamma
   ,S.toList $ S.unions (map succs (M.keys updates)))
   where
@@ -216,7 +230,7 @@ updateAbstractEnvironment sst states gamma =
       -- taking the least upper bound.
       let rho_s' =
             lubAbstractValuations $
-              [ maybe M.empty id (M.lookup r gamma) `updateAbstractValuation` kappa
+              [ maybe M.empty id (M.lookup r gamma) `updateRho` kappa
                 | (_, kappa, r) <- maybe [] id (M.lookup s (eBackward $ sstE sst)) ]
       -- Get the previous abstract valuation for the current state
       let rho_s = maybe M.empty id (M.lookup s gamma)
@@ -224,14 +238,17 @@ updateAbstractEnvironment sst states gamma =
       guard (rho_s' /= rho_s)
       return (M.singleton s rho_s')
 
+    updateRho = if weak then updateAbstractValuationWeak else updateAbstractValuation
+
 abstractInterpretation :: (Ord st, Ord var, Eq delta
                           ,Function func, Rng func ~ [delta]) =>
-                          SST st pred func var
+                          Bool
+                       -> SST st pred func var
                        -> AbstractEnvironment st var delta
-abstractInterpretation sst = go (S.toList $ sstS sst) M.empty
+abstractInterpretation weak sst = go (S.toList $ sstS sst) M.empty
     where
       go [] gamma = gamma
-      go states gamma = let (gamma', states') = updateAbstractEnvironment sst states gamma
+      go states gamma = let (gamma', states') = updateAbstractEnvironment weak sst states gamma
                         in go states' gamma'
 
 applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta]) =>
@@ -257,9 +274,14 @@ applyAbstractEnvironment gamma sst =
       in normalizeUpdateString $ applyAbstractValuationUS rho us
 
 optimize :: (Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
-            SST st pred func var
+            Int
          -> SST st pred func var
-optimize sst = let gamma = abstractInterpretation sst in applyAbstractEnvironment gamma sst
+         -> SST st pred func var
+optimize level sst =
+  let weak = level < 3
+      applyOpt = level > 0
+      gamma = abstractInterpretation weak sst
+  in if applyOpt then applyAbstractEnvironment gamma sst else sst
 
 enumerateStates :: (Ord k, Ord var) => SST k pred func var -> SST Int pred func var
 enumerateStates sst =
