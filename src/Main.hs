@@ -8,6 +8,7 @@ import System.Environment
 import System.Exit (ExitCode(..), exitWith)
 import System.FilePath (splitFileName, dropExtension)
 import Options
+import qualified Data.Set as S
 
 import KMC.Expression hiding (Var)
 import KMC.FSTConstruction hiding (Var)
@@ -19,8 +20,8 @@ import KMC.Program.IL (Program)
 import KMC.RangeSet (RangeSet)
 import KMC.SSTCompiler (compileAutomaton)
 import KMC.SSTConstruction (PathTree, Var, sstFromFST)
-import KMC.SymbolicFST (FST)
-import KMC.SymbolicSST (SST, optimize, Stream, run)
+import KMC.SymbolicFST (FST, fstS)
+import KMC.SymbolicSST (SST, optimize, Stream, run, sstS)
 import KMC.Syntax.Config (fancyRegexParser)
 import KMC.Syntax.Parser (parseRegex)
 import KMC.Visualization
@@ -92,11 +93,17 @@ compile mainOpts compileOpts args = do
    let binFile = maybe (snd $ splitFileName $ dropExtension hasedFile)
                        id
                        (optOutFile compileOpts)
+   let fst = fstFromHased hasedSrc
+   when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (S.size $ fstS fst)
+   let sst = sstFromFST fst
+   when (not $ optQuiet mainOpts) $ putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
+   let sstopt = optimize (optOptimizeSST compileOpts) sst
+   let prog = compileAutomaton sstopt
    when (not $ optQuiet mainOpts) $ putStrLn $ "Writing binary " ++ binFile
    compileProgram (optWordSize compileOpts)
                   (optOptimizeLevelCC compileOpts)
                   (optQuiet mainOpts)
-                  (progFromHased (optOptimizeSST compileOpts) hasedSrc)
+                  prog
                   binFile
                   (optCFile compileOpts)
 
