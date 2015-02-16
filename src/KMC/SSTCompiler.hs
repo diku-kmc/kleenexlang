@@ -6,15 +6,19 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module KMC.SSTCompiler where
 
+import           Control.Monad.Reader
+import           Control.Applicative ((<$>), (<*>), pure)
 import           Data.List (sortBy)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import           Data.Tuple (swap)
 
 import           KMC.OutputTerm
 import           KMC.Program.IL
 import qualified KMC.RangeSet as RS
 import           KMC.SymbolicSST
 import           KMC.Theories
+import           KMC.Util.Map (swapMap)
 
 class PredicateToExpr p where
     predToExpr :: p -> Expr
@@ -65,27 +69,19 @@ tabulate f = Table bitTable bitSize
 --   (1) Variable updates are linear (non-copying)
 --   (2) Within the block of updates, the updated buffer is not live. (I.e., it is safe to modify it)
 compileAssignment :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
-                     M.Map var BufferId        -- ^ Variable to buffer map
-                  -> M.Map func TableId        -- ^ Function to table map
-                  -> M.Map [delta] ConstId
-                  -> var                       -- ^ Variable to be updated
+                     var                       -- ^ Variable to be updated
                   -> UpdateStringFunc var func -- ^ Update function
-                  -> Block delta
-compileAssignment bmap tmap cmap var atoms =
+                  -> EnvReader st var func delta (Block delta)
+compileAssignment var atoms = do
   case atoms of
-    VarA var':atoms' | var == var' -> go atoms'
-    _ -> ResetI bid
-    -- : AlignI bid parentbid
-       : go atoms
+    VarA var':atoms'
+        | var == var' -> mapM conv atoms'
+    _                 -> (:) <$> (ResetI <$> bid) <*> (mapM conv atoms)
   where
-    bid = bmap M.! var
-    go [] = []
-    go (VarA var':atoms') = ConcatI bid (bmap M.! var')
-                            : go atoms'
-    go (ConstA deltas:atoms') = AppendI bid (cmap M.! deltas)
-                              : go atoms'
-    go (FuncA f:atoms') = AppendTblI bid (tmap M.! f)
-                          : go atoms'
+    bid = (M.!) <$> (asks bmap) <*> pure var
+    conv (VarA var')     = ConcatI    <$> bid <*> ((M.!) <$> (asks bmap) <*> pure var')
+    conv (ConstA deltas) = AppendI    <$> bid <*> ((M.!) <$> (asks cmap) <*> pure deltas)
+    conv (FuncA f)       = AppendTblI <$> bid <*> ((M.!) <$> (asks tmap) <*> pure f)
 
 -- | Order assignments in a register update based on data dependencies. An
 -- assignment `a' should come before an assignment `b' if `a' uses the variable
@@ -103,48 +99,41 @@ orderAssignments = sortBy dataDependent
       fv (_:xs) = fv xs
 
 compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
-                         M.Map var BufferId        -- ^ Variable to buffer map
-                      -> M.Map func TableId        -- ^ Function to table map
-                      -> M.Map [delta] ConstId
-                      -> RegisterUpdate var func   -- ^ Register update
-                      -> Block delta
-compileRegisterUpdate bmap tmap cmap =
-  concatMap (uncurry $ compileAssignment bmap tmap cmap) . orderAssignments . M.toList
+                      RegisterUpdate var func   -- ^ Register update
+                      -> EnvReader st var func delta (Block delta)
+compileRegisterUpdate rup = 
+  liftM concat $ mapM (uncurry compileAssignment) $ orderAssignments $ M.toList rup
 
 compileTransition :: (Ord var, Ord func, Rng func ~ [delta], PredicateToExpr pred, Ord delta) =>
-                     M.Map var BufferId        -- ^ Variable to buffer map
-                  -> M.Map func TableId        -- ^ Function to table map
-                  -> M.Map [delta] ConstId
-                  -> pred                      -- ^ Transition predicate
-                  -> RegisterUpdate var func   -- ^ Transition action
-                  -> BlockId                   -- ^ Next block id
-                  -> Block delta
-compileTransition bmap tmap cmap pred' update blockId =
-  [IfI (predToExpr pred') (compileRegisterUpdate bmap tmap cmap update ++ [GotoI blockId])]
+                     pred                    -- ^ Transition predicate
+                  -> RegisterUpdate var func -- ^ Transition action
+                  -> BlockId                 -- ^ Next block id
+                  -> EnvReader st var func delta (Block delta)
+compileTransition pred' update blockId = do
+  block <- compileRegisterUpdate update
+  return [IfI (predToExpr pred') (block ++ [GotoI blockId])]
 
 compileState :: (Ord st, Ord var, Ord func, Ord delta, Rng func ~ [delta], PredicateToExpr pred) =>
-                     M.Map var BufferId        -- ^ Variable to buffer map
-                  -> M.Map func TableId        -- ^ Function to table map
-                  -> M.Map st BlockId          -- ^ State to block id map
-                  -> M.Map [delta] ConstId     -- ^ Constant to const id map
-                  -> var                       -- ^ Designated output variable
-                  -> [(pred, RegisterUpdate var func, st)] -- ^ Transitions
-                  -> Maybe (UpdateString var [delta]) -- ^ Final action
-                  -> Block delta
-compileState bmap tmap smap cmap outvar trans fin =
-  [NextI $
-     case fin of
-       Nothing -> [FailI]
-       Just upd -> compileAssignment bmap tmap cmap outvar (constUpdateStringFunc upd)
-                   ++ [AcceptI]
-  ]
-  ++ concat [ compileTransition bmap tmap cmap p upd (smap M.! st) | (p, upd, st) <- trans ]
-  ++ [FailI]
+                [(pred, RegisterUpdate var func, st)] -- ^ Transitions
+             -> Maybe (UpdateString var [delta])      -- ^ Final action
+             -> EnvReader st var func delta (Block delta)
+compileState trans fin = do
+  assignments <- liftM ((:[]) . NextI) $ case fin of
+                   Nothing  -> return [FailI]
+                   Just upd -> do
+                           var <- asks outvar
+                           ass <- compileAssignment var (constUpdateStringFunc upd)
+                           return $ ass ++ [AcceptI]
+  transitions <- concat `liftM` mapM
+                 (\(p, upd, st) -> do
+                    nextBlock <- (M.!) <$> (asks smap) <*> pure st
+                    compileTransition p upd nextBlock) trans
+  return $ assignments ++ transitions ++ [FailI]
 
 constants :: (Ord delta, Rng func ~ [delta]) =>
-                      [(st, pred, RegisterUpdate var func, st)]
-                   -> [UpdateString var [delta]]
-                   -> S.Set [delta]
+             [(st, pred, RegisterUpdate var func, st)]
+          -> [UpdateString var [delta]]
+          -> S.Set [delta]
 constants trans fins = S.union tconsts fconsts
     where tconsts = S.fromList $ do
                       (_, _, ru, _) <- trans
@@ -157,27 +146,43 @@ constants trans fins = S.union tconsts fconsts
                       Right c <- us
                       return c
 
+data Env st var func delta = Env
+    { bmap   :: M.Map var BufferId      -- ^ Variable to buffer map
+    , tmap   :: M.Map func TableId      -- ^ Function to table map
+    , cmap   :: M.Map [delta] ConstId   -- ^ Constant to const id map
+    , smap   :: M.Map st BlockId        -- ^ State to block id map
+    , outvar :: var                     -- ^ Designated output variable
+    }
+type EnvReader st var func delta = Reader (Env st var func delta)
+
 compileAutomaton :: forall st var func pred delta.
-    (Ord st, Ord var, Ord func, Ord delta
-    ,Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
-    ,PredicateToExpr pred) =>
+    ( Ord st, Ord var, Ord func, Ord delta
+    , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
+    , PredicateToExpr pred) =>
     SST st pred func var
     -> Program delta
 compileAutomaton sst =
   Program
   { progTables       = M.fromList [ (tid, tbl) | (_,tid,tbl) <- funcRel ]
-  , progConstants    = cdmap
-  , progStreamBuffer = bmap M.! sstOut sst
-  , progBuffers      = M.elems bmap
-  , progInitBlock    = smap M.! sstI sst
+  , progConstants    = swapMap (cmap env)
+  , progStreamBuffer = (bmap env) M.! (outvar env)
+  , progBuffers      = M.elems (bmap env)
+  , progInitBlock    = (smap env) M.! sstI sst
   , progBlocks       =
       M.fromList [ (blck
-                   ,compileState bmap tmap smap cmap (sstOut sst)
-                                 (eForwardLookup (sstE sst) st)
-                                 (M.lookup st (sstF sst)))
-                       | (st, blck) <- M.toList smap ]
+                   , flip runReader env $
+                              compileState (eForwardLookup (sstE sst) st)
+                                                (M.lookup st (sstF sst))
+                   )
+                   | (st, blck) <- M.toList (smap env) ]
   }
   where
+    env = Env { bmap = M.fromList $ zip (S.toList $ sstV sst) (map BufferId [0..])
+              , tmap = M.fromList [ (func, tid) | (func, tid, _) <- funcRel ]
+              , smap = M.fromList $ zip (S.toList $ sstS sst) (map BlockId [0..])
+              , cmap = M.fromList $ zip (S.toList consts) (map ConstId [0..])
+              , outvar = sstOut sst
+              }
     -- List of all functions occurring in the SST, obtained by visiting every
     -- update string function in every transition.
     allFunctions =
@@ -191,9 +196,3 @@ compileAutomaton sst =
 
     consts = constants (edgesToList $ sstE sst) (M.elems $ sstF sst)
 
-    tmap = M.fromList [ (func, tid) | (func, tid, _) <- funcRel ]
-    bmap = M.fromList $ zip (S.toList $ sstV sst) (map BufferId [0..])
-    smap = M.fromList $ zip (S.toList $ sstS sst) (map BlockId [0..])
-    cmap = M.fromList $ zip (S.toList consts) (map ConstId [0..])
-    cdmap = M.fromList $ zip (map ConstId [0..]) (S.toList consts)
-    
