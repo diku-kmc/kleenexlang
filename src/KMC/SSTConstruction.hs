@@ -74,7 +74,7 @@ consume :: (PartialOrder pred, Ord st)
 consume fst' p q =
   case fstAbstractEvalEdges fst' q p of
     []        -> zero
-    [(f, q')] -> tell [FuncA f] >> return q'
+    [(f, q')] -> tell [FuncA f] >> visit q'
     _ -> error "Stepping for FSTs with read-fanout greater than one is not supported yet"
 
 eof :: (Ord st) => FST st pred func -> st -> Closure st w st
