@@ -48,7 +48,7 @@ void buf_flush(buffer_t *buf)
 }
 
 
-// Write firt 'bits' of 'w' to 'buf', starting from the MOST significant bit.
+// Write first 'bits' of 'w' to 'buf', starting from the MOST significant bit.
 // Precondition: Remaining bits of 'w' must be zero.
 static inline
 bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
