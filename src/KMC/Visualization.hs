@@ -126,8 +126,8 @@ fancyToDot str =
                                       [Bool])
                     in fstToDot fst'
 
-fancyToSSTDot :: String -> GV.DotGraph Int
-fancyToSSTDot str =
+fancyToSSTDot :: Int -> String -> GV.DotGraph Int
+fancyToSSTDot opt str =
   case parseRegex fancyRegexParser str of
     Left e -> error e
     Right (_, e) -> let sst = sstFromFST (fromMu (fromRegex e))
@@ -137,12 +137,11 @@ fancyToSSTDot str =
                                       (Const Word8 [Bool] :+: Enumerator (RangeSet Word8) Word8 Bool)
                                       [Bool])
                                      Var
-                    in sstToDot ({-optimize $-} enumerateStates sst)
+                    in sstToDot (optimize opt $ enumerateStates sst)
 
 mkViz :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> IO ()
 mkViz f x = do
-    --_ <- forkIO $
-    GC.runGraphvizCanvas GC.Dot (f x) GC.Xlib
+    _ <- forkIO $ GC.runGraphvizCanvas GC.Dot (f x) GC.Xlib
     return ()
 
 mkVizToFile :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> FilePath -> IO ()
@@ -153,8 +152,8 @@ mkVizToFile f x p = do
 vizFancyAsFST :: String -> IO ()
 vizFancyAsFST str = mkViz fancyToDot str
 
-vizFancyAsSST :: String -> IO ()
-vizFancyAsSST str = mkViz fancyToSSTDot str
+vizFancyAsSST :: Int -> String -> IO ()
+vizFancyAsSST opt str = mkViz (fancyToSSTDot opt) str
 
-pngFancyAsSST :: String -> String -> IO FilePath
-pngFancyAsSST file str = GC.runGraphviz (fancyToSSTDot str) GC.Png file
+pngFancyAsSST :: Int -> String -> String -> IO FilePath
+pngFancyAsSST opt file str = GC.runGraphviz (fancyToSSTDot opt str) GC.Png file
