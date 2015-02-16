@@ -45,13 +45,17 @@
 *** Status:
   When optimizing at level < 3, the static analyzer will consider all variables
   depending on themselves as ambiguous.
-** TODO Allow for appending of arrays of chunks.
+** DONE Allow for appending of arrays of chunks.
 *** Description: 
     Instead of making one function call per word appended, with a corresponding range check, 
     make one function call and iterate over an array with all the words.  Put one range check
     in the beginning.
-** TODO The runtime should detect if the program is byte-aligned
+*** Status
+    Is done.
+** DONE The runtime should detect if the program is byte-aligned
 *** Description
     If the word size is 8 everything is always byte-aligned, and all the checks pertaining to 
     this should be removed.  Consider wrapping the key parts of crt.c in suitable #DEFINEs, so
     the generated C code will reflect this.
+*** Status
+    This is now handled by the more general array functions.
