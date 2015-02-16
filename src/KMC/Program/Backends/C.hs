@@ -75,11 +75,18 @@ minUnsignedType n | n < 0   = Nothing
 
 -- | The prefix added to buffer identifiers.
 bufferPrefix :: String
-bufferPrefix = "b"
+bufferPrefix = "buf_"
+
+constPrefix :: String
+constPrefix = "const_"
 
 -- | Pretty print a buffer identifier (as reference)
 buf :: BufferId -> Doc
 buf (BufferId n) = text "&" <> text bufferPrefix <> int n
+
+-- | Pretty print a constant identifier (as reference)
+cid :: ConstId -> Doc
+cid (ConstId n) = text constPrefix <> int n
 
 -- | Pretty print a C type
 ctyp :: CType -> Doc
@@ -167,7 +174,7 @@ splitAppends buftype digits = [ (decodeEnum bs, length bs * baseBits) | bs <- gr
 -- | Pretty print an instruction. Note that the C runtime currently
 -- distinguishes between regular buffers and the output buffer, and hence the
 -- pretty printer needs to handle this case specially.
-prettyInstr :: (Enum delta, Bounded delta) =>
+prettyInstr :: forall delta. (Enum delta, Bounded delta) =>
                CType          -- ^ The buffer unit type
             -> CType          -- ^ The table unit type
             -> Program delta  -- ^ The surrounding program
@@ -177,18 +184,18 @@ prettyInstr buftype tbltype prog instr =
   case instr of
     AcceptI            -> text "goto accept;"
     FailI              -> text "goto fail;"
-    AppendI bid bs     -> vcat $ do
-                            (val, len) <- splitAppends buftype bs
-                            let valdoc = text (num buftype len val)
-                            let lendoc = int len
-                            if bid == streamBuf then
-                                return (text "writeconst"
-                                        <> parens (hcat [valdoc, comma, lendoc])
-                                        <> semi)
-                            else
-                                return (text "append"
-                                        <> parens (hcat [buf bid, comma, valdoc, comma, lendoc])
-                                        <> semi)
+    AppendI bid constid ->
+      let base     = fromEnum (maxBound :: delta) - fromEnum (minBound :: delta) + 1
+          baseBits = bitWidth 2 base
+          lendoc   = text $ show $ length (progConstants prog M.! constid) * baseBits
+      in if bid == streamBuf then
+             text "writearray"
+               <> parens (hcat [cid constid, comma, lendoc])
+               <> semi
+         else
+             text "appendarray"
+               <> parens (hcat [buf bid, comma, cid constid, comma, lendoc])
+               <> semi
     AppendTblI bid tid -> let arg = tbl buftype tbltype tid
                               lendoc = int (tblBitSize $ progTables prog M.! tid)
                           in if bid == streamBuf then
@@ -261,6 +268,19 @@ prettyBufferDecls prog =
   where
     bufferDecl (BufferId n) = text "buffer_t" <+> text bufferPrefix <> int n <> semi
 
+prettyConstantDecls :: (Enum delta, Bounded delta) =>
+                        CType -- ^ Buffer unit type
+                     -> Program delta
+                     -> Doc
+prettyConstantDecls buftype prog =
+  vcat (map constantDecl . M.toList $ progConstants prog)
+  where
+    constantDecl (ConstId n, deltas) =
+      let chunks = splitAppends buftype deltas
+          constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
+      in text "buffer_unit_t" <+> text constPrefix <> int n <> brackets (int $ length chunks)
+         <+> text "=" <+> (braces $ hcat $ punctuate comma constdocs) <> semi
+
 -- | Pretty print initialization code. This is just a call to init_buffer() for
 -- each buffer in the program.
 prettyInit :: Program delta -> Doc
@@ -283,6 +303,7 @@ programToC buftype prog =
   CProg
   { cTables       = prettyTableDecl tbltype prog
   , cDeclarations = prettyBufferDecls prog
+                    $+$ prettyConstantDecls buftype prog
   , cInit         = prettyInit prog
   , cProg         = prettyProg buftype tbltype prog
   , cBufferUnit   = ctyp buftype

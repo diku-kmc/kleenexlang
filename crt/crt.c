@@ -85,7 +85,7 @@ void buf_writearray(buffer_t *dst, buffer_unit_t *arr, int bits)
   if (dst->bitpos % BUFFER_UNIT_BITS == 0)
   {
     int count = (bits / BUFFER_UNIT_BITS) + (bits % BUFFER_UNIT_BITS ? 1 : 0);
-    memcpy(dst->data, arr, count * BUFFER_UNIT_SIZE);
+    memcpy(&dst->data[dst->bitpos / BUFFER_UNIT_BITS], arr, count * BUFFER_UNIT_SIZE);
     dst->bitpos += bits;
   } else
   {
@@ -131,18 +131,18 @@ void writeconst(buffer_unit_t w, int bits)
 }
 
 static inline
-void appendarray(buffer_t *buf, buffer_unit_t *arr, int bits)
+void appendarray(buffer_t *dst, buffer_unit_t *arr, int bits)
 {
   size_t total_bits = dst->bitpos + bits;
-  if (total_bits >= (dst->size - 1) * BUFFER_UNIT_BITS)
+  if (total_bits >= (dst->size - 1) * BUFFER_UNIT_BITS * BUFFER_UNIT_SIZE)
   {
     size_t shift = 1;
-    while (total_bits >= ((dst->size << shift) - 1) * BUFFER_UNIT_BITS)
+    while (total_bits >= ((dst->size << shift) - 1) * BUFFER_UNIT_BITS * BUFFER_UNIT_SIZE)
       shift++;
     buf_resize(dst, shift);
   }
 
-  buf_writearray(buf, arr, bits);
+  buf_writearray(dst, arr, bits);
 }
 
 static inline
@@ -156,6 +156,36 @@ static inline
 void concat(buffer_t *dst, buffer_t *src)
 {
   appendarray(dst, src->data, src->bitpos);
+}
+
+static inline
+void writearray(buffer_unit_t *arr, int bits)
+{
+//  if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
+//  {
+//    buf_flush(&outbuf);
+//    int word_count = bits / BUFFER_UNIT_BITS;
+//    if (word_count == 0) return;
+//    if (fwrite(arr, BUFFER_UNIT_SIZE, word_count, stdout) == -1)
+//    {
+//      fprintf(stderr, "Error writing to stdout.\n");
+//      exit(1);
+//    }
+//  }
+//  else
+//  {
+
+    // Write completed words
+    size_t word_index = 0;
+    for (word_index = 0; word_index < bits / BUFFER_UNIT_BITS; word_index++)
+    {
+      writeconst(arr[word_index], BUFFER_UNIT_BITS);
+    }
+//  }
+
+  int remaining = bits % BUFFER_UNIT_BITS;
+  if (remaining != 0)
+    writeconst(arr[bits / BUFFER_UNIT_BITS], remaining);
 }
 
 static inline

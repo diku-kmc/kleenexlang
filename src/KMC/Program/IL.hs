@@ -14,6 +14,7 @@ import qualified Data.Map as M
 data Table delta = Table { tblTable :: [[delta]], tblDigitSize :: Int }
   deriving (Eq, Ord, Show)
 
+newtype ConstId = ConstId { getConstId :: Int } deriving (Eq, Ord, Show)
 newtype BlockId = BlockId { getBlockId :: Int } deriving (Eq, Ord, Show)
 newtype TableId = TableId { getTableId :: Int } deriving (Eq, Ord, Show)
 newtype BufferId = BufferId { getBufferId :: Int } deriving (Eq, Ord, Show)
@@ -36,7 +37,7 @@ data Expr =
 data Instr delta =
     AcceptI                             -- ^ accept (Program stops)
   | FailI                               -- ^ fail   (Program stops)
-  | AppendI    BufferId [delta]         -- ^ buf  := buf ++ bs
+  | AppendI    BufferId ConstId         -- ^ buf  := buf ++ bs
   | AppendTblI BufferId TableId         -- ^ bif ::= buf ++ tbl(id)(next)[0 .. sz(id) - 1]
   | ConcatI    BufferId BufferId        -- ^ buf1 := buf1 ++ buf2; reset(buf2)
   | ResetI     BufferId                 -- ^ buf1 := []
@@ -56,6 +57,7 @@ type Block delta = [Instr delta]
 data Program delta =
   Program
   { progTables       :: M.Map TableId (Table delta)
+  , progConstants    :: M.Map ConstId [delta]
   , progStreamBuffer :: BufferId
   , progBuffers      :: [BufferId]
   , progInitBlock    :: BlockId

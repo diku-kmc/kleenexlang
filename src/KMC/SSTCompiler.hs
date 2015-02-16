@@ -64,13 +64,14 @@ tabulate f = Table bitTable bitSize
 -- The following is assumed:
 --   (1) Variable updates are linear (non-copying)
 --   (2) Within the block of updates, the updated buffer is not live. (I.e., it is safe to modify it)
-compileAssignment :: (Ord var, Ord func, Rng func ~ [delta]) =>
+compileAssignment :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
                      M.Map var BufferId        -- ^ Variable to buffer map
                   -> M.Map func TableId        -- ^ Function to table map
+                  -> M.Map [delta] ConstId
                   -> var                       -- ^ Variable to be updated
                   -> UpdateStringFunc var func -- ^ Update function
                   -> Block delta
-compileAssignment bmap tmap var atoms =
+compileAssignment bmap tmap cmap var atoms =
   case atoms of
     VarA var':atoms' | var == var' -> go atoms'
     _ -> ResetI bid
@@ -81,7 +82,7 @@ compileAssignment bmap tmap var atoms =
     go [] = []
     go (VarA var':atoms') = ConcatI bid (bmap M.! var')
                             : go atoms'
-    go (ConstA bits:atoms') = AppendI bid bits
+    go (ConstA deltas:atoms') = AppendI bid (cmap M.! deltas)
                               : go atoms'
     go (FuncA f:atoms') = AppendTblI bid (tmap M.! f)
                           : go atoms'
@@ -101,44 +102,63 @@ orderAssignments = sortBy dataDependent
       fv (VarA v:xs) = v:fv xs
       fv (_:xs) = fv xs
 
-compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta]) =>
+compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
                          M.Map var BufferId        -- ^ Variable to buffer map
                       -> M.Map func TableId        -- ^ Function to table map
+                      -> M.Map [delta] ConstId
                       -> RegisterUpdate var func   -- ^ Register update
                       -> Block delta
-compileRegisterUpdate bmap tmap =
-  concatMap (uncurry $ compileAssignment bmap tmap) . orderAssignments . M.toList
+compileRegisterUpdate bmap tmap cmap =
+  concatMap (uncurry $ compileAssignment bmap tmap cmap) . orderAssignments . M.toList
 
-compileTransition :: (Ord var, Ord func, Rng func ~ [delta], PredicateToExpr pred) =>
+compileTransition :: (Ord var, Ord func, Rng func ~ [delta], PredicateToExpr pred, Ord delta) =>
                      M.Map var BufferId        -- ^ Variable to buffer map
                   -> M.Map func TableId        -- ^ Function to table map
+                  -> M.Map [delta] ConstId
                   -> pred                      -- ^ Transition predicate
                   -> RegisterUpdate var func   -- ^ Transition action
                   -> BlockId                   -- ^ Next block id
                   -> Block delta
-compileTransition bmap tmap pred' update blockId =
-  [IfI (predToExpr pred') (compileRegisterUpdate bmap tmap update ++ [GotoI blockId])]
+compileTransition bmap tmap cmap pred' update blockId =
+  [IfI (predToExpr pred') (compileRegisterUpdate bmap tmap cmap update ++ [GotoI blockId])]
 
-compileState :: (Ord st, Ord var, Ord func, Rng func ~ [delta], PredicateToExpr pred) =>
+compileState :: (Ord st, Ord var, Ord func, Ord delta, Rng func ~ [delta], PredicateToExpr pred) =>
                      M.Map var BufferId        -- ^ Variable to buffer map
                   -> M.Map func TableId        -- ^ Function to table map
                   -> M.Map st BlockId          -- ^ State to block id map
+                  -> M.Map [delta] ConstId     -- ^ Constant to const id map
                   -> var                       -- ^ Designated output variable
                   -> [(pred, RegisterUpdate var func, st)] -- ^ Transitions
                   -> Maybe (UpdateString var [delta]) -- ^ Final action
                   -> Block delta
-compileState bmap tmap smap outvar trans fin =
+compileState bmap tmap smap cmap outvar trans fin =
   [NextI $
      case fin of
        Nothing -> [FailI]
-       Just upd -> compileAssignment bmap tmap outvar (constUpdateStringFunc upd)
+       Just upd -> compileAssignment bmap tmap cmap outvar (constUpdateStringFunc upd)
                    ++ [AcceptI]
   ]
-  ++ concat [ compileTransition bmap tmap p upd (smap M.! st) | (p, upd, st) <- trans ]
+  ++ concat [ compileTransition bmap tmap cmap p upd (smap M.! st) | (p, upd, st) <- trans ]
   ++ [FailI]
 
+constants :: (Ord delta, Rng func ~ [delta]) =>
+                      [(st, pred, RegisterUpdate var func, st)]
+                   -> [UpdateString var [delta]]
+                   -> S.Set [delta]
+constants trans fins = S.union tconsts fconsts
+    where tconsts = S.fromList $ do
+                      (_, _, ru, _) <- trans
+                      usf <- M.elems ru
+                      ConstA c <- usf
+                      return c
+
+          fconsts = S.fromList $ do
+                      us <- fins
+                      Right c <- us
+                      return c
+
 compileAutomaton :: forall st var func pred delta.
-    (Ord st, Ord var, Ord func
+    (Ord st, Ord var, Ord func, Ord delta
     ,Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
     ,PredicateToExpr pred) =>
     SST st pred func var
@@ -146,12 +166,13 @@ compileAutomaton :: forall st var func pred delta.
 compileAutomaton sst =
   Program
   { progTables       = M.fromList [ (tid, tbl) | (_,tid,tbl) <- funcRel ]
+  , progConstants    = cdmap
   , progStreamBuffer = bmap M.! sstOut sst
   , progBuffers      = M.elems bmap
   , progInitBlock    = smap M.! sstI sst
   , progBlocks       =
       M.fromList [ (blck
-                   ,compileState bmap tmap smap (sstOut sst)
+                   ,compileState bmap tmap smap cmap (sstOut sst)
                                  (eForwardLookup (sstE sst) st)
                                  (M.lookup st (sstF sst)))
                        | (st, blck) <- M.toList smap ]
@@ -168,6 +189,11 @@ compileAutomaton sst =
     funcRel = [ (t, tid, tabulate t) | t <- allFunctions
                                      | tid <- map TableId [0..] ]
 
+    consts = constants (edgesToList $ sstE sst) (M.elems $ sstF sst)
+
     tmap = M.fromList [ (func, tid) | (func, tid, _) <- funcRel ]
     bmap = M.fromList $ zip (S.toList $ sstV sst) (map BufferId [0..])
     smap = M.fromList $ zip (S.toList $ sstS sst) (map BlockId [0..])
+    cmap = M.fromList $ zip (S.toList consts) (map ConstId [0..])
+    cdmap = M.fromList $ zip (map ConstId [0..]) (S.toList consts)
+    
