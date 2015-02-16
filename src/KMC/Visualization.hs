@@ -11,7 +11,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 
 import           Control.Concurrent (forkIO)
-import           Data.Char (chr)
+import           Data.Char (chr, isPrint)
 import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
@@ -36,7 +36,8 @@ instance (Pretty a) => Pretty (RangeSet a) where
     "[" ++ intercalate "," [ pretty l ++ "-" ++ pretty h | (l,h) <- ranges rs ] ++ "]"
 
 instance Pretty Word8 where
-  pretty a = [chr $ fromEnum a]
+  pretty a = let c = chr $ fromEnum a
+             in if isPrint c then [c] else '\\':show a
 
 instance Pretty Bool where
   pretty False = "0"
@@ -140,14 +141,14 @@ fancyToSSTDot str =
 
 mkViz :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> IO ()
 mkViz f x = do
-    _ <- forkIO $ GC.runGraphvizCanvas GC.Dot (f x) GC.Xlib
+    --_ <- forkIO $
+    GC.runGraphvizCanvas GC.Dot (f x) GC.Xlib
     return ()
 
 mkVizToFile :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> FilePath -> IO ()
 mkVizToFile f x p = do
     fp <- GC.runGraphvizCommand GC.Dot (f x) GC.Pdf p
     putStrLn $ "Wrote file " ++ fp
-    
 
 vizFancyAsFST :: String -> IO ()
 vizFancyAsFST str = mkViz fancyToDot str

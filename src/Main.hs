@@ -11,17 +11,19 @@ import Options
 
 import KMC.Expression hiding (Var)
 import KMC.FSTConstruction hiding (Var)
-import KMC.OutputTerm
-import KMC.Program.Backends.C
-import KMC.Program.IL
-import KMC.RangeSet
-import KMC.SSTCompiler
-import KMC.SSTConstruction
-import KMC.SymbolicSST
-import KMC.Syntax.Config
-import KMC.Syntax.Parser
-import KMC.Hased.Parser
-import KMC.Hased.Lang
+import KMC.Hased.Lang (HasedOutTerm, hasedToMuTerm)
+import KMC.Hased.Parser (parseHased)
+import KMC.OutputTerm (OutputTerm)
+import KMC.Program.Backends.C (CType(..), compileProgram, renderProgram)
+import KMC.Program.IL (Program)
+import KMC.RangeSet (RangeSet)
+import KMC.SSTCompiler (compileAutomaton)
+import KMC.SSTConstruction (PathTree, Var, sstFromFST)
+import KMC.SymbolicFST (FST)
+import KMC.SymbolicSST (SST, optimize, Stream, run)
+import KMC.Syntax.Config (fancyRegexParser)
+import KMC.Syntax.Parser (parseRegex)
+import KMC.Visualization
 
 data MainOptions =
     MainOptions
@@ -36,6 +38,10 @@ data CompileOptions =
     , optCFile           :: Maybe FilePath
     , optWordSize        :: CType
     }
+
+data VisualizeOptions =
+   VisualizeOptions
+   {}
 
 ctypeOptionType :: OptionType CType
 ctypeOptionType =
@@ -71,6 +77,10 @@ instance Options CompileOptions where
                        , optionDescription = "Buffer word size"
                        })
 
+instance Options VisualizeOptions where
+    defineOptions =
+        pure VisualizeOptions
+
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
 compile mainOpts compileOpts args = do
    when (length args /= 1) $ do
@@ -90,18 +100,33 @@ compile mainOpts compileOpts args = do
                   binFile
                   (optCFile compileOpts)
 
+visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
+visualize mainOpts visOpts args = do
+  when (length args /= 1) $ do
+    prog <- getProgName
+    putStrLn $ "Usage: " ++ prog ++ " visualize [options] <hased_file>"
+    exitWith $ ExitFailure 1
+  let [hasedFile] = args
+  hasedSrc <- readFile hasedFile
+  mkViz fstToDot (fstFromHased hasedSrc)
+  return ExitSuccess
+
 main :: IO ExitCode
 main = runSubcommand
        [ subcommand "compile" compile
+       , subcommand "visualize" visualize
        ]
 
 type DFST sigma delta = SST (PathTree Var Int) (RangeSet sigma) (OutputTerm sigma delta) Var
 
+fstFromHased :: String -> FST Int (RangeSet Word8) HasedOutTerm
+fstFromHased str =
+  case parseHased str of
+    Left e -> error e
+    Right ih -> fromMu (hasedToMuTerm ih)
+
 sstFromHased :: Int -> String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
-sstFromHased opt str = 
-    case parseHased str of
-      Left e -> error e
-      Right ih -> optimize opt $ sstFromFST (fromMu (hasedToMuTerm ih))
+sstFromHased opt str = optimize opt $ sstFromFST (fstFromHased str)
 
 progFromHased :: Int -> String -> Program Word8
 progFromHased opt = compileAutomaton . sstFromHased opt
