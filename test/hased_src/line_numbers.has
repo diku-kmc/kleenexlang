@@ -1,0 +1,5 @@
+// Hased program corresponding to (BSD) cat -n
+// Inserts a "line number" (the token "NN: ") in front of each line
+
+x := "NN: " <[^\n]*> <\n> x
+   | "NN: " <[^\n]*>
