@@ -6,6 +6,7 @@
 #include <inttypes.h>
 
 #define OUTBUFFER_SIZE 4096
+#define INBUFFER_SIZE 4096
 #define INITIAL_BUFFER_SIZE (4096*8)
 #define INLINE static inline
 
@@ -23,6 +24,10 @@ int next;
 buffer_t outbuf;
 size_t count = 0;
 
+char inbuf[INBUFFER_SIZE];
+size_t in_size = 0;
+size_t in_cursor = 0;
+
 void buf_flush(buffer_t *buf)
 {
   size_t word_index = buf->bitpos / BUFFER_UNIT_BITS;
@@ -32,7 +37,8 @@ void buf_flush(buffer_t *buf)
   {
     return;
   }
-  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
+//  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
+  if (write(STDOUT_FILENO, buf->data, word_index * BUFFER_UNIT_SIZE) == -1)
   {
     fprintf(stderr, "Error writing to stdout.\n");
     exit(1);
@@ -225,36 +231,17 @@ void write(buffer_t *buf)
   }
 }
 
-char inbuf[2*4096];
-size_t in_size = 0;
-size_t in_cursor = 4096;
-int eof = 0;
-
-/*
-INLINE
-int readnext()
-{
-  next = getchar();
-  count++;
-  return (next != EOF);
-}
-*/
-
 INLINE
 int readnext()
 {
   if (in_cursor >= in_size)
   {
-    if (eof)
+//    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
+    in_size = read(STDIN_FILENO, inbuf, sizeof(inbuf));
+    if (in_size == 0)
     {
       return 0;
     }
-    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
-    if(in_size == 0)
-    {
-      return 0;
-    }
-    eof = in_size < sizeof(inbuf);
     in_cursor = 0;
   }
   next = inbuf[in_cursor++];
