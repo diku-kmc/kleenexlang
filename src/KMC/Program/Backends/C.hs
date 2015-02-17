@@ -321,7 +321,7 @@ renderCProg compInfo cprog =
         , ("INIT"         , render $ cInit cprog)
         , ("DECLS"        , render $ cDeclarations cprog)
         , ("PROG"         , render $ cProg cprog)
-        , ("COMP_INFO")   , compInfo) ]
+        , ("COMP_INFO"    , compInfo) ]
         crt
 
 subst :: [(String, String)] -> String -> String
@@ -340,7 +340,7 @@ subst s = go
 
 
 renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
-renderProgram buftype = renderCProg . programToC buftype
+renderProgram buftype = renderCProg "\"from renderProgram\"" . programToC buftype
 
 compileProgram :: (Enum delta, Bounded delta) =>
                   CType
