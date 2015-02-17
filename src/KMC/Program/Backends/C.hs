@@ -188,7 +188,7 @@ prettyInstr buftype tbltype prog instr =
           baseBits = bitWidth 2 base
           lendoc   = text $ show $ length (progConstants prog M.! constid) * baseBits
       in if bid == streamBuf then
-             text "writearray"
+             text "outputarray"
                <> parens (hcat [cid constid, comma, lendoc])
                <> semi
          else
@@ -198,13 +198,13 @@ prettyInstr buftype tbltype prog instr =
     AppendTblI bid tid -> let arg = tbl buftype tbltype tid
                               lendoc = int (tblBitSize $ progTables prog M.! tid)
                           in if bid == streamBuf then
-                                 text "writeconst" <> parens (hcat [arg, comma, lendoc]) <> semi
+                                 text "outputconst" <> parens (hcat [arg, comma, lendoc]) <> semi
                              else
                                  text  "append"
                                  <> parens (hcat [buf bid, comma, arg, comma, lendoc])
                                  <> semi
     ConcatI bid1 bid2  -> if bid1 == streamBuf then
-                              text "write" <> parens (buf bid2) <> semi
+                              text "output" <> parens (buf bid2) <> semi
                           else
                               text "concat"
                               <> parens (hcat [buf bid1, comma, buf bid2])
