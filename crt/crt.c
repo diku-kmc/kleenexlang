@@ -1,11 +1,13 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
 
-#define OUTBUFFER_SIZE 4096
+#define OUTBUFFER_SIZE (8*1024)
+#define INBUFFER_SIZE (8*1024)
 #define INITIAL_BUFFER_SIZE (4096*8)
 #define INLINE static inline
 
@@ -23,6 +25,10 @@ int next;
 buffer_t outbuf;
 size_t count = 0;
 
+char inbuf[INBUFFER_SIZE];
+size_t in_size = 0;
+size_t in_cursor = 0;
+
 void buf_flush(buffer_t *buf)
 {
   size_t word_index = buf->bitpos / BUFFER_UNIT_BITS;
@@ -32,7 +38,8 @@ void buf_flush(buffer_t *buf)
   {
     return;
   }
-  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
+//  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
+  if (write(fileno(stdout), buf->data, word_index * BUFFER_UNIT_SIZE) == -1)
   {
     fprintf(stderr, "Error writing to stdout.\n");
     exit(1);
@@ -126,7 +133,7 @@ void init_buffer(buffer_t *buf)
 }
 
 INLINE
-void writeconst(buffer_unit_t w, int bits)
+void outputconst(buffer_unit_t w, int bits)
 {
   if (buf_writeconst(&outbuf, w, bits))
   {
@@ -167,7 +174,7 @@ void concat(buffer_t *dst, buffer_t *src)
 }
 
 INLINE
-void writearray(buffer_unit_t *arr, int bits)
+void outputarray(buffer_unit_t *arr, int bits)
 {
  if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
  {
@@ -177,7 +184,8 @@ void writearray(buffer_unit_t *arr, int bits)
    {
      return;
    }
-   if (fwrite(arr, BUFFER_UNIT_SIZE, word_count, stdout) == -1)
+   //if (fwrite(arr, BUFFER_UNIT_SIZE, word_count, stdout) == -1)
+   if (write(fileno(stdout), arr, word_count * BUFFER_UNIT_SIZE) == -1)
    {
      fprintf(stderr, "Error writing to stdout.\n");
      exit(1);
@@ -189,19 +197,19 @@ void writearray(buffer_unit_t *arr, int bits)
     size_t word_index = 0;
     for (word_index = 0; word_index < bits / BUFFER_UNIT_BITS; word_index++)
     {
-      writeconst(arr[word_index], BUFFER_UNIT_BITS);
+      outputconst(arr[word_index], BUFFER_UNIT_BITS);
     }
  }
 
   int remaining = bits % BUFFER_UNIT_BITS;
   if (remaining != 0)
   {
-    writeconst(arr[bits / BUFFER_UNIT_BITS], remaining);
+    outputconst(arr[bits / BUFFER_UNIT_BITS], remaining);
   }
 }
 
 INLINE
-void write(buffer_t *buf)
+void output(buffer_t *buf)
 {
   if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
   {
@@ -214,47 +222,28 @@ void write(buffer_t *buf)
   size_t word_index = 0;
   for (word_index = 0; word_index < buf->bitpos / BUFFER_UNIT_BITS; word_index++)
   {
-    writeconst(buf->data[word_index], BUFFER_UNIT_BITS);
+    outputconst(buf->data[word_index], BUFFER_UNIT_BITS);
   }
 
   // Handle remaining bits
   if (buf->bitpos % BUFFER_UNIT_BITS != 0)
   {
     size_t remaining = buf->bitpos - (word_index * BUFFER_UNIT_BITS);
-    writeconst(buf->data[word_index], remaining);
+    outputconst(buf->data[word_index], remaining);
   }
 }
-
-char inbuf[2*4096];
-size_t in_size = 0;
-size_t in_cursor = 4096;
-int eof = 0;
-
-/*
-INLINE
-int readnext()
-{
-  next = getchar();
-  count++;
-  return (next != EOF);
-}
-*/
 
 INLINE
 int readnext()
 {
   if (in_cursor >= in_size)
   {
-    if (eof)
+//    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
+    in_size = read(fileno(stdin), inbuf, sizeof(inbuf));
+    if (in_size == 0)
     {
       return 0;
     }
-    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
-    if(in_size == 0)
-    {
-      return 0;
-    }
-    eof = in_size < sizeof(inbuf);
     in_cursor = 0;
   }
   next = inbuf[in_cursor++];
@@ -318,7 +307,7 @@ int main(int argc, char *argv[])
 
   if (outbuf.bitpos % BUFFER_UNIT_BITS != 0)
   {
-    writeconst(0, BUFFER_UNIT_BITS);
+    outputconst(0, BUFFER_UNIT_BITS);
   }
   buf_flush(&outbuf);
 }
