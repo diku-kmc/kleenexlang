@@ -277,8 +277,12 @@ prettyConstantDecls buftype prog =
     constantDecl (ConstId n, deltas) =
       let chunks = splitAppends buftype deltas
           constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
-      in text "buffer_unit_t" <+> text constPrefix <> int n <> brackets (int $ length chunks)
-         <+> text "=" <+> (braces $ hcat $ punctuate comma constdocs) <> semi
+      in vcat [
+              , text "buffer_unit_t" <+> text constPrefix <> int n
+                <> brackets (int $ length chunks)
+                <+> text "=" <+>
+                (braces $ hcat $ punctuate comma constdocs) <> semi
+             ]
 
 -- | Pretty print initialization code. This is just a call to init_buffer() for
 -- each buffer in the program.

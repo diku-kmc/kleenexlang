@@ -269,9 +269,37 @@ void match()
     exit(1);
 }
 
+void printCompilationInfo()
+{
+/*   fprintf(stdout, */
+/* %%COMP_INFO */
+/*           ); */
+}
+
+void printUsage(char *name)
+{
+  fprintf(stdout, "usage: %s < infile > outfile\n", name);
+  fprintf(stdout, "%s with no arguments reads from stdin and writes to stdout.", name);
+  fprintf(stdout, "%s with argument \"info\" print compilation info.", name);
+}
+
 
 int main(int argc, char *argv[])
 {
+  if (argc == 2) 
+  {
+    if(strcmp("info", argv[1]) == 0)
+    {
+      printCompilationInfo();
+      return 2;
+    }
+    else
+    {
+      printUsage(argv[0]);
+      return 1;
+    }
+  }
+    
   outbuf.size = OUTBUFFER_SIZE + BUFFER_UNIT_SIZE;
   outbuf.data = malloc(outbuf.size);
   reset(&outbuf);
