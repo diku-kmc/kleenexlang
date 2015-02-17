@@ -251,6 +251,7 @@ int readnext()
     in_cursor = 0;
   }
   next = inbuf[in_cursor++];
+  count++;
   return 1;
 }
 
