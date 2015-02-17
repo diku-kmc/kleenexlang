@@ -8,7 +8,6 @@
 #define OUTBUFFER_SIZE 4096
 #define INITIAL_BUFFER_SIZE (4096*8)
 #define INLINE static inline
-// #define IS_BYTE_ALIGNED
 
 typedef %%BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
@@ -38,10 +37,8 @@ void buf_flush(buffer_t *buf)
     fprintf(stderr, "Error writing to stdout.\n");
     exit(1);
   }
-#ifndef IS_BYTE_ALIGNED
   // Zeroing is important, as we "or" bit fragments into buffer.
   memset(buf->data, 0, word_index * BUFFER_UNIT_SIZE);
-#endif /* IS_BYTE_ALIGNED */
   // Since partially written words are not flushed, they need to be moved to the
   // beginning of the buffer.
   // Note: We assume word_index > 0 to avoid losing data!
@@ -53,7 +50,6 @@ void buf_flush(buffer_t *buf)
   buf->bitpos = buf->bitpos - word_index * BUFFER_UNIT_BITS;
 }
 
-#ifndef IS_BYTE_ALIGNED
 // Write first 'bits' of 'w' to 'buf', starting from the MOST significant bit.
 // Precondition: Remaining bits of 'w' must be zero.
 INLINE
@@ -75,17 +71,6 @@ bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
   // Is cursor in last word?
   return (buf->bitpos >= buf->size * 8 - BUFFER_UNIT_BITS);
 }
-#else /* IS_BYTE_ALIGNED */
-INLINE
-bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
-{
-  size_t word_index = buf -> bitpos / BUFFER_UNIT_BITS;
-  memcpy(&buf->data[word_index], &w, bits);
-  buf->bitpos += bits;
-  // Is cursor in last word?
-  return (buf->bitpos >= buf->size * 8 - BUFFER_UNIT_BITS);
-}
-#endif /* IS_BYTE_ALIGNED */
 
 void buf_resize(buffer_t *buf, size_t shift)
 {
@@ -101,14 +86,11 @@ void buf_resize(buffer_t *buf, size_t shift)
 INLINE
 void buf_writearray(buffer_t *dst, buffer_unit_t *arr, int bits)
 {
-#ifndef IS_BYTE_ALIGNED
   if (dst->bitpos % BUFFER_UNIT_BITS == 0)
   {
-#endif /* IS_BYTE_ALIGNED */
     int count = (bits / BUFFER_UNIT_BITS) + (bits % BUFFER_UNIT_BITS ? 1 : 0);
     memcpy(&dst->data[dst->bitpos / BUFFER_UNIT_BITS], arr, count * BUFFER_UNIT_SIZE);
     dst->bitpos += bits;
-#ifndef IS_BYTE_ALIGNED
   } else
   {
     int word_index = 0;
@@ -122,19 +104,16 @@ void buf_writearray(buffer_t *dst, buffer_unit_t *arr, int bits)
       buf_writeconst(dst, arr[word_index], bits % BUFFER_UNIT_BITS);
     }
   }
-#endif /* IS_BYTE_ALIGNED */
 }
 
 INLINE
 void reset(buffer_t *buf)
 {
-#ifndef IS_BYTE_ALIGNED
   memset(buf->data, 0, buf->bitpos / 8);
   if (buf->bitpos % BUFFER_UNIT_BITS != 0)
   {
     buf->data[buf->bitpos / BUFFER_UNIT_BITS] = 0;
   }
-#endif /* IS_BYTE_ALIGNED */
   buf->bitpos = 0;
 }
 
@@ -143,9 +122,7 @@ void init_buffer(buffer_t *buf)
   buf->data = malloc(INITIAL_BUFFER_SIZE);
   buf->size = INITIAL_BUFFER_SIZE;
   buf->bitpos = 0;
-#ifndef IS_BYTE_ALIGNED
   memset(buf->data, 0, buf->size);
-#endif /* IS_BYTE_ALIGNED */
 }
 
 INLINE
