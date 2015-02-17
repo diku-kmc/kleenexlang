@@ -38,7 +38,7 @@ void buf_flush(buffer_t *buf)
     return;
   }
 //  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
-  if (write(STDOUT_FILENO, buf->data, word_index * BUFFER_UNIT_SIZE) == -1)
+  if (write(fileno(stdout), buf->data, word_index * BUFFER_UNIT_SIZE) == -1)
   {
     fprintf(stderr, "Error writing to stdout.\n");
     exit(1);
@@ -237,7 +237,7 @@ int readnext()
   if (in_cursor >= in_size)
   {
 //    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
-    in_size = read(STDIN_FILENO, inbuf, sizeof(inbuf));
+    in_size = read(fileno(stdin), inbuf, sizeof(inbuf));
     if (in_size == 0)
     {
       return 0;
