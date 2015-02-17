@@ -279,9 +279,9 @@ void match()
 
 void printCompilationInfo()
 {
-/*   fprintf(stdout, */
-/* %%COMP_INFO */
-/*           ); */
+  fprintf(stdout,
+%%COMP_INFO
+          );
 }
 
 void printUsage(char *name)
