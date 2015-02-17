@@ -225,12 +225,33 @@ void write(buffer_t *buf)
   }
 }
 
+char inbuf[4096];
+size_t in_size = 0;
+size_t in_cursor = 4096;
+int eof = 0;
+
+/*
 INLINE
 int readnext()
 {
   next = getchar();
   count++;
   return (next != EOF);
+}
+*/
+
+INLINE
+int readnext()
+{
+  if (in_cursor >= in_size)
+  {
+    if (eof) { return 0; }
+    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
+    eof = in_size < sizeof(inbuf);
+    in_cursor = 0;
+  }
+  next = inbuf[in_cursor++];
+  return 1;
 }
 
 %%TABLES
