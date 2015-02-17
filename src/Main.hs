@@ -1,30 +1,33 @@
 {-# LANGUAGE TypeOperators #-}
 module Main where
 
-import Control.Monad (when)
-import Control.Applicative
-import Data.Word
-import System.Environment
-import System.Exit (ExitCode(..), exitWith)
-import System.FilePath (splitFileName, dropExtension)
-import Options
+import           Control.Applicative
+import           Control.Monad (when)
 import qualified Data.Set as S
+import           Data.List (intercalate)
+import           Data.Time (getCurrentTime)
+import           Data.Hash.MD5 (md5s, Str(..))
+import           Data.Word
+import           Options
+import           System.Environment
+import           System.Exit (ExitCode(..), exitWith)
+import           System.FilePath (splitFileName, dropExtension)
 
-import KMC.Expression hiding (Var)
-import KMC.FSTConstruction hiding (Var)
-import KMC.Hased.Lang (HasedOutTerm, hasedToMuTerm)
-import KMC.Hased.Parser (parseHased)
-import KMC.OutputTerm (OutputTerm)
-import KMC.Program.Backends.C (CType(..), compileProgram, renderProgram)
-import KMC.Program.IL (Program)
-import KMC.RangeSet (RangeSet)
-import KMC.SSTCompiler (compileAutomaton)
-import KMC.SSTConstruction (PathTree, Var, sstFromFST)
-import KMC.SymbolicFST (FST, fstS)
-import KMC.SymbolicSST (SST, optimize, Stream, run, sstS, enumerateStates, enumerateVariables)
-import KMC.Syntax.Config (fancyRegexParser)
-import KMC.Syntax.Parser (parseRegex)
-import KMC.Visualization
+import           KMC.Expression hiding (Var)
+import           KMC.FSTConstruction hiding (Var)
+import           KMC.Hased.Lang (HasedOutTerm, hasedToMuTerm)
+import           KMC.Hased.Parser (parseHased)
+import           KMC.OutputTerm (OutputTerm)
+import           KMC.Program.Backends.C (CType(..), compileProgram, renderProgram)
+import           KMC.Program.IL (Program)
+import           KMC.RangeSet (RangeSet)
+import           KMC.SSTCompiler (compileAutomaton)
+import           KMC.SSTConstruction (PathTree, Var, sstFromFST)
+import           KMC.SymbolicFST (FST, fstS)
+import           KMC.SymbolicSST (SST, optimize, Stream, run, sstS, enumerateStates, enumerateVariables)
+import           KMC.Syntax.Config (fancyRegexParser)
+import           KMC.Syntax.Parser (parseRegex)
+import           KMC.Visualization
 
 data MainOptions =
     MainOptions
@@ -82,6 +85,12 @@ instance Options VisualizeOptions where
     defineOptions =
         pure VisualizeOptions
 
+prettyOptions :: CompileOptions -> String
+prettyOptions opts = intercalate "\\n"
+                     [ "SST optimization level: " ++ show (optOptimizeSST opts)
+                     , "Word size:              " ++ show (optWordSize opts)
+                     ]
+             
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
 compile mainOpts compileOpts args = do
    when (length args /= 1) $ do
@@ -98,10 +107,21 @@ compile mainOpts compileOpts args = do
    when (not $ optQuiet mainOpts) $ putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
    let sstopt = optimize (optOptimizeSST compileOpts) sst
    let prog = compileAutomaton sstopt
+   time <- getCurrentTime
+   let envInfo = intercalate "\\n" [ "Options:"
+                                   , prettyOptions compileOpts
+                                   , ""
+                                   , "Time:       " ++ show time
+                                   , "Hased file: " ++ hasedFile
+                                   , "Hased md5:  " ++ md5s (Str hasedSrc)
+                                   , "SST states: " ++ show (S.size $ sstS sst)
+                                   , "FST states: " ++ show (S.size $ fstS fst)
+                                   ]
    compileProgram (optWordSize compileOpts)
                   (optOptimizeLevelCC compileOpts)
                   (optQuiet mainOpts)
                   prog
+                  (Just envInfo)
                   (optOutFile compileOpts)
                   (optCFile compileOpts)
 
@@ -159,7 +179,7 @@ cFromFancy str =
 
 compileFancy :: String -> IO ExitCode
 compileFancy str =
-  compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) (Just "match") Nothing
+  compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) Nothing (Just "match") Nothing
 
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)

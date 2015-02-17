@@ -4,9 +4,11 @@
 
 module KMC.Program.Backends.C where
 
-import           Control.Monad (when)
+import           Control.Applicative ((<$>), (<*>))
+import           Control.Monad (when, join)
 import           Data.Bits
 import           Data.List (intercalate)
+import           Data.Char (ord, chr, isPrint)
 import qualified Data.Map as M
 import           Numeric
 import           System.Exit (ExitCode(..))
@@ -277,7 +279,9 @@ prettyConstantDecls buftype prog =
     constantDecl (ConstId n, deltas) =
       let chunks = splitAppends buftype deltas
           constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
-      in vcat [ text "// "
+          comment = join $ map escape $ map (chr . fromEnum) deltas
+          escape c = if isPrint c then [c] else "\\x" ++ showHex (ord c) ""
+      in vcat [ text "//" <+> text comment
               , text "buffer_unit_t" <+> text constPrefix <> int n
                 <> brackets (int $ length chunks)
                 <+> text "=" <+>
@@ -340,33 +344,63 @@ subst s = go
 
 
 renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
-renderProgram buftype = renderCProg "\"from renderProgram\"" . programToC buftype
+renderProgram buftype = renderCProg "\"TODO: insert descriptive string from renderProgram\""
+                        . programToC buftype
+
+ccVersion :: IO String
+ccVersion = do
+  (_, out, err, hdl) <- createProcess (proc "gcc" ["-v"]) { std_out = CreatePipe
+                                                          , std_err = CreatePipe }
+  let (hOut, hErr) = maybe (error "bogus handles") id
+                     ((,) <$> out <*> err)
+  outStr <- hGetContents hOut
+  errStr <- hGetContents hErr
+  return $ intercalate "\\n" $ lines $ outStr ++ errStr
 
 compileProgram :: (Enum delta, Bounded delta) =>
                   CType
                -> Int
                -> Bool
                -> Program delta
+               -> Maybe String -- ^ Optional descriptor to put in program.
                -> Maybe FilePath
                -> Maybe FilePath
                -> IO ExitCode
-compileProgram buftype optLevel optQuiet prog moutPath cCodeOutPath = do
-  let cstr info = renderCProg info . programToC buftype $ prog
+compileProgram buftype optLevel optQuiet prog desc moutPath cCodeOutPath = do
+  cver <- ccVersion
+  let info = maybe noOutInfo (outInfo cver) moutPath
+  let cstr = renderCProg info . programToC buftype $ prog
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
       let compInfo = "\"not implemented\""
       when (not optQuiet) $ putStrLn $ "Writing C source to " ++ p
-      writeFile p (cstr compInfo)
+      writeFile p cstr
   case moutPath of
     Nothing -> return ExitSuccess
     Just outPath -> do
-      let opts = ["-O" ++ show optLevel, "-xc", "-o", outPath, "-"]
-      let compInfo = "\"opts: " ++ intercalate " " opts ++ "\""
       when (not optQuiet) $
-        putStrLn $ "Running CC with options '" ++ intercalate " " opts ++ "'"
-      (Just hin, _, _, hproc) <- createProcess (proc "gcc" opts)
+        putStrLn $ "Running CC with options '" ++ intercalate " " (compilerOpts outPath) ++ "'"
+      (Just hin, _, _, hproc) <- createProcess (proc "gcc" (compilerOpts outPath))
                                                { std_in = CreatePipe }
-      hPutStrLn hin (cstr compInfo)
+      hPutStrLn hin cstr
       hClose hin
       waitForProcess hproc
+  where
+    compilerOpts p = ["-O" ++ show optLevel, "-xc", "-o", p, "-"]
+    appendNL s = s ++ "\\n"
+    quote s = "\"" ++ s ++ "\""
+    noOutInfo = quote $ intercalate "\\n"
+                [ "No object file generated!"
+                , maybe "No environment info available" id desc
+                ]
+    outInfo cver path = quote $ intercalate "\\n" 
+                        [ "Compiler info: "
+                        , cver
+                        , ""
+                        , "CC options: "
+                        , intercalate " " (compilerOpts path)
+                        , ""
+                        , maybe "No environment info available" id desc
+                        ]
+    

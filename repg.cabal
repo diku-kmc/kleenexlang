@@ -27,14 +27,15 @@ executable repg
                      , graphviz >= 2999.17.0.2
                      , kmc-regexps-syntax
                      , mtl >= 2.2.1
+                     , options >= 1.2.1.1
                      , parsec >= 3.1.8
                      , pretty >= 1.1.1.0
                      , process >= 1.1.0.2
-                     , text >= 1.1.0.0
-                     , transformers >= 0.4.2.0
                      , template-haskell
-                     , options >= 1.2.1.1
-
+                     , text >= 1.1.0.0
+                     , time >= 1.4.2
+                     , transformers >= 0.4.2.0
+                     , MissingH
                      -- Remove before distributing: Only needed because haskell-mode
                      -- is too stupid to figure out build-depends for the test suite.
                      , Cabal >= 1.22.0.0
@@ -61,4 +62,5 @@ test-suite test-repg
                      , pretty >= 1.1.1.0
                      , process >= 1.1.0.2
                      , text >= 1.1.0.0
+                     , time >= 1.4.2
                      , transformers >= 0.4.2.0
