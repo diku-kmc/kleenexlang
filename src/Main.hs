@@ -21,7 +21,7 @@ import KMC.RangeSet (RangeSet)
 import KMC.SSTCompiler (compileAutomaton)
 import KMC.SSTConstruction (PathTree, Var, sstFromFST)
 import KMC.SymbolicFST (FST, fstS)
-import KMC.SymbolicSST (SST, optimize, Stream, run, sstS)
+import KMC.SymbolicSST (SST, optimize, Stream, run, sstS, enumerateStates, enumerateVariables)
 import KMC.Syntax.Config (fancyRegexParser)
 import KMC.Syntax.Parser (parseRegex)
 import KMC.Visualization
@@ -90,21 +90,19 @@ compile mainOpts compileOpts args = do
      exitWith $ ExitFailure 1
    let [hasedFile] = args
    hasedSrc <- readFile hasedFile
-   let binFile = maybe (snd $ splitFileName $ dropExtension hasedFile)
-                       id
-                       (optOutFile compileOpts)
    let fst = fstFromHased hasedSrc
    when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (S.size $ fstS fst)
-   let sst = sstFromFST fst
+   -- replace state and variable names with integers, which are much faster to
+   -- compare (speeds up static analysis)
+   let sst = enumerateVariables $ enumerateStates $ sstFromFST fst
    when (not $ optQuiet mainOpts) $ putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
    let sstopt = optimize (optOptimizeSST compileOpts) sst
    let prog = compileAutomaton sstopt
-   when (not $ optQuiet mainOpts) $ putStrLn $ "Writing binary " ++ binFile
    compileProgram (optWordSize compileOpts)
                   (optOptimizeLevelCC compileOpts)
                   (optQuiet mainOpts)
                   prog
-                  binFile
+                  (optOutFile compileOpts)
                   (optCFile compileOpts)
 
 visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
@@ -161,7 +159,7 @@ cFromFancy str =
 
 compileFancy :: String -> IO ExitCode
 compileFancy str =
-  compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) "match" Nothing
+  compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) (Just "match") Nothing
 
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)
