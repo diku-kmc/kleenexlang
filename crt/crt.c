@@ -1,13 +1,12 @@
 #include <stdio.h>
-#include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
 
-#define OUTBUFFER_SIZE (8*1024)
-#define INBUFFER_SIZE (8*1024)
+#define OUTBUFFER_SIZE (16*1024)
+#define INBUFFER_SIZE (16*1024)
 #define INITIAL_BUFFER_SIZE (4096*8)
 #define INLINE static inline
 
@@ -38,8 +37,7 @@ void buf_flush(buffer_t *buf)
   {
     return;
   }
-//  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
-  if (write(fileno(stdout), buf->data, word_index * BUFFER_UNIT_SIZE) == -1)
+  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
   {
     fprintf(stderr, "Error writing to stdout.\n");
     exit(1);
@@ -184,8 +182,8 @@ void outputarray(buffer_unit_t *arr, int bits)
    {
      return;
    }
-   //if (fwrite(arr, BUFFER_UNIT_SIZE, word_count, stdout) == -1)
-   if (write(fileno(stdout), arr, word_count * BUFFER_UNIT_SIZE) == -1)
+   if (fwrite(arr, BUFFER_UNIT_SIZE, word_count, stdout) == -1)
+//   if (write(fileno(stdout), arr, word_count * BUFFER_UNIT_SIZE) == -1)
    {
      fprintf(stderr, "Error writing to stdout.\n");
      exit(1);
@@ -238,8 +236,7 @@ int readnext()
 {
   if (in_cursor >= in_size)
   {
-//    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
-    in_size = read(fileno(stdin), inbuf, sizeof(inbuf));
+    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
     if (in_size == 0)
     {
       return 0;
