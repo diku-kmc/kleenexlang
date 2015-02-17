@@ -323,7 +323,7 @@ subst :: [(String, String)] -> String -> String
 subst s = go
     where
       go [] = []
-      go ('%':'%':xs) | Just (y, xs') <- lu s xs = y ++ go xs
+      go ('%':'%':xs) | Just (y, xs') <- lu s xs = y ++ go xs'
       go (x:xs) = x:go xs
 
       lu [] _ = Nothing
