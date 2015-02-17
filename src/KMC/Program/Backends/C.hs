@@ -17,7 +17,6 @@ import           Text.PrettyPrint
 import           KMC.Coding
 import           KMC.Program.IL
 import           KMC.Util.Heredoc
-import           KMC.Util.List
 
 {- Utility functions -}
 -- | Chunk a list into list of lists of length n, starting from the left. The
@@ -313,12 +312,26 @@ programToC buftype prog =
 
 renderCProg :: CProg -> String
 renderCProg cprog =
-    replace "%%TABLES"        (render $ cTables cprog)
-  . replace "%%DECLS"         (render $ cDeclarations cprog)
-  . replace "%%INIT"          (render $ cInit cprog)
-  . replace "%%PROG"          (render $ cProg cprog)
-  . replace "%%BUFFER_UNIT_T" (render $ cBufferUnit cprog)
-  $ crt
+  subst [("BUFFER_UNIT_T", render $ cBufferUnit cprog)
+        ,("TABLES"       , render $ cTables cprog)
+        ,("INIT"         , render $ cInit cprog)
+        ,("DECLS"        , render $ cDeclarations cprog)
+        ,("PROG"         , render $ cProg cprog)]
+        crt
+
+subst :: [(String, String)] -> String -> String
+subst s = go
+    where
+      go [] = []
+      go ('%':'%':xs) | Just (y, xs') <- lu s xs = y ++ go xs
+      go (x:xs) = x:go xs
+
+      lu [] _ = Nothing
+      lu ((x, y):s') xs = let (xs1, xs2) = splitAt (length x) xs
+                          in if xs1 == x then
+                                 Just (y, xs2)
+                             else
+                                 lu s' xs
 
 renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
 renderProgram buftype = renderCProg . programToC buftype
