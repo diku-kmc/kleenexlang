@@ -7,6 +7,7 @@
 
 #define OUTBUFFER_SIZE 4096
 #define INITIAL_BUFFER_SIZE (4096*8)
+#define INLINE static inline
 
 typedef %%BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
@@ -27,7 +28,10 @@ void buf_flush(buffer_t *buf)
   size_t word_index = buf->bitpos / BUFFER_UNIT_BITS;
   // If we do not have a single complete word to flush, return.
   // Not just an optimization! The zeroing logic below assumes word_index > 0.
-  if (word_index == 0) return;
+  if (word_index == 0)
+  {
+    return;
+  }
   if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
   {
     fprintf(stderr, "Error writing to stdout.\n");
@@ -50,7 +54,7 @@ void buf_flush(buffer_t *buf)
 
 // Write first 'bits' of 'w' to 'buf', starting from the MOST significant bit.
 // Precondition: Remaining bits of 'w' must be zero.
-static inline
+INLINE
 bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
 {
   size_t word_index = buf->bitpos / BUFFER_UNIT_BITS;
@@ -60,7 +64,9 @@ bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
   buf->data[word_index] |= w >> offset;
   // Test important; shifting by the word size is undefined behaviour.
   if (offset > 0)
+  {
     buf->data[word_index+1] |= w << bits_available;
+  }
 
   buf->bitpos += bits;
 
@@ -79,7 +85,7 @@ void buf_resize(buffer_t *buf, size_t shift)
   buf->size = new_size;
 }
 
-static inline
+INLINE
 void buf_writearray(buffer_t *dst, buffer_unit_t *arr, int bits)
 {
   if (dst->bitpos % BUFFER_UNIT_BITS == 0)
@@ -102,7 +108,7 @@ void buf_writearray(buffer_t *dst, buffer_unit_t *arr, int bits)
   }
 }
 
-static inline
+INLINE
 void reset(buffer_t *buf)
 {
   memset(buf->data, 0, buf->bitpos / 8);
@@ -121,7 +127,7 @@ void init_buffer(buffer_t *buf)
   memset(buf->data, 0, buf->size);
 }
 
-static inline
+INLINE
 void writeconst(buffer_unit_t w, int bits)
 {
   if (buf_writeconst(&outbuf, w, bits))
@@ -130,7 +136,7 @@ void writeconst(buffer_unit_t w, int bits)
   }
 }
 
-static inline
+INLINE
 void appendarray(buffer_t *dst, buffer_unit_t *arr, int bits)
 {
   size_t total_bits = dst->bitpos + bits;
@@ -138,34 +144,41 @@ void appendarray(buffer_t *dst, buffer_unit_t *arr, int bits)
   {
     size_t shift = 1;
     while (total_bits >= ((dst->size << shift) - 1) * BUFFER_UNIT_BITS * BUFFER_UNIT_SIZE)
-      shift++;
+    {
+      shift++;  
+    }
     buf_resize(dst, shift);
   }
 
   buf_writearray(dst, arr, bits);
 }
 
-static inline
+INLINE
 void append(buffer_t *buf, buffer_unit_t w, int bits)
 {
   if (buf_writeconst(buf, w, bits))
+  {
     buf_resize(buf, 1);
+  }  
 }
 
-static inline
+INLINE
 void concat(buffer_t *dst, buffer_t *src)
 {
   appendarray(dst, src->data, src->bitpos);
 }
 
-static inline
+INLINE
 void writearray(buffer_unit_t *arr, int bits)
 {
  if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
  {
    buf_flush(&outbuf);
    int word_count = bits / BUFFER_UNIT_BITS;
-   if (word_count == 0) return;
+   if (word_count == 0)
+   {
+     return;
+   }
    if (fwrite(arr, BUFFER_UNIT_SIZE, word_count, stdout) == -1)
    {
      fprintf(stderr, "Error writing to stdout.\n");
@@ -184,10 +197,12 @@ void writearray(buffer_unit_t *arr, int bits)
 
   int remaining = bits % BUFFER_UNIT_BITS;
   if (remaining != 0)
+  {
     writeconst(arr[bits / BUFFER_UNIT_BITS], remaining);
+  }
 }
 
-static inline
+INLINE
 void write(buffer_t *buf)
 {
   if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
@@ -212,7 +227,7 @@ void write(buffer_t *buf)
   }
 }
 
-static inline
+INLINE
 int readnext()
 {
   next = getchar();
@@ -247,6 +262,8 @@ int main(int argc, char *argv[])
   match();
 
   if (outbuf.bitpos % BUFFER_UNIT_BITS != 0)
+  {
     writeconst(0, BUFFER_UNIT_BITS);
+  }
   buf_flush(&outbuf);
 }
