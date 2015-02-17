@@ -35,6 +35,7 @@ data CompileOptions =
     CompileOptions
     { optOptimizeSST     :: Int
     , optOptimizeLevelCC :: Int
+    , optByteAligned     :: Bool
     , optOutFile         :: Maybe FilePath
     , optCFile           :: Maybe FilePath
     , optWordSize        :: CType
@@ -70,6 +71,7 @@ instance Options CompileOptions where
       CompileOptions
       <$> simpleOption "opt" 0 "SST optimization level (1-3)"
       <*> simpleOption "copt" 3 "C compiler optimization level (1-3)"
+      <*> simpleOption "ba" True "Byte-aligned output buffers"
       <*> simpleOption "out" Nothing "Output file"
       <*> simpleOption "srcout" Nothing "Write intermediate C program to given file path"
       <*> defineOption ctypeOptionType
@@ -101,6 +103,7 @@ compile mainOpts compileOpts args = do
    compileProgram (optWordSize compileOpts)
                   (optOptimizeLevelCC compileOpts)
                   (optQuiet mainOpts)
+                  (optByteAligned compileOpts)
                   prog
                   (optOutFile compileOpts)
                   (optCFile compileOpts)
@@ -159,7 +162,7 @@ cFromFancy str =
 
 compileFancy :: String -> IO ExitCode
 compileFancy str =
-  compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) (Just "match") Nothing
+  compileProgram UInt8T 3 False False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) (Just "match") Nothing
 
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)

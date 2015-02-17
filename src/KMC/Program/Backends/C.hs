@@ -327,11 +327,12 @@ compileProgram :: (Enum delta, Bounded delta) =>
                   CType
                -> Int
                -> Bool
+               -> Bool
                -> Program delta
                -> Maybe FilePath
                -> Maybe FilePath
                -> IO ExitCode
-compileProgram buftype optLevel optQuiet prog moutPath cCodeOutPath = do
+compileProgram buftype optLevel optQuiet optByteAligned prog moutPath cCodeOutPath = do
   let cstr = renderCProg . programToC buftype $ prog
   case cCodeOutPath of
     Nothing -> return ()
@@ -341,7 +342,9 @@ compileProgram buftype optLevel optQuiet prog moutPath cCodeOutPath = do
   case moutPath of
     Nothing -> return ExitSuccess
     Just outPath -> do
-      let opts = ["-O" ++ show optLevel, "-xc", "-o", outPath, "-"]
+      let opts = ["-O" ++ show optLevel] ++
+                 (if optByteAligned then ["-D IS_BYTE_ALIGNED"] else []) ++
+                 ["-xc", "-o", outPath, "-"]
       when (not optQuiet) $
         putStrLn $ "Running CC with options '" ++ intercalate " " opts ++ "'"
       (Just hin, _, _, hproc) <- createProcess (proc "gcc" opts)
