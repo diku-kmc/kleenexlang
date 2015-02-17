@@ -41,6 +41,7 @@ data CompileOptions =
     , optOutFile         :: Maybe FilePath
     , optCFile           :: Maybe FilePath
     , optWordSize        :: CType
+    , optAltCompiler     :: Maybe FilePath
     }
 
 data VisualizeOptions =
@@ -80,6 +81,7 @@ instance Options CompileOptions where
                        , optionDefault     = UInt8T
                        , optionDescription = "Buffer word size"
                        })
+      <*> simpleOption "cc" Nothing "Alternative C compiler"
 
 instance Options VisualizeOptions where
     defineOptions =
@@ -122,6 +124,7 @@ compile mainOpts compileOpts args = do
                   (optQuiet mainOpts)
                   prog
                   (Just envInfo)
+                  (optAltCompiler compileOpts)
                   (optOutFile compileOpts)
                   (optCFile compileOpts)
 
@@ -179,7 +182,7 @@ cFromFancy str =
 
 compileFancy :: String -> IO ExitCode
 compileFancy str =
-  compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) Nothing (Just "match") Nothing
+  compileProgram UInt8T 3 False (compileAutomaton (sstFromFancy str :: DFST Word8 Bool)) Nothing Nothing (Just "match") Nothing
 
 runSST :: String -> [Char] -> Stream [Bool]
 runSST str = run (sstFromFancy str)

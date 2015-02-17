@@ -347,27 +347,32 @@ renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
 renderProgram buftype = renderCProg "\"TODO: insert descriptive string from renderProgram\""
                         . programToC buftype
 
-ccVersion :: IO String
-ccVersion = do
-  (_, out, err, hdl) <- createProcess (proc "gcc" ["-v"]) { std_out = CreatePipe
-                                                          , std_err = CreatePipe }
+ccVersion :: Maybe FilePath -> IO String
+ccVersion altComp = do
+  (_, out, err, hdl) <- createProcess (proc (maybe "gcc" id altComp) ["-v"])
+                        { std_out = CreatePipe
+                        , std_err = CreatePipe }
   let (hOut, hErr) = maybe (error "bogus handles") id
                      ((,) <$> out <*> err)
   outStr <- hGetContents hOut
   errStr <- hGetContents hErr
   return $ intercalate "\\n" $ lines $ outStr ++ errStr
 
+compileCmd :: String
+compileCmd = "gcc"
+         
 compileProgram :: (Enum delta, Bounded delta) =>
                   CType
                -> Int
                -> Bool
                -> Program delta
                -> Maybe String -- ^ Optional descriptor to put in program.
+               -> Maybe FilePath -- ^ Alternative C compiler to gcc
                -> Maybe FilePath
                -> Maybe FilePath
                -> IO ExitCode
-compileProgram buftype optLevel optQuiet prog desc moutPath cCodeOutPath = do
-  cver <- ccVersion
+compileProgram buftype optLevel optQuiet prog desc altComp moutPath cCodeOutPath = do
+  cver <- ccVersion altComp
   let info = maybe noOutInfo (outInfo cver) moutPath
   let cstr = renderCProg info . programToC buftype $ prog
   case cCodeOutPath of
@@ -381,7 +386,7 @@ compileProgram buftype optLevel optQuiet prog desc moutPath cCodeOutPath = do
     Just outPath -> do
       when (not optQuiet) $
         putStrLn $ "Running CC with options '" ++ intercalate " " (compilerOpts outPath) ++ "'"
-      (Just hin, _, _, hproc) <- createProcess (proc "gcc" (compilerOpts outPath))
+      (Just hin, _, _, hproc) <- createProcess (proc (maybe "gcc" id altComp) (compilerOpts outPath))
                                                { std_in = CreatePipe }
       hPutStrLn hin cstr
       hClose hin
