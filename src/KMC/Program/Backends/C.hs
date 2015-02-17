@@ -277,7 +277,7 @@ prettyConstantDecls buftype prog =
     constantDecl (ConstId n, deltas) =
       let chunks = splitAppends buftype deltas
           constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
-      in vcat [
+      in vcat [ text "// "
               , text "buffer_unit_t" <+> text constPrefix <> int n
                 <> brackets (int $ length chunks)
                 <+> text "=" <+>
@@ -314,13 +314,14 @@ programToC buftype prog =
   where
     tbltype = UInt8T
 
-renderCProg :: CProg -> String
-renderCProg cprog =
-  subst [("BUFFER_UNIT_T", render $ cBufferUnit cprog)
-        ,("TABLES"       , render $ cTables cprog)
-        ,("INIT"         , render $ cInit cprog)
-        ,("DECLS"        , render $ cDeclarations cprog)
-        ,("PROG"         , render $ cProg cprog)]
+renderCProg :: String -> CProg -> String
+renderCProg compInfo cprog =
+  subst [ ("BUFFER_UNIT_T", render $ cBufferUnit cprog)
+        , ("TABLES"       , render $ cTables cprog)
+        , ("INIT"         , render $ cInit cprog)
+        , ("DECLS"        , render $ cDeclarations cprog)
+        , ("PROG"         , render $ cProg cprog)
+        , ("COMP_INFO")   , compInfo) ]
         crt
 
 subst :: [(String, String)] -> String -> String
@@ -337,6 +338,7 @@ subst s = go
                              else
                                  lu s' xs
 
+
 renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
 renderProgram buftype = renderCProg . programToC buftype
 
@@ -349,20 +351,22 @@ compileProgram :: (Enum delta, Bounded delta) =>
                -> Maybe FilePath
                -> IO ExitCode
 compileProgram buftype optLevel optQuiet prog moutPath cCodeOutPath = do
-  let cstr = renderCProg . programToC buftype $ prog
+  let cstr info = renderCProg info . programToC buftype $ prog
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
+      let compInfo = "\"not implemented\""
       when (not optQuiet) $ putStrLn $ "Writing C source to " ++ p
-      writeFile p cstr
+      writeFile p (cstr compInfo)
   case moutPath of
     Nothing -> return ExitSuccess
     Just outPath -> do
       let opts = ["-O" ++ show optLevel, "-xc", "-o", outPath, "-"]
+      let compInfo = "\"opts: " ++ intercalate " " opts ++ "\""
       when (not optQuiet) $
         putStrLn $ "Running CC with options '" ++ intercalate " " opts ++ "'"
       (Just hin, _, _, hproc) <- createProcess (proc "gcc" opts)
                                                { std_in = CreatePipe }
-      hPutStrLn hin cstr
+      hPutStrLn hin (cstr compInfo)
       hClose hin
       waitForProcess hproc

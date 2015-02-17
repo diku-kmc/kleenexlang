@@ -225,7 +225,7 @@ void write(buffer_t *buf)
   }
 }
 
-char inbuf[4096];
+char inbuf[2*4096];
 size_t in_size = 0;
 size_t in_cursor = 4096;
 int eof = 0;
@@ -245,8 +245,15 @@ int readnext()
 {
   if (in_cursor >= in_size)
   {
-    if (eof) { return 0; }
+    if (eof)
+    {
+      return 0;
+    }
     in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
+    if(in_size == 0)
+    {
+      return 0;
+    }
     eof = in_size < sizeof(inbuf);
     in_cursor = 0;
   }
@@ -279,9 +286,9 @@ void printCompilationInfo()
 
 void printUsage(char *name)
 {
-  fprintf(stdout, "usage: %s < infile > outfile\n", name);
-  fprintf(stdout, "%s with no arguments reads from stdin and writes to stdout.", name);
-  fprintf(stdout, "%s with argument \"info\" print compilation info.", name);
+  fprintf(stdout, "Normal usage: %s < infile > outfile\n", name);
+  fprintf(stdout, "- \"%s\": reads from stdin and writes to stdout.\n", name);
+  fprintf(stdout, "- \"%s info\": prints compilation info.\n", name);
 }
 
 
