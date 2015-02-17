@@ -1,4 +1,6 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -294,6 +296,30 @@ enumerateStates sst =
     where
       states = M.fromList (zip (S.toList (sstS sst)) [(0::Int)..])
       aux q = states M.! q
+
+enumerateVariables :: forall var st pred func. (Ord var, Ord st) => SST st pred func var -> SST st pred func Int
+enumerateVariables sst =
+  SST
+  { sstS = sstS sst
+  , sstE = edgesFromList [ (st, p, transMap f, st') | (st, p, f, st') <- edgesToList (sstE sst) ]
+  , sstI = sstI sst
+  , sstF = M.map usReplace $ sstF sst
+  }
+  where
+    vids          = M.fromList $ zip (S.toList (sstV sst)) [0..]
+    transMap m    = M.fromList [ (replace x, usfReplace v) | (x, v) <- M.toList m ]
+    replace v     = vids M.! v
+    usfReplace as = do
+      at <- as
+      case at of
+        VarA v   -> [VarA (replace v)]
+        ConstA c -> [ConstA c]
+        FuncA f  -> [FuncA f]
+    usReplace as  = do
+      at <- as
+      case at of
+        Left v  -> [Left (replace v)]
+        Right c -> [Right c]
 
 {-- Simulation --}
 

@@ -9,7 +9,7 @@ import           Data.Bits
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import           Numeric
-import           System.Exit (ExitCode)
+import           System.Exit (ExitCode(..))
 import           System.IO
 import           System.Process
 import           Text.PrettyPrint
@@ -328,21 +328,24 @@ compileProgram :: (Enum delta, Bounded delta) =>
                -> Int
                -> Bool
                -> Program delta
-               -> FilePath
+               -> Maybe FilePath
                -> Maybe FilePath
                -> IO ExitCode
-compileProgram buftype optLevel optQuiet prog outPath cCodeOutPath = do
+compileProgram buftype optLevel optQuiet prog moutPath cCodeOutPath = do
   let cstr = renderCProg . programToC buftype $ prog
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
       when (not optQuiet) $ putStrLn $ "Writing C source to " ++ p
       writeFile p cstr
-  let opts = ["-O" ++ show optLevel, "-xc", "-o", outPath, "-"]
-  when (not optQuiet) $
-    putStrLn $ "Running CC with options '" ++ intercalate " " opts ++ "'"
-  (Just hin, _, _, hproc) <- createProcess (proc "gcc" opts)
-                                           { std_in = CreatePipe }
-  hPutStrLn hin cstr
-  hClose hin
-  waitForProcess hproc
+  case moutPath of
+    Nothing -> return ExitSuccess
+    Just outPath -> do
+      let opts = ["-O" ++ show optLevel, "-xc", "-o", outPath, "-"]
+      when (not optQuiet) $
+        putStrLn $ "Running CC with options '" ++ intercalate " " opts ++ "'"
+      (Just hin, _, _, hproc) <- createProcess (proc "gcc" opts)
+                                               { std_in = CreatePipe }
+      hPutStrLn hin cstr
+      hClose hin
+      waitForProcess hproc
