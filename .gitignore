@@ -2,3 +2,7 @@ dist/
 .cabal-sandbox
 cabal.sandbox.config
 *~
+test/data/*.txt
+test/data/issuu/*.json
+*.prof
+cabal.config
