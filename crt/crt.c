@@ -8,13 +8,13 @@
 #define OUTBUFFER_SIZE (16*1024)
 #define INBUFFER_SIZE (16*1024)
 #define INITIAL_BUFFER_SIZE (4096*8)
-#define INLINE static inline
+#define INLINE static inline __attribute__((always_inline))
 
 typedef %%BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
   buffer_unit_t *data;
-  size_t size; /* size in bytes */
-  size_t bitpos;
+  size_t size;         /* size in bytes */
+  size_t bitpos;       /* size in bits  */
 } buffer_t;
 
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
