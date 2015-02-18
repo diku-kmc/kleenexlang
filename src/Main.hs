@@ -31,13 +31,13 @@ import           KMC.Visualization
 
 data MainOptions =
     MainOptions
-    { optQuiet :: Bool
+    { optQuiet       :: Bool
+    , optOptimizeSST :: Int
     }
 
 data CompileOptions =
     CompileOptions
-    { optOptimizeSST     :: Int
-    , optOptimizeLevelCC :: Int
+    { optOptimizeLevelCC :: Int
     , optOutFile         :: Maybe FilePath
     , optCFile           :: Maybe FilePath
     , optWordSize        :: CType
@@ -68,12 +68,12 @@ instance Options MainOptions where
     defineOptions =
       MainOptions
       <$> simpleOption "quiet" False "Be quiet"
+      <*> simpleOption "opt" 0 "SST optimization level (1-3)"
 
 instance Options CompileOptions where
     defineOptions =
       CompileOptions
-      <$> simpleOption "opt" 0 "SST optimization level (1-3)"
-      <*> simpleOption "copt" 3 "C compiler optimization level (1-3)"
+      <$> simpleOption "copt" 3 "C compiler optimization level (1-3)"
       <*> simpleOption "out" Nothing "Output file"
       <*> simpleOption "srcout" Nothing "Write intermediate C program to given file path"
       <*> defineOption ctypeOptionType
@@ -87,10 +87,10 @@ instance Options VisualizeOptions where
     defineOptions =
         pure VisualizeOptions
 
-prettyOptions :: CompileOptions -> String
-prettyOptions opts = intercalate "\\n"
-                     [ "SST optimization level: " ++ show (optOptimizeSST opts)
-                     , "Word size:              " ++ show (optWordSize opts)
+prettyOptions :: MainOptions -> CompileOptions -> String
+prettyOptions mainOpts compileOpts = intercalate "\\n"
+                     [ "SST optimization level: " ++ show (optOptimizeSST mainOpts)
+                     , "Word size:              " ++ show (optWordSize compileOpts)
                      ]
              
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
@@ -107,11 +107,11 @@ compile mainOpts compileOpts args = do
    -- compare (speeds up static analysis)
    let sst = enumerateVariables $ enumerateStates $ sstFromFST fst
    when (not $ optQuiet mainOpts) $ putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
-   let sstopt = optimize (optOptimizeSST compileOpts) sst
+   let sstopt = optimize (optOptimizeSST mainOpts) sst
    let prog = compileAutomaton sstopt
    time <- getCurrentTime
    let envInfo = intercalate "\\n" [ "Options:"
-                                   , prettyOptions compileOpts
+                                   , prettyOptions mainOpts compileOpts
                                    , ""
                                    , "Time:       " ++ show time
                                    , "Hased file: " ++ hasedFile
