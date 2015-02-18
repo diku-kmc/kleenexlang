@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
+#include <sys/time.h>
 
 #define OUTBUFFER_SIZE (16*1024)
 #define INBUFFER_SIZE (16*1024)
@@ -274,18 +275,40 @@ void printUsage(char *name)
 {
   fprintf(stdout, "Normal usage: %s < infile > outfile\n", name);
   fprintf(stdout, "- \"%s\": reads from stdin and writes to stdout.\n", name);
-  fprintf(stdout, "- \"%s info\": prints compilation info.\n", name);
+  fprintf(stdout, "- \"%s -i\": prints compilation info.\n", name);
+  fprintf(stdout, "- \"%s -t\": runs normally, but prints timing to stderr.\n", name);
 }
 
+INLINE
+void run()
+{
+  match();
+  if (outbuf.bitpos % BUFFER_UNIT_BITS != 0)
+  {
+    outputconst(0, BUFFER_UNIT_BITS);
+  }
+  buf_flush(&outbuf);
+}
 
 int main(int argc, char *argv[])
 {
+  bool do_timing = false;
+
+  if(argc > 2)
+  {
+    printUsage(argv[0]);
+    return 1;
+  }
   if (argc == 2) 
   {
-    if(strcmp("info", argv[1]) == 0)
+    if(strcmp("-i", argv[1]) == 0)
     {
       printCompilationInfo();
       return 2;
+    }
+    else if(strcmp("-t", argv[1]) == 0)
+    {
+      do_timing = true;
     }
     else
     {
@@ -300,11 +323,19 @@ int main(int argc, char *argv[])
 
 %%INIT
 
-  match();
-
-  if (outbuf.bitpos % BUFFER_UNIT_BITS != 0)
+  if(do_timing)
   {
-    outputconst(0, BUFFER_UNIT_BITS);
+    struct timeval time_before, time_after, time_result;
+    long int millis;
+    gettimeofday(&time_before, NULL);
+    run();
+    gettimeofday(&time_after, NULL);
+    timersub(&time_after, &time_before, &time_result);
+    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+    fprintf(stderr, "time (ms): %ld\n", millis);
   }
-  buf_flush(&outbuf);
+  else
+  {
+    run();
+  }
 }
