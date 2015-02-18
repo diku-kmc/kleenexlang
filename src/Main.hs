@@ -7,6 +7,7 @@ import           Data.Char (toLower)
 import qualified Data.GraphViz.Commands as GC
 import           Data.Hash.MD5 (md5s, Str(..))
 import           Data.List (intercalate)
+import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Time (getCurrentTime, diffUTCTime)
 import           Data.Word
@@ -23,7 +24,7 @@ import           KMC.RangeSet (RangeSet)
 import           KMC.SSTCompiler (compileAutomaton)
 import           KMC.SSTConstruction (sstFromFST)
 import           KMC.SymbolicFST (FST, fstS)
-import           KMC.SymbolicSST (SST, optimize, sstS, enumerateStates, enumerateVariables)
+import           KMC.SymbolicSST
 --import           KMC.Syntax.Config (fancyRegexParser)
 --import           KMC.Syntax.Parser (parseRegex)
 import           KMC.Visualization
@@ -131,7 +132,9 @@ compile mainOpts compileOpts args = do
    -- replace state and variable names with integers, which are much faster to
    -- compare (speeds up static analysis)
    let sst = enumerateVariables $ enumerateStates $ sstFromFST fst'
-   when (not $ optQuiet mainOpts) $ putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
+   when (not $ optQuiet mainOpts) $ do
+     putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
+     putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ eForward $ sstE sst)
    timeSSTgen' <- getCurrentTime
    timeSSTopt <- getCurrentTime
    let (sstopt, i) = optimize (optOptimizeSST mainOpts) sst
