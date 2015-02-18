@@ -347,30 +347,27 @@ renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
 renderProgram buftype = renderCProg "\"TODO: insert descriptive string from renderProgram\""
                         . programToC buftype
 
-ccVersion :: Maybe FilePath -> IO String
-ccVersion altComp = do
+ccVersion :: FilePath -> IO String
+ccVersion comp = do
   -- gcc/clang prints version info on stderr
-  (_, _, err, hdl) <- createProcess (proc (maybe "gcc" id altComp) ["-v"])
-                        { std_err = CreatePipe }
-  let hErr = maybe (error "bogus handles") id err
+  (_, _, err, hdl) <- createProcess (proc comp ["-v"])
+                      { std_err = CreatePipe }
+  let hErr = maybe (error "ccVersion: bogus handle") id err
   errStr <- hGetContents hErr
   return $ intercalate "\\n" $ lines $ errStr
 
-compileCmd :: String
-compileCmd = "gcc"
-         
 compileProgram :: (Enum delta, Bounded delta) =>
                   CType
                -> Int
                -> Bool
                -> Program delta
                -> Maybe String -- ^ Optional descriptor to put in program.
-               -> Maybe FilePath -- ^ Alternative C compiler to gcc
+               -> FilePath     -- ^ Path to C compiler
                -> Maybe FilePath
                -> Maybe FilePath
                -> IO ExitCode
-compileProgram buftype optLevel optQuiet prog desc altComp moutPath cCodeOutPath = do
-  cver <- ccVersion altComp
+compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath = do
+  cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
   let cstr = renderCProg info . programToC buftype $ prog
   case cCodeOutPath of
@@ -383,14 +380,14 @@ compileProgram buftype optLevel optQuiet prog desc altComp moutPath cCodeOutPath
     Nothing -> return ExitSuccess
     Just outPath -> do
       when (not optQuiet) $
-        putStrLn $ "Running CC with options '" ++ intercalate " " (compilerOpts outPath) ++ "'"
-      (Just hin, _, _, hproc) <- createProcess (proc (maybe "gcc" id altComp) (compilerOpts outPath))
+        putStrLn $ "Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'"
+      (Just hin, _, _, hproc) <- createProcess (proc comp (compilerOpts outPath))
                                                { std_in = CreatePipe }
       hPutStrLn hin cstr
       hClose hin
       waitForProcess hproc
   where
-    compilerOpts p = ["-O" ++ show optLevel, "-xc", "-o", p, "-"]
+    compilerOpts binPath = ["-O" ++ show optLevel, "-xc", "-o", binPath, "-"]
     appendNL s = s ++ "\\n"
     quote s = "\"" ++ s ++ "\""
     noOutInfo = quote $ intercalate "\\n"
@@ -402,8 +399,8 @@ compileProgram buftype optLevel optQuiet prog desc altComp moutPath cCodeOutPath
                         [ "Compiler info: "
                         , cver
                         , ""
-                        , "CC options: "
-                        , intercalate " " (compilerOpts path)
+                        , "CC cmd: "
+                        , intercalate " " (comp : compilerOpts path)
                         , ""
                         , maybe "No environment info available" id desc
                         , "" -- adds newline at the end
