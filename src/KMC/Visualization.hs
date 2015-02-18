@@ -137,7 +137,7 @@ fancyToSSTDot opt str =
                                       (Const Word8 [Bool] :+: Enumerator (RangeSet Word8) Word8 Bool)
                                       [Bool])
                                      Var
-                    in sstToDot (optimize opt $ enumerateStates sst)
+                    in sstToDot (fst $ optimize opt $ enumerateStates sst)
 
 mkViz :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> IO ()
 mkViz f x = do
