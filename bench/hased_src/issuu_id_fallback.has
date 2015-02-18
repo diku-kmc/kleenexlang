@@ -1,5 +1,6 @@
-/* Identity transformation on Issuu-data.  The input is copied to the output, but it
-   is also validated in the process.
+/* Identity transformation on Issuu-data with fallback case.  
+   The input is copied to the output, but it is also validated in the process.
+   If an unexpected key is encountered, it is reported but still output.
 */
 
 objects := object <\n> objects
@@ -43,7 +44,7 @@ keyVal := <"ts":> someNumber
         | <"env_build":> <"> someString <">
         | <"env_name":> <"> someString <">
         | <"env_component":> <"> someString <">
-        // | "Unknown key/Val: " <"> someString <"> ~<:> "/" (<"> someString <"> | someNumber)
+        | "Unknown key/Val: " <"> someString <"> ~<:> "/" (<"> someString <"> | someNumber)
 
 hash16 := <[a-f0-9]{16}>
 someString := <[^"]*>
