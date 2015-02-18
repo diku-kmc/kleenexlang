@@ -1,0 +1,59 @@
+/* Identity transformation on Issuu-data with no fallback case.
+   The input is copied to the output, but it is also validated in the process.
+   If an unexpected key is encountered, the program fails.
+*/
+
+objects := object <\n> objects
+         | object <\n?>
+
+object := <\{> keyValPairs <}>
+
+keyValPairs := keyVal <,> keyValPairs
+             | keyVal
+
+keyVal := <"ts":> someNumber
+        | <"visitor_uuid":> <"> hash16 <">
+        | <"visitor_source":> <"> visitorSource <"> 
+        | <"visitor_device":> <"> visitorDevice <">
+        | <"visitor_useragent":> <"> someString <">
+        | <"visitor_ip":> <"> hash16 <">
+        | <"visitor_country":> <"> <[A-Z]{2}> <">
+        | <"visitor_referrer":> <"> hash16 <">
+        | <"env_type":> <"> envType <">
+        | <"env_doc_id":> <"> someString <">
+        | <"event_type":> <"> eventType <">
+        | <"subject_type":> <"> subjectType <">
+        | <"subject_doc_id":> <"> someString <">
+        | <"subject_page":> someNumber
+        | <"cause_type":> <"> causeType <">
+        | <"env_ranking":> someNumber
+        | <"event_readtime":> someNumber
+        | <"visitor_username":> (<"> hash16 <"> | <null>)
+        | <"env_adid":> <"> hash16 <">
+        | <"env_ranking":> someNumber
+        | <"event_service":> <"> serviceName <">
+        | <"event_readtime":> someNumber
+        | <"event_index":> someNumber
+        | <"subject_infoboxid":> <"> someString <">
+        | <"subject_url":> <"> someString <">
+        | <"subject_link_position":> <"> someString <">
+        | <"cause_position":> someNumber
+        | <"cause_adid":> <"> hash16 <">
+        | <"cause_embedid":> someNumber /* undocumented */
+        | <"cause_token":> <"> someString <"> /* undocumented */
+        | <"env_build":> <"> someString <">
+        | <"env_name":> <"> someString <">
+        | <"env_component":> <"> someString <">
+        // | "Unknown key/Val: " <"> someString <"> ~<:> "/" (<"> someString <"> | someNumber)
+
+hash16 := <[a-f0-9]{16}>
+someString := <[^"]*>
+someNumber := <[0-9]+>
+
+eventType  := <impression|click|read|download|share|pageread|pagereadtime|continuation_load>
+causeType  := <impression|page|ad|related|archive>
+envType    := <reader|stream|website>
+visitorSource := <external|internal>
+visitorDevice := <browser|android>
+subjectType := <doc|infobox|link>
+serviceName := <email|facebook|twitter|google|tumblr|linkedin>
