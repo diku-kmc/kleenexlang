@@ -6,6 +6,9 @@
 #include <inttypes.h>
 #include <sys/time.h>
 
+#define RETC_PRINT_USAGE 1
+#define RETC_PRINT_INFO 2
+
 #define OUTBUFFER_SIZE (16*1024)
 #define INBUFFER_SIZE (16*1024)
 #define INITIAL_BUFFER_SIZE (4096*8)
@@ -279,7 +282,6 @@ void printUsage(char *name)
   fprintf(stdout, "- \"%s -t\": runs normally, but prints timing to stderr.\n", name);
 }
 
-INLINE
 void run()
 {
   match();
@@ -297,14 +299,14 @@ int main(int argc, char *argv[])
   if(argc > 2)
   {
     printUsage(argv[0]);
-    return 1;
+    return RETC_PRINT_USAGE;
   }
   if (argc == 2) 
   {
     if(strcmp("-i", argv[1]) == 0)
     {
       printCompilationInfo();
-      return 2;
+      return RETC_PRINT_INFO;
     }
     else if(strcmp("-t", argv[1]) == 0)
     {
@@ -313,7 +315,7 @@ int main(int argc, char *argv[])
     else
     {
       printUsage(argv[0]);
-      return 1;
+      return RETC_PRINT_USAGE;
     }
   }
     
@@ -331,6 +333,7 @@ int main(int argc, char *argv[])
     run();
     gettimeofday(&time_after, NULL);
     timersub(&time_after, &time_before, &time_result);
+    // A timeval contains seconds and microseconds.
     millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
     fprintf(stderr, "time (ms): %ld\n", millis);
   }
@@ -338,4 +341,6 @@ int main(int argc, char *argv[])
   {
     run();
   }
+
+  return 0;
 }
