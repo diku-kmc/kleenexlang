@@ -279,7 +279,8 @@ prettyConstantDecls buftype prog =
       let chunks = splitAppends buftype deltas
           constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
           comment = join $ map escape $ map (chr . fromEnum) deltas
-          escape c = if isPrint c then [c] else "\\x" ++ showHex (ord c) ""
+          escape c = if isPrint c && isSafe c then [c] else "\\x" ++ showHex (ord c) ""
+          isSafe c = c /= '\\'
       in vcat [ text "//" <+> text comment
               , text "buffer_unit_t" <+> text constPrefix <> int n
                 <> brackets (int $ length chunks)
