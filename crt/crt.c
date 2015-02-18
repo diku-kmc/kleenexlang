@@ -12,7 +12,7 @@
 #define OUTBUFFER_SIZE (16*1024)
 #define INBUFFER_SIZE (16*1024)
 #define INITIAL_BUFFER_SIZE (4096*8)
-#define INLINE static inline __attribute__((always_inline))
+#define INLINE static inline
 
 typedef %%BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
