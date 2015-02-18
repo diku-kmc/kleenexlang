@@ -253,14 +253,15 @@ abstractInterpretation :: (Ord st, Ord var, Eq delta
                           ,Function func, Rng func ~ [delta]) =>
                           Bool
                        -> SST st pred func var
-                       -> AbstractEnvironment st var delta
+                       -> (AbstractEnvironment st var delta, Int)
 abstractInterpretation weak sst = go (sstS sst)
                                      (sstS sst)
                                      (M.fromList [(st, M.empty) | st <- S.toList (sstS sst)])
+                                     0
     where
-      go _         states gamma | S.null states = gamma
-      go oldStates states gamma = let (gamma', states') = updateAbstractEnvironment weak sst oldStates states gamma
-                                  in go states states' gamma'
+      go _         states gamma i | S.null states = (gamma, i)
+      go oldStates states gamma i = let (gamma', states') = updateAbstractEnvironment weak sst oldStates states gamma
+                                    in go states states' gamma' (i+1)
 
 applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta]) =>
                             AbstractEnvironment st var delta
@@ -287,12 +288,12 @@ applyAbstractEnvironment gamma sst =
 optimize :: (Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
             Int
          -> SST st pred func var
-         -> SST st pred func var
+         -> (SST st pred func var, Int)
 optimize level sst =
   let weak = level < 3
       applyOpt = level > 0
-      gamma = abstractInterpretation weak sst
-  in if applyOpt then applyAbstractEnvironment gamma sst else sst
+      (gamma, i) = abstractInterpretation weak sst
+  in if applyOpt then (applyAbstractEnvironment gamma sst, i) else (sst, 0)
 
 enumerateStates :: (Ord k, Ord var) => SST k pred func var -> SST Int pred func var
 enumerateStates sst =

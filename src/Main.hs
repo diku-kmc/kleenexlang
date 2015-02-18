@@ -5,7 +5,7 @@ import           Control.Applicative
 import           Control.Monad (when)
 import qualified Data.Set as S
 import           Data.List (intercalate)
-import           Data.Time (getCurrentTime)
+import           Data.Time (getCurrentTime, diffUTCTime)
 import           Data.Hash.MD5 (md5s, Str(..))
 import           Data.Word
 import           Options
@@ -101,35 +101,55 @@ compile mainOpts compileOpts args = do
      exitWith $ ExitFailure 1
    let [hasedFile] = args
    hasedSrc <- readFile hasedFile
+   timeFSTgen <- getCurrentTime
    let fst = fstFromHased hasedSrc
    when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (S.size $ fstS fst)
+   timeFSTgen' <- getCurrentTime
+   timeSSTgen <- getCurrentTime
    -- replace state and variable names with integers, which are much faster to
    -- compare (speeds up static analysis)
    let sst = enumerateVariables $ enumerateStates $ sstFromFST fst
    when (not $ optQuiet mainOpts) $ putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
-   let sstopt = optimize (optOptimizeSST mainOpts) sst
+   timeSSTgen' <- getCurrentTime
+   timeSSTopt <- getCurrentTime
+   let (sstopt, i) = optimize (optOptimizeSST mainOpts) sst
+   timeSSTopt' <- i `seq` getCurrentTime
    let prog = compileAutomaton sstopt
-   time <- getCurrentTime
+   timeCompile <- getCurrentTime
    let envInfo = intercalate "\\n" [ "Options:"
                                    , prettyOptions mainOpts compileOpts
                                    , ""
-                                   , "Time:       " ++ show time
+                                   , "Time:       " ++ show timeCompile
                                    , "Hased file: " ++ hasedFile
                                    , "Hased md5:  " ++ md5s (Str hasedSrc)
                                    , "SST states: " ++ show (S.size $ sstS sst)
                                    , "FST states: " ++ show (S.size $ fstS fst)
                                    ]
-   compileProgram (optWordSize compileOpts)
-                  (optOptimizeLevelCC compileOpts)
-                  (optQuiet mainOpts)
-                  prog
-                  (Just envInfo)
-                  (optAltCompiler compileOpts)
-                  (optOutFile compileOpts)
-                  (optCFile compileOpts)
+   ret <- compileProgram (optWordSize compileOpts)
+                         (optOptimizeLevelCC compileOpts)
+                         (optQuiet mainOpts)
+                         prog
+                         (Just envInfo)
+                         (optAltCompiler compileOpts)
+                         (optOutFile compileOpts)
+                         (optCFile compileOpts)
+   timeCompile' <- getCurrentTime
+   when (not $ optQuiet mainOpts) $ do
+     let fstGenDuration = diffUTCTime timeFSTgen' timeFSTgen
+         sstGenDuration = diffUTCTime timeSSTgen' timeSSTgen
+         sstOptDuration = diffUTCTime timeSSTopt' timeSSTopt
+         compileDuration = diffUTCTime timeCompile' timeCompile
+         fmt t = let s = show . round . toRational $ 1000 * t
+                 in replicate (8 - length s) ' ' ++ s
+     putStrLn $ "FST generation (ms)   : " ++ fmt fstGenDuration
+     putStrLn $ "SST generation (ms)   : " ++ fmt sstGenDuration
+     putStrLn $ "SST optimization (ms) : " ++ fmt sstOptDuration
+     putStrLn $ "code generation (ms)  : " ++ fmt compileDuration
+     putStrLn $ "total (ms)            : " ++ fmt (fstGenDuration + sstGenDuration + sstOptDuration + compileDuration)
+   return ret
 
 visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
-visualize mainOpts visOpts args = do
+visualize _ _ args = do
   when (length args /= 1) $ do
     prog <- getProgName
     putStrLn $ "Usage: " ++ prog ++ " visualize [options] <hased_file>"
@@ -145,46 +165,8 @@ main = runSubcommand
        , subcommand "visualize" visualize
        ]
 
-type DFST sigma delta = SST (PathTree Var Int) (RangeSet sigma) (OutputTerm sigma delta) Var
-
 fstFromHased :: String -> FST Int (RangeSet Word8) HasedOutTerm
 fstFromHased str =
   case parseHased str of
     Left e -> error e
     Right ih -> fromMu (hasedToMuTerm ih)
-
-sstFromHased :: Int -> String -> SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
-sstFromHased opt str = optimize opt $ sstFromFST (fstFromHased str)
-
-progFromHased :: Int -> String -> Program Word8
-progFromHased opt = compileAutomaton . sstFromHased opt
-
-cFromHased :: Int -> String -> String
-cFromHased opt = renderProgram UInt8T . progFromHased opt
-
-
-{-------------------------------------------}
-
-sstFromFancy :: (Bounded sigma, Enum sigma, Ord sigma) =>
-                String
-                -> DFST sigma Bool
-sstFromFancy str =
-  case parseRegex fancyRegexParser str of
-    Left e -> error e
-    Right (_, re) -> optimize 3 $ sstFromFST $ fromMu $ fromRegex re
-
-progFromFancy :: String -> Program Bool
-progFromFancy str = compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
-
-cFromFancy :: String -> String
-cFromFancy str =
-  renderProgram UInt8T $ compileAutomaton (sstFromFancy str :: DFST Word8 Bool)
-
-compileFancy :: String -> IO ExitCode
-compileFancy str =
-  compileProgram UInt8T 3 False
-                     (compileAutomaton (sstFromFancy str :: DFST Word8 Bool))
-                     (Just "From compileFancy") "gcc" (Just "match") Nothing
-
-runSST :: String -> [Char] -> Stream [Bool]
-runSST str = run (sstFromFancy str)
