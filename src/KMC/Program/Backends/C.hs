@@ -349,14 +349,12 @@ renderProgram buftype = renderCProg "\"TODO: insert descriptive string from rend
 
 ccVersion :: Maybe FilePath -> IO String
 ccVersion altComp = do
-  (_, out, err, hdl) <- createProcess (proc (maybe "gcc" id altComp) ["-v"])
-                        { std_out = CreatePipe
-                        , std_err = CreatePipe }
-  let (hOut, hErr) = maybe (error "bogus handles") id
-                     ((,) <$> out <*> err)
-  outStr <- hGetContents hOut
+  -- gcc/clang prints version info on stderr
+  (_, _, err, hdl) <- createProcess (proc (maybe "gcc" id altComp) ["-v"])
+                        { std_err = CreatePipe }
+  let hErr = maybe (error "bogus handles") id err
   errStr <- hGetContents hErr
-  return $ intercalate "\\n" $ lines $ outStr ++ errStr
+  return $ intercalate "\\n" $ lines $ errStr
 
 compileCmd :: String
 compileCmd = "gcc"
@@ -373,7 +371,7 @@ compileProgram :: (Enum delta, Bounded delta) =>
                -> IO ExitCode
 compileProgram buftype optLevel optQuiet prog desc altComp moutPath cCodeOutPath = do
   cver <- ccVersion altComp
-  let info = maybe noOutInfo (outInfo cver) moutPath
+  let info = (maybe noOutInfo (outInfo cver) moutPath)
   let cstr = renderCProg info . programToC buftype $ prog
   case cCodeOutPath of
     Nothing -> return ()
@@ -398,6 +396,7 @@ compileProgram buftype optLevel optQuiet prog desc altComp moutPath cCodeOutPath
     noOutInfo = quote $ intercalate "\\n"
                 [ "No object file generated!"
                 , maybe "No environment info available" id desc
+                , "" -- adds newline at the end
                 ]
     outInfo cver path = quote $ intercalate "\\n" 
                         [ "Compiler info: "
@@ -407,5 +406,6 @@ compileProgram buftype optLevel optQuiet prog desc altComp moutPath cCodeOutPath
                         , intercalate " " (compilerOpts path)
                         , ""
                         , maybe "No environment info available" id desc
+                        , "" -- adds newline at the end
                         ]
     
