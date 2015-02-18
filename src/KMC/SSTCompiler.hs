@@ -11,7 +11,6 @@ import           Control.Applicative ((<$>), (<*>), pure)
 import           Data.List (sortBy)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Tuple (swap)
 
 import           KMC.OutputTerm
 import           KMC.Program.IL

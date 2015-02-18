@@ -4,7 +4,6 @@
 
 module KMC.Program.Backends.C where
 
-import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad (when, join)
 import           Data.Bits
 import           Data.List (intercalate)

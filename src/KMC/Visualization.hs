@@ -43,6 +43,9 @@ instance Pretty Bool where
   pretty False = "0"
   pretty True = "1"
 
+instance Pretty Int where
+  pretty = show
+
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left x) = "(" ++ pretty x ++ ")"
   pretty (Right y) = pretty y
