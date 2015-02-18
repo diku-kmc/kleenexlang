@@ -10,7 +10,7 @@ import           Control.Applicative
 import           Control.Monad
 
 import qualified Data.Set as S
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 import           KMC.Theories
 
@@ -149,10 +149,12 @@ isExact :: AbstractVal a -> Bool
 isExact (Exact _) = True
 isExact _ = False
 
+-- | Compute the least upper bound of two abstract values.
 lubAbstractVal :: (Eq a) => AbstractVal a -> AbstractVal a -> AbstractVal a
 lubAbstractVal (Exact x) (Exact y) = if x == y then Exact x else Ambiguous
 lubAbstractVal _ _ = Ambiguous
 
+-- | Compute the least upper bound of a set of abstract valuations.
 lubAbstractValuations :: (Ord var, Eq delta) =>
                          [AbstractValuation var delta] -> AbstractValuation var delta
 lubAbstractValuations = M.unionsWith lubAbstractVal
@@ -214,28 +216,33 @@ updateAbstractEnvironment :: (Ord st, Ord var, Eq delta
                              ,Function func, Rng func ~ [delta]) =>
                              Bool
                           -> SST st pred func var
-                          -> [st]
+                          -> S.Set st
+                          -> S.Set st
                           -> AbstractEnvironment st var delta
-                          -> (AbstractEnvironment st var delta, [st])
-updateAbstractEnvironment weak sst states gamma =
+                          -> (AbstractEnvironment st var delta, S.Set st)
+updateAbstractEnvironment weak sst oldStates states gamma =
   (M.union updates gamma
-  ,S.toList $ S.unions (map succs (M.keys updates)))
+  ,S.unions (map succs (M.keys updates)))
   where
     -- Compute the set of successors of a given state
     succs q =
       S.fromList [ q' | Just xs <- [M.lookup q (eForward $ sstE sst)], (_,_,q') <- xs ]
 
     updates = M.unions $ do
-      s <- states
+      s <- S.toList states
+      -- Get the previous abstract valuation for the current state
+      let rho_s = maybe M.empty id (M.lookup s gamma)
       -- Compute the abstract valuation for the current state by applying the
       -- update function to the abstract valuations of all predecessors and
       -- taking the least upper bound.
       let rho_s' =
             lubAbstractValuations $
+              rho_s:
               [ maybe M.empty id (M.lookup r gamma) `updateRho` kappa
-                | (_, kappa, r) <- maybe [] id (M.lookup s (eBackward $ sstE sst)) ]
-      -- Get the previous abstract valuation for the current state
-      let rho_s = maybe M.empty id (M.lookup s gamma)
+                | (_, kappa, r) <- maybe [] id (M.lookup s (eBackward $ sstE sst))
+                  -- Only consider abstract valuations from the states that were
+                  -- updated in last iteration
+                , S.member r oldStates ]
       -- Did we learn more information?
       guard (rho_s' /= rho_s)
       return (M.singleton s rho_s')
@@ -247,11 +254,13 @@ abstractInterpretation :: (Ord st, Ord var, Eq delta
                           Bool
                        -> SST st pred func var
                        -> AbstractEnvironment st var delta
-abstractInterpretation weak sst = go (S.toList $ sstS sst) M.empty
+abstractInterpretation weak sst = go (sstS sst)
+                                     (sstS sst)
+                                     (M.fromList [(st, M.empty) | st <- S.toList (sstS sst)])
     where
-      go [] gamma = gamma
-      go states gamma = let (gamma', states') = updateAbstractEnvironment weak sst states gamma
-                        in go states' gamma'
+      go _         states gamma | S.null states = gamma
+      go oldStates states gamma = let (gamma', states') = updateAbstractEnvironment weak sst oldStates states gamma
+                                  in go states states' gamma'
 
 applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta]) =>
                             AbstractEnvironment st var delta
