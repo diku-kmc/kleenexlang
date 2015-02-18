@@ -8,20 +8,14 @@ import qualified Data.Map as M
 import           Data.Word (Word8)
 import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust)
-import qualified Data.GraphViz as GV
 
-import           KMC.SSTConstruction (sstFromFST, PathTree, Var)
-import           KMC.FSTConstruction (fromMu)
-import           KMC.Visualization (Pretty(..), mkViz, mkVizToFile, fstToDot, sstToDot)
+import           KMC.Visualization (Pretty(..))
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, RangeSet)
-import           KMC.SymbolicSST -- (run, SST, Stream(..), optimize, enumerateStates)
 import           KMC.Theories (top)
 import           KMC.Expression (Mu (..))
 import           KMC.Syntax.External (Regex (..), unparse)
 import qualified KMC.Hased.Parser as H
-
-import Debug.Trace
 
 fromChar :: Enum a => Char -> a
 fromChar = toEnum . ord
@@ -78,7 +72,7 @@ out' = out . map fromChar
 -- | Get the index of an element in a list, or Nothing.
 pos :: (Eq a) => a -> [a] -> Maybe Nat
 pos _ []                 = Nothing
-pos x (e:es) | x == e    = return Z
+pos x (e:_)  | x == e    = return Z
 pos x (_:es) | otherwise = S `fmap` (pos x es)
 
 -- | Get the nth element on the stack, or Nothing.
@@ -92,13 +86,13 @@ getStack _ _            = Nothing
 -- The given identifier is treated as the top-level bound variable,
 -- i.e., it becomes the first mu.  
 hasedToSimpleMu :: H.Identifier -> H.Hased -> SimpleMu 
-hasedToSimpleMu init (H.Hased ass) = SMLoop $ go [init] (fromJust $ M.lookup init mp)
+hasedToSimpleMu initVar (H.Hased ass) = SMLoop $ go [initVar] (fromJust $ M.lookup initVar mp)
     where
       mp :: M.Map H.Identifier H.HasedTerm
       mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
       
       go :: [H.Identifier] -> H.HasedTerm -> SimpleMu
-      go vars (H.Constant n) = SMWrite n
+      go _    (H.Constant n) = SMWrite n
       go vars (H.Var name) =
           case name `pos` vars of
             Nothing ->
@@ -108,7 +102,7 @@ hasedToSimpleMu init (H.Hased ass) = SMLoop $ go [init] (fromJust $ M.lookup ini
             Just p  -> SMVar p
       go vars (H.Sum l r) = SMAlt (go vars l) (go vars r)
       go vars (H.Seq l r) = SMSeq (go vars l) (go vars r)
-      go vars H.One       = SMAccept
+      go _    H.One       = SMAccept
       go vars (H.Ignore e) = SMIgnore $ go vars e
       go _ (H.RE re) = SMRegex re
 
@@ -121,7 +115,7 @@ simpleMuToMuTerm :: [HasedMu a] -> Bool -> SimpleMu -> HasedMu a
 simpleMuToMuTerm st ign sm =
     case sm of
       SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
-      SMLoop sm    -> Loop $ \x -> simpleMuToMuTerm ((Var x) : st) ign sm
+      SMLoop sm'   -> Loop $ \x -> simpleMuToMuTerm ((Var x) : st) ign sm'
       SMAlt l r    -> (simpleMuToMuTerm st ign l) `Alt` (simpleMuToMuTerm st ign r)
       SMSeq l r    -> (simpleMuToMuTerm st ign l) `Seq` (simpleMuToMuTerm st ign r)
       SMWrite s    -> if ign
@@ -142,8 +136,8 @@ hasedToMuTerm (i, h) = simpleMuToMuTerm [] False $ hasedToSimpleMu i h
 -- action on the matched symbols: It either copies any matched symbols or
 -- ignores them.
 regexToMuTerm :: HasedOutTerm -> Regex -> HasedMu a
-regexToMuTerm o r =
-    case r of
+regexToMuTerm o re =
+    case re of
        One        -> Accept
        Dot        -> RW top o Accept
        Chr a      -> RW (singleton (fromChar a)) o Accept
@@ -166,17 +160,17 @@ regexToMuTerm o r =
        LazyQuestion e -> Accept `Alt` (regexToMuTerm o e)
        Suppress e -> regexToMuTerm (out []) e
        Range e n m ->
-           let start exp = case m of
-                             Nothing -> exp `Seq` (regexToMuTerm o (Star e))
-                             Just n' -> exp `Seq` (foldr Seq Accept
-                                                   (replicate (n' - n)
+           let start expr = case m of
+                             Nothing -> expr `Seq` (regexToMuTerm o (Star e))
+                             Just n' -> expr `Seq` (foldr Seq Accept
+                                                    (replicate (n' - n)
                                                     (regexToMuTerm o (Question e))))
            in start (foldr Seq Accept
                      (replicate n (regexToMuTerm o e)))
        NamedSet _ _    -> error "Named sets not yet supported"
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
-f s = runFile "test/issuu.has" s >>= putStr
+{-
 runFile :: FilePath -> String -> IO String
 runFile fp str = H.parseHasedFile fp >>= flip go str
     where
@@ -185,7 +179,7 @@ runFile fp str = H.parseHasedFile fp >>= flip go str
         let sst = sstFromFST (fromMu (hasedToMuTerm ih))
                 :: SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
         return $ showStream $ streamToString $ KMC.SymbolicSST.run sst $ map fromChar str
-f' = showFile "test/issuu.has"
+
 showFile :: FilePath -> IO ()
 showFile fp = readFile fp >>= H.pf
 
@@ -254,7 +248,8 @@ runHasedSST str ws = streamToString $
                              Var
                   in KMC.SymbolicSST.run sst (map fromChar ws)
 
-
+-}
+{-
 iss1 = "{visitor_ip:255.233.123.213,visitor_device:browser}"
 iss1many = unlines $ replicate 4 iss1
 
@@ -262,3 +257,4 @@ iss2 = "{\"ts\":1393631983,\"visitor_uuid\":\"04daa9ed9dde73d3\",\"visitor_sourc
 iss2many = unlines $ replicate 4 iss2
 
 iss3 = "{\"ts\":1,\"visitor_uuid\":\"04daa9ed9dde73d3\",\"visitor_source\":\"external\",\"visitor_device\":\"browser\",\"visitor_useragent\":\"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.117 Safari/537.36\",\"visitor_ip\":\"6a3273d508a9de04\",\"visitor_country\":\"ES\",\"visitor_referrer\":\"64f729926497515c\",\"env_type\":\"reader\",\"env_doc_id\":\"140224195414-e5a9acedd5eb6631bb6b39422fba6798\",\"event_type\":\"impression\",\"subject_type\":\"doc\",\"subject_doc_id\":\"140224195414-e5a9acedd5eb6631bb6b39422fba6798\",\"subject_page\":0,\"cause_type\":\"impression\",\"env_ranking\":11}"
+-}
