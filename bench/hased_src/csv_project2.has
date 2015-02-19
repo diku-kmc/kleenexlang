@@ -1,0 +1,16 @@
+/* CSV project #2
+   Project away every uneven column from a CSV file.
+   Does no checks on the format, except requiring it to have at least one
+   column.
+*/
+
+csvProj2 := rowOdd <\n> csvProj2
+          | rowOdd <\n?>
+
+rowOdd := ~col ~<,> rowEven
+        | ~col
+
+rowEven := col <,> rowOdd
+         | col
+
+col := <[^,\n]*>

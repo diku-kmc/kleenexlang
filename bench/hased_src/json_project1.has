@@ -1,0 +1,24 @@
+/* JSON project #1
+   Project away the key "last_name" from a JSON file.
+   Leave everything else intact.
+*/
+
+jsonProj1 := block ws jsonProj1
+           | block ws
+
+block := <\{> ws keyVals ws <}>
+
+keyVals := anonymized <,> ws keyVals
+         | ws generalKey ws <:> ws generalVal <,> ws keyVals
+         | anonymized
+         | ws generalKey ws <:> ws generalVal
+
+anonymized := <"last_name"> ws <:> ws "\"ANONYMIZED\"" ~stringVal
+
+generalKey := <"> <[^ \n"]*> <">
+generalVal := stringVal | numVal
+
+stringVal  := <"[^"]*">
+numVal := <[0-9]+>
+
+ws := <[ \n]*>
