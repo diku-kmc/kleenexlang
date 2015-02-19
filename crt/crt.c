@@ -6,12 +6,12 @@
 #include <inttypes.h>
 #include <sys/time.h>
 
-#define RETC_PRINT_USAGE 1
-#define RETC_PRINT_INFO 2
+#define RETC_PRINT_USAGE     1
+#define RETC_PRINT_INFO      2
 
-#define OUTBUFFER_SIZE (16*1024)
-#define INBUFFER_SIZE (16*1024)
-#define INITIAL_BUFFER_SIZE (4096*8)
+#define OUTBUFFER_SIZE       (16*1024)
+#define INBUFFER_SIZE        (16*1024)
+#define INITIAL_BUFFER_SIZE  (4096*8)
 #define INLINE static inline
 
 typedef %%BUFFER_UNIT_T buffer_unit_t;
