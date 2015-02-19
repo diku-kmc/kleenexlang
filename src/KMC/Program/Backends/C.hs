@@ -184,18 +184,20 @@ prettyInstr buftype tbltype prog instr =
   case instr of
     AcceptI            -> text "goto accept;"
     FailI              -> text "goto fail;"
-    AppendI bid constid ->
+    AppendI bid constid -> 
       let base     = fromEnum (maxBound :: delta) - fromEnum (minBound :: delta) + 1
           baseBits = bitWidth 2 base
-          lendoc   = text $ show $ length (progConstants prog M.! constid) * baseBits
-      in if bid == streamBuf then
-             text "outputarray"
-               <> parens (hcat [cid constid, comma, lendoc])
-               <> semi
-         else
-             text "appendarray"
-               <> parens (hcat [buf bid, comma, cid constid, comma, lendoc])
-               <> semi
+          len      = length (progConstants prog M.! constid) * baseBits
+          lendoc   = text $ show len
+      in if len == 0 then text "/* do not output zero-length string */" else
+             if bid == streamBuf then
+                 text "outputarray"
+                  <> parens (hcat [cid constid, comma, lendoc])
+                  <> semi
+             else
+                 text "appendarray"
+                  <> parens (hcat [buf bid, comma, cid constid, comma, lendoc])
+                  <> semi
     AppendTblI bid tid -> let arg = tbl buftype tbltype tid
                               lendoc = int (tblBitSize $ progTables prog M.! tid)
                           in if bid == streamBuf then
