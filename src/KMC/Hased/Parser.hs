@@ -4,7 +4,7 @@
 
 module KMC.Hased.Parser where
 
-import Control.Applicative ((<$>), (<*>), (<*), (*>))
+import Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import Control.Monad.Identity (Identity)
 import Text.Parsec hiding (parseTest)
 import Text.Parsec.Prim (runParser)
@@ -125,13 +125,13 @@ hasedIdentifier = Identifier <$>
 
 -- | Parses a character or an escaped double quote.
 escapedChar :: Parsec String s Char
-escapedChar = satisfy (not . flip elem replacements)
+escapedChar = satisfy (not . mustBeEscaped)
               <|> escaped
     where
-      escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
-      escapedChar code replacement = char code >> return replacement
-      codes        = ['\\', '"', 'n']
-      replacements = ['\\', '"', '\n']
+      mustBeEscaped c = c `elem` map snd cr
+      escaped = char '\\' >> choice (map escapedChar cr)
+      escapedChar (code, replacement) = replacement <$ char code
+      cr = [('\\', '\\'), ('"', '"'), ('n', '\n'), ('t', '\t')]
                
 -- | A "constant" is a string enclosed in quotes.
 hasedConstant :: HasedParser String
