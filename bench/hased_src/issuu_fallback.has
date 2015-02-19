@@ -21,10 +21,8 @@ object := ~<\{> sep keyValPairs ~<}>
 keyValPairs := keyVal ~<,> keyValPairs
              | keyVal
 
-sep := "
-   "
-nl := "
-"
+sep := "\n"
+nl := "\n"
 
 keyVal := ~<"ts":> "Timestamp=" someNumber sep
         | ~<"visitor_uuid":> "vistor-id: " ~<"> hash16 ~<"> sep
