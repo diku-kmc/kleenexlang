@@ -130,8 +130,8 @@ escapedChar = satisfy (not . flip elem replacements)
     where
       escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
       escapedChar code replacement = char code >> return replacement
-      codes        = ['\\', '"']
-      replacements = ['\\', '"']
+      codes        = ['\\', '"', 'n']
+      replacements = ['\\', '"', '\n']
                
 -- | A "constant" is a string enclosed in quotes.
 hasedConstant :: HasedParser String
@@ -242,42 +242,5 @@ parseTest' p input
                        fail ""
         Right x  -> return x
 
-p = parseTest (hasedAssignment <* eof)
-t1 = unlines [ "x := \"CSV \" <ab*> x"
-             , "   | !c! \" hej \" y"
-             , "   | \"C3 \" !e!"
-             , "y := \"ABC \" <0+> y"
-             , "   | !e*! x"
-             ]
-t2 = unlines [ "x := \"line start \" <a|b*> (\"\nelement #1\" <a>"
-               , "                          | \"\nelement #2\" <b>)"
-               , "            <def|fed> x"
-               , "  | \"EOF!\""
-              ]
-p2 = parseTest (hasedTerm <* eof)
-
-t4 = unlines [ "x := \"CSV\" <a|b*> !c*! "
-             , "   <def+fed> y"
-             , "y := \"Abc\" <(d|e)*> x"
-             ]
-t5 = unlines [ "x := \"CSV\" <a|b*> "
-             , "    !c*! "
-             , "    <def+fed> y"
-             , "    \"Abc\" <(d|e)*> x"
-             , "y := "
-             , "    \"Cons\" !re!"
-             ]
--- use ~ as ignore syntax
-t6 = unlines [ "x := ~\"test, x \" <a*> ~~(~<b*> | <e>) ~y z"
-             , "y := ~<c*>"
-             , "z := <d*>"
-             ]
--- TODO:  Implement macros!
-t7 = unlines [ "x := p(<a>)"
-             , "p(x) := <\"> x <\"> "
-             ]
-
 pf = parseTest (hased <* eof)
 pf' = parseTest' (hased <* eof)
-
-f' = readFile "test/issuu.has" >>= pf
