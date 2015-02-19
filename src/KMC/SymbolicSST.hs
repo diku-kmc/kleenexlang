@@ -7,7 +7,6 @@
 module KMC.SymbolicSST where
 
 import           Control.Applicative
-import           Control.Monad
 
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
@@ -24,8 +23,7 @@ type RegisterUpdate var func   = M.Map var (UpdateStringFunc var func)
 
 data EdgeSet st pred func var =
   EdgeSet
-  { eForward  :: M.Map st [(pred, RegisterUpdate var func, st)]
-  , eBackward :: M.Map st [(pred, RegisterUpdate var func, st)]
+  { eForward      :: M.Map st [(pred, RegisterUpdate var func, st)]
   }
 
 data SST st pred func var =
@@ -88,7 +86,6 @@ normalizeUpdateString = go
 
 edgesFromList :: (Ord st) => [(st, pred, RegisterUpdate var func, st)] -> EdgeSet st pred func var
 edgesFromList xs = EdgeSet { eForward  = M.fromListWith (++) [ (q,  [(p, u, q')]) | (q,p,u,q') <- xs ]
-                           , eBackward = M.fromListWith (++) [ (q', [(p, u, q)])  | (q,p,u,q') <- xs ]
                            }
 
 edgesToList :: EdgeSet st pred func var -> [(st, pred, RegisterUpdate var func, st)]
@@ -156,6 +153,12 @@ lubAbstractVal :: (Eq a) => AbstractVal a -> AbstractVal a -> AbstractVal a
 lubAbstractVal (Exact x) (Exact y) = if x == y then Exact x else Ambiguous
 lubAbstractVal _ _ = Ambiguous
 
+lubAbstractValuation :: (Ord var, Eq delta) =>
+                        AbstractValuation var delta
+                     -> AbstractValuation var delta
+                     -> AbstractValuation var delta
+lubAbstractValuation = M.unionWith lubAbstractVal
+
 -- | Compute the least upper bound of a set of abstract valuations.
 lubAbstractValuations :: (Ord var, Eq delta) =>
                          [AbstractValuation var delta] -> AbstractValuation var delta
@@ -219,35 +222,24 @@ updateAbstractEnvironment :: (Ord st, Ord var, Eq delta
                              Bool
                           -> SST st pred func var
                           -> S.Set st
-                          -> S.Set st
                           -> AbstractEnvironment st var delta
                           -> (AbstractEnvironment st var delta, S.Set st)
-updateAbstractEnvironment weak sst oldStates states gamma =
+updateAbstractEnvironment weak sst states gamma =
   (M.union updates gamma
-  ,S.unions (map succs (M.keys updates)))
+  ,M.keysSet updates)
   where
-    -- Compute the set of successors of a given state
-    succs q =
-      S.fromList [ q' | Just xs <- [M.lookup q (eForward $ sstE sst)], (_,_,q') <- xs ]
-
-    updates = M.unions $ do
-      s <- S.toList states
-      -- Get the previous abstract valuation for the current state
+    updateOldRho s rho' =
       let rho_s = maybe M.empty id (M.lookup s gamma)
-      -- Compute the abstract valuation for the current state by applying the
-      -- update function to the abstract valuations of all predecessors and
-      -- taking the least upper bound.
-      let rho_s' =
-            lubAbstractValuations $
-              rho_s:
-              [ maybe M.empty id (M.lookup r gamma) `updateRho` kappa
-                | (_, kappa, r) <- maybe [] id (M.lookup s (eBackward $ sstE sst))
-                  -- Only consider abstract valuations from the states that were
-                  -- updated in last iteration
-                , S.member r oldStates ]
-      -- Did we learn more information?
-      guard (rho_s' /= rho_s)
-      return (M.singleton s rho_s')
+      in if M.isSubmapOf rho' rho_s then
+           Nothing
+         else
+           Just (lubAbstractValuation rho_s rho')
+
+    updates = M.mapMaybeWithKey updateOldRho $ M.fromListWith lubAbstractValuation $ do
+      r <- S.toList states
+      let rho_r = maybe M.empty id (M.lookup r gamma)
+      (_, kappa, s) <- eForwardLookup (sstE sst) r
+      return (s, rho_r `updateRho` kappa)
 
     updateRho = if weak then updateAbstractValuationWeak else updateAbstractValuation
 
@@ -257,13 +249,12 @@ abstractInterpretation :: (Ord st, Ord var, Eq delta
                        -> SST st pred func var
                        -> (AbstractEnvironment st var delta, Int)
 abstractInterpretation weak sst = go (sstS sst)
-                                     (sstS sst)
                                      (M.fromList [(st, M.empty) | st <- S.toList (sstS sst)])
                                      0
     where
-      go _         states gamma i | S.null states = (gamma, i)
-      go oldStates states gamma i = let (gamma', states') = updateAbstractEnvironment weak sst oldStates states gamma
-                                    in go states states' gamma' (i+1)
+      go states gamma i | S.null states = (gamma, i)
+      go states gamma i = let (gamma', states') = updateAbstractEnvironment weak sst states gamma
+                          in go states' gamma' (i+1)
 
 applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta]) =>
                             AbstractEnvironment st var delta
