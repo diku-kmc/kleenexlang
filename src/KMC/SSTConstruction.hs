@@ -129,9 +129,13 @@ specialize :: (Function func, Rng func ~ [delta]
               [(st, pred, [(var, UpdateStringFunc var func)], st)]
               -> [(st, pred, [(var, UpdateStringFunc var func)], st)]
 specialize ts =
-  [ (q, p, [ (v, specFunc p f) | (v,f) <- xs ], q')
+  [ (q, p, [ (v, resolveConstFunc $ specFunc p f) | (v,f) <- xs ], q')
     | (q, p, xs, q') <- ts ]
   where
+    resolveConstFunc = normalizeUpdateStringFunc . concatMap resolve
+    resolve (FuncA f) | Just c <- isConst f = [ConstA c]
+    resolve x = [x]
+
     specFunc p f =
       if size p == 1 then
           constUpdateStringFunc $ evalUpdateStringFunc (lookupIndex 0 p) f
