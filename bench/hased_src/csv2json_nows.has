@@ -1,0 +1,18 @@
+/* Convert a CSV format to its JSON-version without superfluous whitespace.
+Uses a comma as separator. */
+
+csv2json := "{" row "}" ~<\n> csv2json
+          | "{" row "}" ~<\n>
+
+row := "\"id\""         ":" numVal <,>
+       "\"first_name\"" ":" stringVal <,>
+       "\"last_name\""  ":" stringVal <,>
+       "\"email\""      ":" stringVal <,>
+       "\"country\""    ":" stringVal <,>
+       "\"ip\""         ":" "\"" ipVal "\""
+
+// Match an unquoted string.
+stringVal := "\"" <([^,\n])*> "\""
+ipVal := <[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}>
+
+numVal := <[0-9]+>

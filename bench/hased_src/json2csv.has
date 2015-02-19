@@ -1,0 +1,20 @@
+/* Convert a (specific) JSON format to a CSV format.  Should be the identity when composed 
+with either csv2json.has or csv2json_nows.has
+*/
+
+json2csv := ~<\{> block "\n" ~<}> ws json2csv
+          | ~<\{> block "\n" ~<}> ws
+
+
+block :=   ws ~<"id">         ws ~<:> ws numVal ws
+       <,> ws ~<"first_name"> ws ~<:> ws stringVal ws
+       <,> ws ~<"last_name">  ws ~<:> ws stringVal ws
+       <,> ws ~<"email">      ws ~<:> ws stringVal ws
+       <,> ws ~<"country">    ws ~<:> ws stringVal ws
+       <,> ws ~<"ip">         ws ~<:> ws ipVal ws
+
+stringVal := ~<"> <[^",\n]*> ~<">
+numVal := <[0-9]+>
+ipVal := ~<"> <[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}> ~<">
+
+ws := ~<[ \n]*>

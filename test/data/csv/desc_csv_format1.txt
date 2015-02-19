@@ -1,0 +1,3 @@
+CSV data obtained from mockaroo.com by generating 3*1000 rows with the default settings and no header.  These 3000 rows were then concatenated into each other repeatedle with cat to reach the file size.
+
+The two JSON versions of the data are generated from the CSV data by csv2json.has and csv2json_nows.has

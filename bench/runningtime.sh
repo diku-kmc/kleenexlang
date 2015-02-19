@@ -10,6 +10,9 @@ declare -A inputdata=(
     ["flip_ab.has"]="abs_8.txt;abs9.txt"
     ["issuu_fallback.has"]="issuu/big.json"
     ["issuu_nofallback.has"]="issuu/big.json"
+    ["csv2json.has"]="csv/csv_format1.csv"
+    ["csv2json_nows.has"]="csv/csv_format1.csv"
+    ["json2csv.has"]="csv/csv_format1.csv.ws.json;csv/csv_format1.csv.nows.json"
 )
 
 
