@@ -68,6 +68,7 @@ normalizeUpdateStringFunc :: (Rng func ~ [delta]) => UpdateStringFunc var func -
 normalizeUpdateStringFunc = go
     where
       go [] = []
+      go (ConstA []:xs) = go xs
       go (ConstA x:ConstA y:xs) = go (ConstA (x ++ y):xs)
       go (ConstA x:xs) = ConstA x:go xs
       go (VarA v:xs) = VarA v:go xs
@@ -80,6 +81,7 @@ normalizeUpdateString :: UpdateString var [delta] -> UpdateString var [delta]
 normalizeUpdateString = go
     where
       go [] = []
+      go (Right []:xs) = go xs
       go (Right x:Right y:xs) = Right (x++y):xs
       go (Left v:xs) = Left v:go xs
       go (Right x:xs) = Right x:go xs
