@@ -25,8 +25,6 @@ import           KMC.SSTCompiler (compileAutomaton)
 import           KMC.SSTConstruction (sstFromFST)
 import           KMC.SymbolicFST (FST, fstS)
 import           KMC.SymbolicSST
---import           KMC.Syntax.Config (fancyRegexParser)
---import           KMC.Syntax.Parser (parseRegex)
 import           KMC.Visualization
 
 data MainOptions =
@@ -84,7 +82,7 @@ instance Options MainOptions where
     defineOptions =
       MainOptions
       <$> simpleOption "quiet" False "Be quiet"
-      <*> simpleOption "opt" 0 "SST optimization level (1-3)"
+      <*> simpleOption "opt" 3 "SST optimization level (1-3)"
 
 instance Options CompileOptions where
     defineOptions =
