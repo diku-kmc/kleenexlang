@@ -255,7 +255,7 @@ prettyTableDecl :: (Enum delta, Bounded delta) =>
                 -> Doc
 prettyTableDecl tbltype prog =
   if null tables then text "/* no tables */" else
-    ctyp tbltype <+> text "tbl" <> brackets (int (length tables)) <> brackets (int tableSize) <+> text "="
+    text "const" <+> ctyp tbltype <+> text "tbl" <> brackets (int (length tables)) <> brackets (int tableSize) <+> text "="
     $$ lbrace <> vcat (punctuate comma (map (prettyTableExpr tbltype) tables)) <> rbrace <> semi
   where
     tables    = M.elems $ progTables prog
@@ -282,7 +282,7 @@ prettyConstantDecls buftype prog =
           escape c = if isPrint c && isSafe c then [c] else "\\x" ++ showHex (ord c) ""
           isSafe c = c /= '\\'
       in vcat [ text "//" <+> text comment
-              , text "buffer_unit_t" <+> text constPrefix <> int n
+              , text "const" <+> text "buffer_unit_t" <+> text constPrefix <> int n
                 <> brackets (int $ length chunks)
                 <+> text "=" <+>
                 (braces $ hcat $ punctuate comma constdocs) <> semi

@@ -93,7 +93,7 @@ void buf_resize(buffer_t *buf, size_t shift)
 }
 
 INLINE
-void buf_writearray(buffer_t *dst, buffer_unit_t *arr, int bits)
+void buf_writearray(buffer_t *dst, const buffer_unit_t *arr, int bits)
 {
   if (dst->bitpos % BUFFER_UNIT_BITS == 0)
   {
@@ -144,7 +144,7 @@ void outputconst(buffer_unit_t w, int bits)
 }
 
 INLINE
-void appendarray(buffer_t *dst, buffer_unit_t *arr, int bits)
+void appendarray(buffer_t *dst, const buffer_unit_t *arr, int bits)
 {
   size_t total_bits = dst->bitpos + bits;
   if (total_bits >= (dst->size - 1) * BUFFER_UNIT_BITS * BUFFER_UNIT_SIZE)
