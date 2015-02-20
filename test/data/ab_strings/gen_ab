@@ -1,0 +1,2 @@
+export LC_CTYPE=C
+cat /dev/urandom | tr -dc 'a-b'
