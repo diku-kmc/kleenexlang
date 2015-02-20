@@ -35,7 +35,7 @@ executable repg
                      , text >= 1.1.0.0
                      , time >= 1.4.2
                      , transformers >= 0.4.2.0
-                     , MissingH
+                     , MissingH >= 1.3
                      -- Remove before distributing: Only needed because haskell-mode
                      -- is too stupid to figure out build-depends for the test suite.
                      , Cabal >= 1.22.0.0
