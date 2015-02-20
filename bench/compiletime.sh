@@ -22,7 +22,7 @@ function setname {
 
 function areyousure {
     while true; do
-        read -p "This will clear old data in $OUT_DIR.  Proceed? " yn
+        read -p "$1" yn
         case $yn in
             [Yy]* ) break;;
             [Nn]* ) exit;;
@@ -31,12 +31,22 @@ function areyousure {
     done
 }
 
+prefix=""
 cleardata=false
-while getopts ":c" opt; do
+while getopts ":p:cn:" opt; do
   case $opt in
   c)
       cleardata=true
-      areyousure
+      areyousure "This will clear old data in $OUT_DIR.  Proceed? "
+      ;;
+  p)
+      prefix=$OPTARG
+      ;;
+  n)
+      areyousure "This will delete anything in $BIN_DIR and $OUT_DIR prefixed by $OPTARG.  Proceed? "
+      rm $BIN_DIR$OPTARG*
+      rm $OUT_DIR$OPTARG*
+      exit
       ;;
   \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -48,14 +58,17 @@ done
 for opt_level in ${OPT_LEVELS[@]}; do
     for cc in ${CCS[@]}; do
         for n in $(ls $HASDIR); do
+            if [[ ${n} != *".has" ]]; then
+                continue
+            fi
             if [[ ${n} !=  ${SKIP}* ]]; then
                 setname $n $opt_level $cc
-                timingdata=$OUT_DIR$NAME$COMPILETIME_POSTFIX
+                timingdata=$OUT_DIR$prefix$NAME$COMPILETIME_POSTFIX
                 if [ "$cleardata" = true ]; then
                     cat /dev/null > $timingdata
                 fi
                 for i in `seq 1 $REPS`; do
-                    binary=$BIN_DIR$NAME #$BIN_POSTFIX
+                    binary=$BIN_DIR$prefix$NAME #$BIN_POSTFIX
                     CMD="$REPGC compile $HASDIR$n --out $binary --opt $opt_level --cc $cc >> $timingdata"
                     echo $i
                     echo $CMD

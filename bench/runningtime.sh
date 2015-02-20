@@ -30,7 +30,7 @@ function setprimname {
 
 function areyousure {
     while true; do
-        read -p "This will clear old data in $OUT_DIR.  Proceed? " yn
+        read -p "$1" yn
         case $yn in
             [Yy]* ) break;;
             [Nn]* ) exit;;
@@ -39,12 +39,22 @@ function areyousure {
     done
 }
 
+
+prefix=""
 cleardata=false
-while getopts ":c" opt; do
+while getopts ":p:cn:" opt; do
   case $opt in
   c)
       cleardata=true
-      areyousure
+      areyousure "This will clear old data in $OUT_DIR.  Proceed? "
+      ;;
+  p)
+      prefix=$OPTARG
+      ;;
+  n)      
+      areyousure "This will delete anything in $OUT_DIR prefixed by $OPTARG.  Proceed? "
+      rm $OUT_DIR$OPTARG*
+      exit
       ;;
   \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -58,7 +68,7 @@ for bin in $(ls $BIN_DIR); do
     setprimname $bin
     IFS=';' read -a inputs <<< ${inputdata[$PRIMNAME]}
     for input in ${inputs[@]}; do
-        outfile=$OUT_DIR$bin${RUNTIME_POSTFIX}
+        outfile=$OUT_DIR$prefix$bin${RUNTIME_POSTFIX}
         if [ "$cleardata" = true ]; then
             cat /dev/null > $outfile
         fi
