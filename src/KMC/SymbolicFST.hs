@@ -128,6 +128,48 @@ coarsestPredicateSet fst' qs = coarsestPartition ps
            [ p | q <- qs
                , (p, _, _) <- maybe [] id (M.lookup q (eForward . fstE $ fst')) ]
 
+{-- LCP analysis --}
+
+-- | Compute the (right-projective) epsilon-closure from a given set of
+-- states. The result is the set of all states reachable by epsilon-transitions
+-- which have no outgoing epsilon-transitions.
+epsilonClosure :: (Ord st) => FST st pred func -> S.Set st -> S.Set st
+epsilonClosure fst' set = S.fromList $ concatMap (go S.empty) (S.toList set)
+    where
+      go vis q =
+        let succs = map snd $ fstEvalEpsilonEdges fst' q in
+        if null succs then
+            [q]
+        else
+            let vis' = S.union vis (S.fromList succs) in
+            concatMap (go vis') $ filter (not . flip S.member vis) succs
+
+next :: (Ord st, Boolean pred, PartialOrder pred) => FST st pred func -> S.Set st -> S.Set st
+next fst' set = epsilonClosure fst' $ S.unions $ map go $ S.toList set
+    where
+      go q = S.fromList $ map snd $ fstAbstractEvalEdges fst' q bot
+
+-- | The conjunction of all predicates on outgoing transitions from all states
+-- in the given set.
+commonPred :: (Boolean pred, Ord st) => FST st pred func -> S.Set st -> pred
+commonPred fst' set =
+  foldr conj bot $ do
+    q <- S.toList set
+    return $ foldr conj bot
+               [ p | Just xs <- [M.lookup q (eForward $ fstE fst')]
+                   , (p, _, _) <- xs ]
+
+lcp :: (Boolean pred, PartialOrder pred, Ord st) => FST st pred func -> st -> [pred]
+lcp fst' q = go (epsilonClosure fst' $ S.singleton q)
+    where go set =
+              let c = commonPred fst' set in
+              if c `eq` bot then
+                  []
+              else
+                  c:go (next fst' set)
+
+{-- Simulation --}
+
 run :: (Function func
        ,SetLike pred (Dom func)
        ,Monoid (Rng func)

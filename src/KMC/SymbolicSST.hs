@@ -23,7 +23,7 @@ type RegisterUpdate var func   = M.Map var (UpdateStringFunc var func)
 
 data EdgeSet st pred func var =
   EdgeSet
-  { eForward      :: M.Map st [(pred, RegisterUpdate var func, st)]
+  { eForward :: M.Map st [(pred, RegisterUpdate var func, st)]
   }
 
 data SST st pred func var =
@@ -85,8 +85,7 @@ normalizeUpdateString = go
       go (Right x:xs) = Right x:go xs
 
 edgesFromList :: (Ord st) => [(st, pred, RegisterUpdate var func, st)] -> EdgeSet st pred func var
-edgesFromList xs = EdgeSet { eForward  = M.fromListWith (++) [ (q,  [(p, u, q')]) | (q,p,u,q') <- xs ]
-                           }
+edgesFromList xs = EdgeSet { eForward  = M.fromListWith (++) [ (q,  [(p, u, q')]) | (q,p,u,q') <- xs ] }
 
 edgesToList :: EdgeSet st pred func var -> [(st, pred, RegisterUpdate var func, st)]
 edgesToList es = [ (q,p,u,q') | (q, xs) <- M.toList (eForward es), (p,u,q') <- xs ]
