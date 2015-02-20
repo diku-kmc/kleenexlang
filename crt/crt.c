@@ -176,7 +176,7 @@ void concat(buffer_t *dst, buffer_t *src)
 }
 
 INLINE
-void outputarray(buffer_unit_t *arr, int bits)
+void outputarray(const buffer_unit_t *arr, int bits)
 {
  if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
  {
