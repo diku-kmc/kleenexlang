@@ -1,0 +1,2 @@
+// Match and copy a string of as.
+as := <a*>

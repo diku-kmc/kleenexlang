@@ -1,25 +1,11 @@
 // From Kristoffer and Sebastians repository.
 
-#include <cstdio>
 #include <re2/re2.h>
 #include <iostream>
-#include <iterator>
 #include <string>
-#include <sys/time.h>
-#include <ctime>
-#include <algorithm>
+#include "common.hpp"
 
-using std::string;
-
-// Size of the buffer to read input into
-#define BUFFER_SIZE (200*1024*1024)
-char buffer[BUFFER_SIZE] = {0};
-
-// Filename buffer for regex
-char filename[10240] = {0};
-
-// Size of the chunks we read in at a time
-#define INPUT_BLOCK_SIZE (1024*1024)
+using namespace std;
 
 // Number of capturing parentheses
 #define NCAP 3
@@ -30,31 +16,6 @@ char filename[10240] = {0};
 #else
     #define CAPTURE false
 #endif
-
-/** Read an entire stream into a string */
-char *read_all(FILE *f) {
-    size_t pos = 0, count = 0;
-    do {
-        count = fread(&buffer[pos], 1, INPUT_BLOCK_SIZE, f);
-        pos += count;
-    } while (count > 0);
-    return buffer;
-}
-
-/** Gets the current timestamp in microsecond resolution */
-uint64_t getTimeUs() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-
-    return tv.tv_usec + tv.tv_sec * 1000 * 1000;
-}
-
-/** Trims whitespace from end of a string
-  * Taken from http://stackoverflow.com/a/217605/79061 */
-static inline std::string &rtrim(std::string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
-    return s;
-}
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
@@ -69,7 +30,7 @@ int main(int argc, char *argv[]) {
     regex = rtrim(regex);
 
     // Pre-compile pattern
-    uint64_t preCompile = getTimeUs();
+    uint64_t preCompile = getTimeMs();
     RE2 pattern(regex);
 
     // Initialize capture arguments
@@ -80,20 +41,20 @@ int main(int argc, char *argv[]) {
     }
 
     // START TIMING
-    uint64_t start = getTimeUs();
+    uint64_t start = getTimeMs();
 
     char *data = read_all(stdin);
 
-    uint64_t data_read = getTimeUs();
+    uint64_t data_read = getTimeMs();
 
     bool match = CAPTURE ? RE2::FullMatchN(data, pattern, args, NCAP)
                          : RE2::FullMatch(data, pattern);
 
-    uint64_t stop = getTimeUs();
+    uint64_t stop = getTimeMs();
     // END TIMING
 
-    std::cout << "matching was " << (match ? "" : "un") << "successful." << std::endl;
-    std::cout << start - preCompile << " uS spent on compilation" << std::endl;
-    std::cout << stop - start << " uS spent on matching" << std::endl;
-    std::cout << "of this, " << data_read - start << " uS was spent on reading in the data" << std::endl;
+    cout << "matching was " << (match ? "" : "un") << "successful." << endl;
+    cout << "compilation (ms):  " << start - preCompile << endl;
+    cout << "matching (ms):     " << stop - start << endl;
+    cout << "data reading (ms): " << data_read - start << endl;
 }
