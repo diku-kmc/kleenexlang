@@ -7,7 +7,7 @@ module KMC.Program.Backends.C where
 import           Control.Monad (when, join)
 import           Data.Bits
 import           Data.List (intercalate)
-import           Data.Char (ord, chr, isPrint, isAscii)
+import           Data.Char (ord, chr, isPrint, isAscii, isSpace)
 import qualified Data.Map as M
 import           Numeric
 import           System.Exit (ExitCode(..))
@@ -231,12 +231,29 @@ prettyInstr buftype tbltype prog instr =
 prettyBlock :: (Enum delta, Bounded delta) => CType -> CType -> Program delta -> Block delta -> Doc
 prettyBlock buftype tbltype prog is = vcat $ map (prettyInstr buftype tbltype prog) is
 
+prettyStr :: [Int] -> Doc
+prettyStr = doubleQuotes . hcat . map prettyOrd
+    where
+      prettyOrd n = let c = chr n in
+                    if and [isPrint c
+                           ,isAscii c
+                           ,not (isSpace c)
+                           ,not (c `elem` "\"\\")] then
+                      char c
+                    else
+                      text "\\x" <> text (showHex n "")
+
 -- | Pretty print a test expression.
 prettyExpr :: Expr -> Doc
 prettyExpr e =
   case e of
     SymE i            -> text "next" <> brackets (int i)
     AvailableSymbolsE -> text "avail"
+    CompareE i str    -> text "cmp"
+                           <> parens (hcat $ punctuate comma
+                                        [text "&next" <> brackets (int i)
+                                        ,prettyStr str
+                                        ,int (length str)])
     ConstE n          -> let c = chr n in
                          if isPrint c && isAscii c && c /= '\\' && c /= '\'' then
                              quotes (char c)
@@ -358,8 +375,8 @@ renderProgram buftype = renderCProg "\"TODO: insert descriptive string from rend
 ccVersion :: FilePath -> IO String
 ccVersion comp = do
   -- gcc/clang prints version info on stderr
-  (_, _, err, hdl) <- createProcess (proc comp ["-v"])
-                      { std_err = CreatePipe }
+  (_, _, err, _) <- createProcess (proc comp ["-v"])
+                    { std_err = CreatePipe }
   let hErr = maybe (error "ccVersion: bogus handle") id err
   errStr <- hGetContents hErr
   return $ intercalate "\\n" $ lines $ errStr
@@ -381,7 +398,6 @@ compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath = 
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
-      let compInfo = "\"not implemented\""
       when (not optQuiet) $ putStrLn $ "Writing C source to " ++ p
       writeFile p cstr
   case moutPath of
@@ -399,7 +415,6 @@ compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath = 
                            , "-o", binPath
                            , "-Wno-tautological-constant-out-of-range-compare"
                            , "-"]
-    appendNL s = s ++ "\\n"
     quote s = "\"" ++ s ++ "\""
     noOutInfo = quote $ intercalate "\\n"
                 [ "No object file generated!"

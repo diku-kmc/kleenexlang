@@ -262,6 +262,18 @@ int readnext(int minCount, int maxCount)
   return 1;
 }
 
+INLINE
+int cmp(char *str1, char *str2, int l)
+{
+  int i = 0;
+  for (i = 0; i < l; i++)
+  {
+    if (str1[i] != str2[i])
+      return 0;
+  }
+  return 1;
+}
+
 %%TABLES
 
 %%DECLS

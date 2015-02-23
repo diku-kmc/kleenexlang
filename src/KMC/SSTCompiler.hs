@@ -20,18 +20,57 @@ import           KMC.SymbolicSST
 import           KMC.Theories
 import           KMC.Util.Map (swapMap)
 
-class PredicateToExpr p where
-    predToExpr :: p -> Int -> Expr
+class PredicateListToExpr p where
+    predListToExpr :: [p] -> Int -> Expr
 
-instance (Eq a, Enum a) => PredicateToExpr (RS.RangeSet a) where
-  predToExpr rs i = case map rangeTest (RS.ranges rs) of
-                      [] -> FalseE
-                      xs -> foldr1 OrE xs
-      where
-        rangeTest (l, h)
-          | l == h    = EqE (SymE i) (ConstE $ fromEnum l)
-          | otherwise = AndE (LteE (ConstE $ fromEnum l) (SymE i))
-                             (LteE (SymE i) (ConstE $ fromEnum h))
+instance (Eq a, Enum a) => PredicateListToExpr (RS.RangeSet a) where
+    predListToExpr [] _ = TrueE
+    predListToExpr xs i =
+      let (xsEq, xsRest') = span (\rs -> RS.size rs == 1) xs
+          (xsComplex, xsRest) = span (\rs -> RS.size rs > 1) xsRest'
+          compareExpr  = CompareE i (map (fromEnum . fromSingleton) xsEq)
+          complexExprs = zipWith predToExpr xsComplex [i + length xsEq..]
+          recExpr      = predListToExpr xsRest (i + length xsEq + length xsComplex)
+          allExprs     = (if null xsEq then [] else [compareExpr])
+                         ++ complexExprs
+                         ++ [recExpr]
+      in foldr AndE TrueE allExprs
+         where
+          fromSingleton rs | [(l,h)] <- RS.ranges rs, l == h = l
+                           | otherwise = error "not a singleton rangeset"
+          
+          predToExpr rs j = case map rangeTest (RS.ranges rs) of
+                              []     -> FalseE
+                              ranges -> foldr1 OrE ranges
+              where
+                rangeTest (l, h)
+                  | l == h    = EqE (SymE j) (ConstE $ fromEnum l)
+                  | otherwise = AndE (LteE (ConstE $ fromEnum l) (SymE j))
+                                     (LteE (SymE j) (ConstE $ fromEnum h))
+
+data KVTree a b =
+  BranchT (Maybe b) [([a], KVTree a b)]
+  deriving (Eq, Ord, Show)
+
+kvtree :: (Ord a) => [([a], b)] -> KVTree a b
+kvtree xs = BranchT b [ (k, kvtree ts') | (k, ts') <- M.elems ts ]
+    where
+      b = case [ b' | ([], b') <- xs ] of
+            []   -> Nothing
+            [b'] -> Just b'
+            _    -> error "Ambiguous transition map"
+      ts = M.map lcp $ M.fromListWith (++) [ (a, [(a:as, b')]) | (a:as, b') <- xs ]
+
+lcp :: (Eq a) => [([a], b)] -> ([a], [([a], b)])
+lcp xs | null xs || any (null . fst) xs = ([], xs)
+       | otherwise =
+           let h = head (fst (head xs))
+               (p, xs') = lcp [ (as, b) | (_:as, b) <- xs ]
+           in
+           if all (h ==) [ a | (a:_, _) <- xs ] then
+               (h:p, xs')
+           else
+               ([], xs)
 
 -- | The output functions of FSTs generated from Mu-expressions are a strict
 -- subset of the update string functions of SSTs. We can therefore "join" any
@@ -107,29 +146,26 @@ compileRegisterUpdate rup =
   liftM concat $ mapM (uncurry compileAssignment) $ orderAssignments $ M.toList rup
 
 compileTransitions :: (Ord st, Ord var, Ord pred, Ord func, Ord delta
-                      ,Rng func ~ [delta], PredicateToExpr pred) =>
+                      ,Rng func ~ [delta], PredicateListToExpr pred) =>
                       Int
-                   -> [([pred], RegisterUpdate var func, st)] -- ^ Transitions
+                   -> KVTree pred (RegisterUpdate var func, st) -- ^ Transitions
                    -> EnvReader st var func delta (Block delta)
-compileTransitions i ts = do
-  testBlock <- forM tests $ \(p, ts') ->
-    do block <- compileTransitions (i+1) ts'
-       return [IfI ((AvailableSymbolsE `GteE` (ConstE (i+1)))
-                    `AndE` (predToExpr p i))
+compileTransitions i (BranchT action tests) = do
+  testBlock <- forM tests $ \(ps, ts') ->
+    do block <- compileTransitions (i+length ps) ts'
+       return [IfI ((AvailableSymbolsE `GteE` (ConstE (i+length ps)))
+                    `AndE` (predListToExpr ps i))
                    block]
-  actionBlock <- case [ (upd, st') | ([], upd, st') <- ts ] of
-                   [] -> return []
-                   [(upd, st')] -> do
+  actionBlock <- case action of
+                   Nothing -> return []
+                   Just (upd, st') -> do
                                bid <- (M.! st') <$> asks smap
                                block <- compileRegisterUpdate upd
                                return $ block ++ [ConsumeI i, GotoI bid]
-                   _ -> error "ambiguous transition"
   return $ concat testBlock ++ actionBlock
-  where
-    tests = M.toList $ M.fromListWith (++) [ (p, [(ps, upd, st')]) | (p:ps, upd, st') <- ts ]
 
 compileState :: (Ord st, Ord var, Ord pred, Ord func, Ord delta
-                ,Rng func ~ [delta], PredicateToExpr pred) =>
+                ,Rng func ~ [delta], PredicateListToExpr pred) =>
                 [([pred], RegisterUpdate var func, st)] -- ^ Transitions
              -> Maybe (UpdateString var [delta])        -- ^ Final action
              -> EnvReader st var func delta (Block delta)
@@ -148,7 +184,7 @@ compileState trans fin = do
                            var <- asks outvar
                            ass <- compileAssignment var (constUpdateStringFunc upd)
                            return $ ass ++ [AcceptI]
-  transitions <- compileTransitions 0 trans
+  transitions <- compileTransitions 0 (kvtree [ (ps, (upd, st')) | (ps, upd, st') <- trans ])
   return $ assignments ++ transitions ++ [FailI]
 
 constants :: (Ord delta, Rng func ~ [delta]) =>
@@ -179,7 +215,7 @@ type EnvReader st var func delta = Reader (Env st var func delta)
 compileAutomaton :: forall st var func pred delta.
     ( Ord st, Ord var, Ord func, Ord pred, Ord delta
     , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
-    , PredicateToExpr pred) =>
+    , PredicateListToExpr pred) =>
     SST st pred func var
     -> Program delta
 compileAutomaton sst =

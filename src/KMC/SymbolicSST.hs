@@ -13,8 +13,6 @@ import qualified Data.Map.Strict as M
 
 import           KMC.Theories
 
-import Debug.Trace
-
 type Valuation var delta       = M.Map var [delta]
 type Environment st var delta  = M.Map st (Valuation var delta)
 
