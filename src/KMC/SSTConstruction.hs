@@ -53,33 +53,49 @@ runClosure x = evalState (evalTreeWriterT x) S.empty
 {------------------------------------------------------------------------------}
 {-- Computing path trees --}
 
+genclosure :: (Ord st, Monoid w)
+           => FST st pred func
+           -> (Rng func -> w)
+           -> st
+           -> Closure st w st
+genclosure fst' inj q =
+  case fstEvalEpsilonEdges fst' q of
+    [] -> return q
+    [(out, q')] ->
+        tell (inj out) >> visit q' >> genclosure fst' inj q'
+    [(out1, q1'), (out2, q2')] ->
+       plus (tell (inj out1) >> visit q1' >> genclosure fst' inj q1')
+            (tell (inj out2) >> visit q2' >> genclosure fst' inj q2')
+    _ -> error "Computing closures for FSTs with epsilon-fanout greater than two is not supported yet"
 
 -- | Non-deterministically follow all non-input transitions.
 closure :: (Ord st)
            => FST st pred func
            -> st
            -> Closure st (UpdateString var (Rng func)) st
-closure fst' q =
-  case fstEvalEpsilonEdges fst' q of
-    [] -> return q
-    [(out, q')] ->
-        tell [Right out] >> visit q' >> closure fst' q'
-    [(out1, q1'), (out2, q2')] ->
-       plus (tell [Right out1] >> visit q1' >> closure fst' q1')
-            (tell [Right out2] >> visit q2' >> closure fst' q2')
-    _ -> error "Computing closures for FSTs with epsilon-fanout greater than two is not supported yet"
+closure fst' q = genclosure fst' (\c -> [Right c]) q
+
+closureFunc :: (Ord st) =>
+               FST st pred func
+            -> st
+            -> Closure st (UpdateStringFunc var func) st
+closureFunc fst' q = genclosure fst' (\c -> [ConstA c]) q
 
 consume :: (PartialOrder pred, Ord st)
-        => FST st pred func -> pred -> st -> Closure st (UpdateStringFunc var func) st
-consume fst' p q =
+        => FST st pred func -> pred -> Int -> st -> Closure st (UpdateStringFunc var func) st
+consume fst' p i q =
   case fstAbstractEvalEdges fst' q p of
     []        -> zero
-    [(f, q')] -> tell [FuncA f] >> visit q'
+    [(f, q')] -> tell [FuncA f i] >> visit q'
     _ -> error "Stepping for FSTs with read-fanout greater than one is not supported yet"
 
 eof :: (Ord st) => FST st pred func -> st -> Closure st w st
 eof fst' q | S.member q (fstF fst') = visit q
            | otherwise = zero
+
+kill :: (Ord st) => [st] -> st -> Closure st (UpdateStringFunc var func) st
+kill kills q | elem q kills = zero
+             | otherwise = return q
 
 closureAbstractTree :: (Ord a) =>
                        FST a pred func
@@ -89,15 +105,33 @@ closureAbstractTree fst' tr =
   let tr' = fmap (mapOutput (return . Left)) tr
   in runClosure (resume' tr' >>= closure fst')
 
+closureTree :: (Ord st) =>
+               FST st pred func
+            -> PathTree (UpdateString var (Rng func)) st
+            -> PathTree (UpdateString var (Rng func)) st
+closureTree fst' tr = runClosure (resume' tr >>= closure fst')
+
+closureTreeFunc :: (Ord st) =>
+               FST st pred func
+            -> PathTree (UpdateStringFunc var func) st
+            -> PathTree (UpdateStringFunc var func) st
+closureTreeFunc fst' tr = runClosure (resume' tr >>= closureFunc fst')
+
 eofTree :: (Ord a, Monoid w) => FST a pred func -> PathTree w a -> PathTree w a
 eofTree fst' tr = runClosure (resume' tr >>= eof fst')
 
 consumeTree :: (PartialOrder pred, Ord st)
             => FST st pred func
             -> pred
+            -> Int
             -> PathTree (UpdateStringFunc var func) st
             -> PathTree (UpdateStringFunc var func) st
-consumeTree fst' p tr = runClosure (resume' tr >>= consume fst' p)
+consumeTree fst' p i tr = runClosure (resume' tr >>= consume fst' p i)
+
+killTree :: (Ord st) =>
+            [st] -> PathTree (UpdateStringFunc var func) st
+                 -> PathTree (UpdateStringFunc var func) st
+killTree kills tr = runClosure (resume' tr >>= kill kills)
 
 {------------------------------------------------------------------------------}
 {-- Abstracting path trees --}
@@ -126,29 +160,39 @@ unabstract = fmap (mapOutput (constUpdateStringFunc))
 specialize :: (Function func, Rng func ~ [delta]
               ,Enumerable pred (Dom func)
               ,Ord st) =>
-              [(st, pred, [(var, UpdateStringFunc var func)], st)]
-              -> [(st, pred, [(var, UpdateStringFunc var func)], st)]
+              [(st, [pred], [(var, UpdateStringFunc var func)], st)]
+              -> [(st, [pred], [(var, UpdateStringFunc var func)], st)]
 specialize ts =
-  [ (q, p, [ (v, resolveConstFunc $ specFunc p f) | (v,f) <- xs ], q')
-    | (q, p, xs, q') <- ts ]
+  [ (q, ps, [ (v, resolveConstFunc $ specFunc ps f) | (v,f) <- xs ], q')
+    | (q, ps, xs, q') <- ts ]
   where
     resolveConstFunc = normalizeUpdateStringFunc . concatMap resolve
-    resolve (FuncA f) | Just c <- isConst f = [ConstA c]
+    resolve (FuncA f _) | Just c <- isConst f = [ConstA c]
     resolve x = [x]
 
-    specFunc p f =
-      if size p == 1 then
-          constUpdateStringFunc $ evalUpdateStringFunc (lookupIndex 0 p) f
+    specFunc ps f =
+      if product (map size ps) == 1 then
+          constUpdateStringFunc $ evalUpdateStringFunc (map (lookupIndex 0) ps) f
       else
           f
 
 {------------------------------------------------------------------------------}
 {-- SST construction from FST --}
 
+consumeTreeMany :: (PartialOrder pred, Ord st) =>
+                   FST st pred func
+                -> [pred]
+                -> PathTree (UpdateStringFunc var func) st
+                -> PathTree (UpdateStringFunc var func) st
+consumeTreeMany fst' = go 0
+    where
+      go _ [] tr = tr
+      go i (p:ps) tr = go (i+1) ps (consumeTree fst' p i (closureTreeFunc fst' tr))
+
 sstFromFST :: (Ord a, Ord pred, PartialOrder pred, Function func,
                Enumerable pred (Dom func), Rng func ~ [delta]) =>
-              FST a pred func -> SST (Maybe (Tree Var a)) pred func Var
-sstFromFST fst' =
+              FST a pred func -> Bool -> SST (Maybe (Tree Var a)) pred func Var
+sstFromFST fst' singletonMode =
   construct initialState (specialize transitions) outputs
   where
     initialState           = Just (Tip (Var []) (fstI fst'))
@@ -161,10 +205,12 @@ sstFromFST fst' =
       | (t, ws') <- S.deleteFindMin ws =
         let tcl  = closureAbstractTree fst' t
             tcl' = unabstract tcl
-            wl'  = S.fromList [ newt | (_,_,_,newt) <- ts ]
-            ts   = do p <- coarsestPredicateSet fst' (tflat' tcl')
-                      let (kappa, t'') = abstract' $ consumeTree fst' p tcl'
-                      guard (isJust t'')
-                      return (t, p, kappa, t'')
             os   = [ (t, w) | Just (Tip w _) <- [eofTree fst' tcl] ]
+
+            ts   = do (ps, kills) <- prefixTests fst' singletonMode (tflat' tcl')
+                      guard $ not $ null ps
+                      let (kappa, t'') = abstract' $ consumeTreeMany fst' ps $ killTree kills tcl'
+                      guard (isJust t'')
+                      return (t, ps, kappa, t'')
+            wl'  = S.fromList [ newt | (_,_,_,newt) <- ts ]
         in saturate (S.union ws' wl') (S.insert t states) (ts ++ trans) (os ++ outs)

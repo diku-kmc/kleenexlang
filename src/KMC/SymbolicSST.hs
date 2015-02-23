@@ -13,18 +13,34 @@ import qualified Data.Map.Strict as M
 
 import           KMC.Theories
 
+import Debug.Trace
+
 type Valuation var delta       = M.Map var [delta]
 type Environment st var delta  = M.Map st (Valuation var delta)
 
-data Atom var func             = VarA var | ConstA (Rng func) | FuncA func
+data Atom var func             = VarA var           -- ^ SST register variable
+                               | ConstA (Rng func)  -- ^ Constant
+                               | FuncA func Int     -- ^ Function call: func(next[i])
 type UpdateStringFunc var func = [Atom var func]
 type UpdateString var rng      = [Either var rng]
 type RegisterUpdate var func   = M.Map var (UpdateStringFunc var func)
 
-data EdgeSet st pred func var =
-  EdgeSet
-  { eForward :: M.Map st [(pred, RegisterUpdate var func, st)]
-  }
+type EdgeSet st pred func var = M.Map st [([pred], RegisterUpdate var func, st)]
+
+edgesFromList :: (Ord st) => [(st, [pred], RegisterUpdate var func, st)] -> EdgeSet st pred func var
+edgesFromList xs = M.fromListWith (++) [ (q,  [(ps, u, q')]) | (q,ps,u,q') <- xs ]
+
+edgesToList :: EdgeSet st pred func var -> [(st, [pred], RegisterUpdate var func, st)]
+edgesToList es = [ (q,ps,u,q') | (q, xs) <- M.toList es, (ps,u,q') <- xs ]
+
+eForwardLookup :: (Ord st) => EdgeSet st pred func var -> st -> [([pred], RegisterUpdate var func, st)]
+eForwardLookup es st = maybe [] id (M.lookup st es)
+
+mapEdges :: (Ord st)
+         => ((st, [pred], RegisterUpdate var func, st) -> (st, [pred], RegisterUpdate var func, st))
+         -> EdgeSet st pred func var
+         -> EdgeSet st pred func var
+mapEdges f = edgesFromList . map f . edgesToList
 
 data SST st pred func var =
   SST
@@ -34,27 +50,25 @@ data SST st pred func var =
   , sstF :: M.Map st (UpdateString var (Rng func)) -- ^ Final states with final output
   }
 
--- | Get the designated output variable of an SST.
-sstOut :: (Ord var) => SST st pred func var -> var
-sstOut = S.findMin . sstV
-
 -- | Output variables. The minimal variable is the designated output variable.
 sstV :: (Ord var) => SST st pred func var -> S.Set var
 sstV sst = S.unions [ M.keysSet upd | (_,_,upd,_) <- edgesToList $ sstE sst ]
 
+-- | Get the designated output variable of an SST.
+sstOut :: (Ord var) => SST st pred func var -> var
+sstOut = S.findMin . sstV
+
 deriving instance (Show var, Show func, Show (Rng func)) => Show (Atom var func)
-deriving instance (Show st, Show pred, Show func, Show var, Show (Rng func))
-             => Show (EdgeSet st pred func var)
 deriving instance (Show st, Show pred, Show func, Show var, Show (Rng func))
              => Show (SST st pred func var)
 
 evalUpdateStringFunc :: (Function func, Rng func ~ [delta]) =>
-                        Dom func -> UpdateStringFunc var func -> UpdateString var [delta]
-evalUpdateStringFunc x = normalizeUpdateString . map subst
+                        [Dom func] -> UpdateStringFunc var func -> UpdateString var [delta]
+evalUpdateStringFunc xs = normalizeUpdateString . map subst
     where
       subst (VarA v)   = Left v
       subst (ConstA y) = Right y
-      subst (FuncA f)  = Right $ eval f x
+      subst (FuncA f i)  = Right $ eval f (xs !! i)
 
 constUpdateStringFunc :: UpdateString var (Rng func) -> UpdateStringFunc var func
 constUpdateStringFunc = map subst
@@ -70,7 +84,7 @@ normalizeUpdateStringFunc = go
       go (ConstA x:ConstA y:xs) = go (ConstA (x ++ y):xs)
       go (ConstA x:xs) = ConstA x:go xs
       go (VarA v:xs) = VarA v:go xs
-      go (FuncA f:xs) = FuncA f:go xs
+      go (FuncA f i:xs) = FuncA f i:go xs
 
 normalizeRegisterUpdate :: (Rng func ~ [delta]) => RegisterUpdate var func -> RegisterUpdate var func
 normalizeRegisterUpdate = M.map normalizeUpdateStringFunc
@@ -84,26 +98,11 @@ normalizeUpdateString = go
       go (Left v:xs) = Left v:go xs
       go (Right x:xs) = Right x:go xs
 
-edgesFromList :: (Ord st) => [(st, pred, RegisterUpdate var func, st)] -> EdgeSet st pred func var
-edgesFromList xs = EdgeSet { eForward  = M.fromListWith (++) [ (q,  [(p, u, q')]) | (q,p,u,q') <- xs ] }
-
-edgesToList :: EdgeSet st pred func var -> [(st, pred, RegisterUpdate var func, st)]
-edgesToList es = [ (q,p,u,q') | (q, xs) <- M.toList (eForward es), (p,u,q') <- xs ]
-
-eForwardLookup :: (Ord st) => EdgeSet st pred func var -> st -> [(pred, RegisterUpdate var func, st)]
-eForwardLookup es st = maybe [] id (M.lookup st (eForward es))
-
-mapEdges :: (Ord st)
-         => ((st, pred, RegisterUpdate var func, st) -> (st, pred, RegisterUpdate var func, st))
-         -> EdgeSet st pred func var
-         -> EdgeSet st pred func var
-mapEdges f = edgesFromList . map f . edgesToList
-
 -- | Construct an SST from an edge set and a list of final outputs.
 construct :: (Ord st, Ord var, Rng func ~ [delta]) =>
-       st                                                   -- ^ Initial state
-    -> [(st, pred, [(var, UpdateStringFunc var func)], st)] -- ^ Edge set
-    -> [(st, UpdateString var [delta])]                     -- ^ Final outputs
+       st                                                     -- ^ Initial state
+    -> [(st, [pred], [(var, UpdateStringFunc var func)], st)] -- ^ Edge set
+    -> [(st, UpdateString var [delta])]                       -- ^ Final outputs
     -> SST st pred func var
 construct qin es os =
   SST
@@ -118,9 +117,9 @@ construct qin es os =
          . M.fromListWith (error "Inconsistent register update: Same variable updated more than once.")
 
 construct' :: (Ord st, Ord var, Rng func ~ [delta]) =>
-       st                                        -- ^ Initial state
-    -> [(st, pred, RegisterUpdate var func, st)] -- ^ Edge set
-    -> [(st, [Either var [delta]])]              -- ^ Final outputs
+       st                                          -- ^ Initial state
+    -> [(st, [pred], RegisterUpdate var func, st)] -- ^ Edge set
+    -> [(st, [Either var [delta]])]                -- ^ Final outputs
     -> SST st pred func var
 construct' qin es os =
   SST
@@ -152,6 +151,10 @@ lubAbstractVal :: (Eq a) => AbstractVal a -> AbstractVal a -> AbstractVal a
 lubAbstractVal (Exact x) (Exact y) = if x == y then Exact x else Ambiguous
 lubAbstractVal _ _ = Ambiguous
 
+lteAbstractVal :: (Eq a) => AbstractVal a -> AbstractVal a -> Bool
+lteAbstractVal _ Ambiguous = True -- Ambiguous is the top element
+lteAbstractVal v1 v2 = v1 == v2 -- Everything else is discretely ordered
+
 lubAbstractValuation :: (Ord var, Eq delta) =>
                         AbstractValuation var delta
                      -> AbstractValuation var delta
@@ -172,7 +175,7 @@ liftAbstractValuation rho = go
   where
     go [] = return (pure [])
     go (VarA v:xs) = liftA2 (++) <$> M.lookup v rho <*> go xs
-    go (FuncA f:xs) = case isConst f of
+    go (FuncA f _:xs) = case isConst f of
                         Nothing -> Just Ambiguous
                         Just ys  -> liftA (ys++) <$> go xs
     go (ConstA ys:xs) = liftA (ys++) <$> go xs
@@ -216,7 +219,7 @@ applyAbstractValuationUS rho = normalizeUpdateString . map subst
                      | otherwise = Left v
       subst a = a
 
-updateAbstractEnvironment :: (Ord st, Ord var, Eq delta
+updateAbstractEnvironment :: (Show st, Show var, Show delta, Ord st, Ord var, Eq delta
                              ,Function func, Rng func ~ [delta]) =>
                              Bool
                           -> SST st pred func var
@@ -229,7 +232,7 @@ updateAbstractEnvironment weak sst states gamma =
   where
     updateOldRho s rho' =
       let rho_s = maybe M.empty id (M.lookup s gamma)
-      in if M.isSubmapOf rho' rho_s then
+      in if M.isSubmapOfBy lteAbstractVal rho' rho_s then
            Nothing
          else
            Just (lubAbstractValuation rho_s rho')
@@ -242,7 +245,7 @@ updateAbstractEnvironment weak sst states gamma =
 
     updateRho = if weak then updateAbstractValuationWeak else updateAbstractValuation
 
-abstractInterpretation :: (Ord st, Ord var, Eq delta
+abstractInterpretation :: (Show st, Show var, Show delta, Ord st, Ord var, Eq delta
                           ,Function func, Rng func ~ [delta]) =>
                           Bool
                        -> SST st pred func var
@@ -277,7 +280,7 @@ applyAbstractEnvironment gamma sst =
       let rho = maybe M.empty id (M.lookup q gamma)
       in normalizeUpdateString $ applyAbstractValuationUS rho us
 
-optimize :: (Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
+optimize :: (Show st, Show delta, Show var, Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
             Int
          -> SST st pred func var
          -> (SST st pred func var, Int)
@@ -314,9 +317,9 @@ enumerateVariables sst =
     usfReplace as = do
       at <- as
       case at of
-        VarA v   -> [VarA (replace v)]
-        ConstA c -> [ConstA c]
-        FuncA f  -> [FuncA f]
+        VarA v    -> [VarA (replace v)]
+        ConstA c  -> [ConstA c]
+        FuncA f i -> [FuncA f i]
     usReplace as  = do
       at <- as
       case at of
@@ -334,9 +337,10 @@ valuate s (Right d:xs) = d ++ valuate s xs
 valuate s (Left v:xs) = maybe (error "valuate: Variable not in valuation") id (M.lookup v s)
                         ++ valuate s xs
 
-run :: (Ord t, Ord st, SetLike pred (Dom func),
+run :: forall var st pred func delta.
+        (Ord var, Ord st, SetLike pred (Dom func),
         Function func, Rng func ~ [delta])
-    => SST st pred func t
+    => SST st pred func var
     -> [Dom func]
     -> Stream [delta]
 run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
@@ -352,15 +356,21 @@ run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
         case M.lookup q (sstF sst) of
           Nothing -> Fail "End of input reached, but final state is not accepting."
           Just out -> Chunk (valuate s out) Done
-      go q s (a:as) = maybe (Fail "No match") id $ do
-        ts <- M.lookup q (eForward $ sstE sst)
-        (upd, q') <- findTrans a ts
-        let (out, s') = extractOutput $ M.map (valuate s . evalUpdateStringFunc a) upd
-        return $ Chunk out (go q' s' as)
+      go q s as = maybe (Fail "No match") id $ do
+        ts <- M.lookup q (sstE sst)
+        (upd, q', cs, as') <- findTrans as ts
+        let (out, s') = extractOutput $ M.map (valuate s . evalUpdateStringFunc cs) upd
+        return $ Chunk out (go q' s' as')
 
-      findTrans _ [] = Nothing
-      findTrans a ((p, upd, q'):ts) =
-        if member a p then
-            Just (upd, q')
-        else
-            findTrans a ts
+      -- | Use backtracking to find longest matching transition
+      findTrans :: [Dom func] -> [([pred], RegisterUpdate var func, st)]
+                -> Maybe (RegisterUpdate var func, st, [Dom func], [Dom func])
+      findTrans as ts =
+        (do (a:as') <- pure as
+            let ts' = [ (ps, upd, st') | (p:ps, upd, st') <- ts, member a p ]
+            (upd, st', cs, as'') <- findTrans as' ts'
+            return (upd, st', a:cs, as''))
+        <|> case [ (upd, st') | ([], upd, st') <- ts ] of
+              []           -> Nothing
+              [(upd, st')] -> Just (upd, st', [], as)
+              _            -> error "ambiguous lookahead"

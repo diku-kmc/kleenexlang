@@ -20,7 +20,8 @@ newtype TableId = TableId { getTableId :: Int } deriving (Eq, Ord, Show)
 newtype BufferId = BufferId { getBufferId :: Int } deriving (Eq, Ord, Show)
 
 data Expr =
-    SymE
+    SymE Int          -- ^ next[i] (i less than value of AvailableSymbolsE)
+  | AvailableSymbolsE -- ^ Number of available symbols
   | ConstE Int
   | FalseE
   | TrueE
@@ -38,7 +39,7 @@ data Instr delta =
     AcceptI                             -- ^ accept (Program stops)
   | FailI                               -- ^ fail   (Program stops)
   | AppendI    BufferId ConstId         -- ^ buf  := buf ++ bs
-  | AppendTblI BufferId TableId         -- ^ bif ::= buf ++ tbl(id)(next)[0 .. sz(id) - 1]
+  | AppendTblI BufferId TableId Int     -- ^ bif ::= buf ++ tbl(id)(next[i])[0 .. sz(id) - 1]
   | ConcatI    BufferId BufferId        -- ^ buf1 := buf1 ++ buf2; reset(buf2)
   | ResetI     BufferId                 -- ^ buf1 := []
   | AlignI     BufferId BufferId        -- ^ align buf1 buf2. assert that buf1 is empty, and
@@ -49,7 +50,8 @@ data Instr delta =
                                         --   affect the final result.
   | IfI        Expr (Block delta)       -- ^ if (e :: Bool) { ... }
   | GotoI      BlockId                  -- ^ goto b
-  | NextI      (Block delta)            -- ^ if (!next()) { ... }
+  | NextI      Int Int (Block delta)    -- ^ if (!getChars(min,max)) { ... }
+  | ConsumeI   Int                      -- next += i
   deriving (Eq, Ord, Show)
 
 type Block delta = [Instr delta]

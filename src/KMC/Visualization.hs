@@ -31,7 +31,8 @@ import           KMC.Syntax.Config
 class Pretty a where
   pretty :: a -> String
 
-instance (Pretty a) => Pretty (RangeSet a) where
+instance (Eq a, Pretty a) => Pretty (RangeSet a) where
+  pretty rs | [(l,h)] <- ranges rs, l == h = pretty l
   pretty rs =
     "[" ++ intercalate "," [ pretty l ++ "-" ++ pretty h | (l,h) <- ranges rs ] ++ "]"
 
@@ -65,7 +66,7 @@ instance (Pretty p, Pretty a) => Pretty (Join (Const dom a :+: Enumerator p dom 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) where
   pretty (VarA v) = "(" ++ pretty v ++ ")"
   pretty (ConstA x) = pretty x
-  pretty (FuncA f) = "{" ++ pretty f ++ "}"
+  pretty (FuncA f i) = "{" ++ pretty f ++ "(" ++ show i ++ ")}"
 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate var func) where
   pretty m = "[" ++ intercalate "\\l," [ pretty v ++ ":=" ++ pretty f | (v,f) <- M.toList m ] ++ "]"
@@ -111,7 +112,7 @@ sstToDot sst = GV.graphElemsToDot params nodes edges
                }
       nodes = map (\x -> (statesMap M.! x, statesMap M.! x)) (S.toList (sstS sst))
       edges = [ (statesMap M.! q, statesMap M.! q', (p,k))
-              | (q, xs) <- M.toList (KMC.SymbolicSST.eForward $ sstE sst), (p, k, q') <- xs ]
+              | (q, xs) <- M.toList (sstE sst), (p, k, q') <- xs ]
 
       formatSSTEdge (_,_, (p,k)) = [ GV.textLabel $ pack (pretty p ++ " /\\l" ++ pretty k) ]
       statesMap = M.fromList (zip (S.toList (sstS sst)) [(0::Int)..])
@@ -133,7 +134,7 @@ fancyToSSTDot :: Int -> String -> GV.DotGraph Int
 fancyToSSTDot opt str =
   case parseRegex fancyRegexParser str of
     Left e -> error e
-    Right (_, e) -> let sst = sstFromFST (fromMu (fromRegex e))
+    Right (_, e) -> let sst = sstFromFST (fromMu (fromRegex e)) False
                               :: SST (PathTree Var Int)
                                      (RangeSet Word8)
                                      (Join

@@ -24,13 +24,14 @@ typedef struct {
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
 #define BUFFER_UNIT_BITS (BUFFER_UNIT_SIZE * 8)
 
-int next;
+char *next;
 buffer_t outbuf;
 size_t count = 0;
 
-char inbuf[INBUFFER_SIZE];
+char inbuf[INBUFFER_SIZE*2];
 size_t in_size = 0;
-size_t in_cursor = 0;
+int in_cursor = 0;
+#define avail (in_size - in_cursor)
 
 void buf_flush(buffer_t *buf)
 {
@@ -236,19 +237,28 @@ void output(buffer_t *buf)
 }
 
 INLINE
-int readnext()
+void consume(int c)
 {
-  if (in_cursor >= in_size)
+  count     += c;
+  in_cursor += c;
+  next      += c;
+}
+
+INLINE
+int readnext(int minCount, int maxCount)
+{
+  if (avail < maxCount)
   {
-    in_size = fread(inbuf, 1, sizeof(inbuf), stdin);
-    if (in_size == 0)
-    {
-      return 0;
-    }
-    in_cursor = 0;
+    int remaining = avail;
+    memmove(&inbuf[INBUFFER_SIZE - remaining], &inbuf[INBUFFER_SIZE+in_cursor], remaining);
+    in_cursor = -remaining;
+    in_size = fread(&inbuf[INBUFFER_SIZE], 1, INBUFFER_SIZE, stdin);
   }
-  next = inbuf[in_cursor++];
-  count++;
+  if (avail < minCount)
+  {
+    return 0;
+  }
+  next = &inbuf[INBUFFER_SIZE+in_cursor];
   return 1;
 }
 

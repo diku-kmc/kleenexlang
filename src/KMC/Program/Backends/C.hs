@@ -7,7 +7,7 @@ module KMC.Program.Backends.C where
 import           Control.Monad (when, join)
 import           Data.Bits
 import           Data.List (intercalate)
-import           Data.Char (ord, chr, isPrint)
+import           Data.Char (ord, chr, isPrint, isAscii)
 import qualified Data.Map as M
 import           Numeric
 import           System.Exit (ExitCode(..))
@@ -106,8 +106,9 @@ cast ctypeto ctypefrom doc = parens (parens (ctyp ctypeto) <> parens doc)
 -- | Pretty print a table lookup with cast
 tbl :: CType -- ^ Buffer unit type
     -> CType -- ^ Table unit type
-    -> TableId -> Doc
-tbl ctypectx ctypetbl (TableId n) = cast ctypectx ctypetbl (text "tbl" <> brackets (int n) <> brackets (text "next"))
+    -> TableId -> Int -> Doc
+tbl ctypectx ctypetbl (TableId n) i =
+  cast ctypectx ctypetbl (text "tbl" <> brackets (int n) <> brackets (text "next" <> brackets (int i)))
 
 -- | Pretty print a block identifier
 blck :: BlockId -> Doc
@@ -196,14 +197,14 @@ prettyInstr buftype tbltype prog instr =
              text "appendarray"
                <> parens (hcat [buf bid, comma, cid constid, comma, lendoc])
                <> semi
-    AppendTblI bid tid -> let arg = tbl buftype tbltype tid
-                              lendoc = int (tblBitSize $ progTables prog M.! tid)
-                          in if bid == streamBuf then
-                                 text "outputconst" <> parens (hcat [arg, comma, lendoc]) <> semi
-                             else
-                                 text  "append"
-                                 <> parens (hcat [buf bid, comma, arg, comma, lendoc])
-                                 <> semi
+    AppendTblI bid tid i -> let arg = tbl buftype tbltype tid i
+                                lendoc = int (tblBitSize $ progTables prog M.! tid)
+                            in if bid == streamBuf then
+                                   text "outputconst" <> parens (hcat [arg, comma, lendoc]) <> semi
+                               else
+                                   text  "append"
+                                   <> parens (hcat [buf bid, comma, arg, comma, lendoc])
+                                   <> semi
     ConcatI bid1 bid2  -> if bid1 == streamBuf then
                               text "output" <> parens (buf bid2) <> semi
                           else
@@ -219,10 +220,12 @@ prettyInstr buftype tbltype prog instr =
                           nest 3 (prettyBlock buftype tbltype prog is) $+$
                           rbrace
     GotoI blid         -> text "goto" <+> blck blid <> semi
-    NextI is           -> text "if" <+> parens (text "!readnext()") $$
+    NextI minL maxL is -> text "if"
+                            <+> parens (text "!readnext" <> parens (int minL <> comma <+> int maxL)) $$
                           lbrace $+$
                           nest 3 (prettyBlock buftype tbltype prog is) $+$
                           rbrace
+    ConsumeI i         -> text "consume" <> parens (int i) <> semi
 
 -- | Pretty print a list of instructions.
 prettyBlock :: (Enum delta, Bounded delta) => CType -> CType -> Program delta -> Block delta -> Doc
@@ -232,18 +235,23 @@ prettyBlock buftype tbltype prog is = vcat $ map (prettyInstr buftype tbltype pr
 prettyExpr :: Expr -> Doc
 prettyExpr e =
   case e of
-    SymE        -> text "next"
-    ConstE n    -> int n
-    FalseE      -> int 0
-    TrueE       -> int 1
-    LteE e1 e2  -> op "<=" e1 e2
-    LtE e1 e2   -> op "<" e1 e2
-    GteE e1 e2  -> op ">=" e1 e2
-    GtE e1 e2   -> op ">" e1 e2
-    EqE e1 e2   -> op "==" e1 e2
-    OrE e1 e2   -> op "||" e1 e2
-    AndE e1 e2  -> op "&&" e1 e2
-    NotE e1     -> text "!" <> parens (prettyExpr e1)
+    SymE i            -> text "next" <> brackets (int i)
+    AvailableSymbolsE -> text "avail"
+    ConstE n          -> let c = chr n in
+                         if isPrint c && isAscii c && c /= '\\' && c /= '\'' then
+                             quotes (char c)
+                         else
+                             int n
+    FalseE            -> int 0
+    TrueE             -> int 1
+    LteE e1 e2        -> op "<=" e1 e2
+    LtE e1 e2         -> op "<" e1 e2
+    GteE e1 e2        -> op ">=" e1 e2
+    GtE e1 e2         -> op ">" e1 e2
+    EqE e1 e2         -> op "==" e1 e2
+    OrE e1 e2         -> op "||" e1 e2
+    AndE e1 e2        -> op "&&" e1 e2
+    NotE e1           -> text "!" <> parens (prettyExpr e1)
 
   where
     op str e1 e2 = parens (prettyExpr e1 <+> text str <+> prettyExpr e2)
@@ -279,7 +287,7 @@ prettyConstantDecls buftype prog =
       let chunks = splitAppends buftype deltas
           constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
           comment = join $ map escape $ map (chr . fromEnum) deltas
-          escape c = if isPrint c && isSafe c then [c] else "\\x" ++ showHex (ord c) ""
+          escape c = if isPrint c && isAscii c && isSafe c then [c] else "\\x" ++ showHex (ord c) ""
           isSafe c = c /= '\\'
       in vcat [ text "//" <+> text comment
               , text "const" <+> text "buffer_unit_t" <+> text constPrefix <> int n

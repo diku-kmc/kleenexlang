@@ -130,43 +130,30 @@ coarsestPredicateSet fst' qs = coarsestPartition ps
 
 {-- LCP analysis --}
 
--- | Compute the (right-projective) epsilon-closure from a given set of
--- states. The result is the set of all states reachable by epsilon-transitions
--- which have no outgoing epsilon-transitions.
-epsilonClosure :: (Ord st) => FST st pred func -> S.Set st -> S.Set st
-epsilonClosure fst' set = S.fromList $ concatMap (go S.empty) (S.toList set)
+-- | Longest deterministic prefix.
+ldp :: (Boolean pred, PartialOrder pred, Ord st) => FST st pred func -> st -> [pred]
+ldp fst' = go
     where
-      go vis q =
-        let succs = map snd $ fstEvalEpsilonEdges fst' q in
-        if null succs then
-            [q]
-        else
-            let vis' = S.union vis (S.fromList succs) in
-            concatMap (go vis') $ filter (not . flip S.member vis) succs
+      go q =
+        case M.lookup q (eForward $ fstE fst') of
+          Just [(p,_,q')] -> p:go q'
+          _ -> []
 
-next :: (Ord st, Boolean pred, PartialOrder pred) => FST st pred func -> S.Set st -> S.Set st
-next fst' set = epsilonClosure fst' $ S.unions $ map go $ S.toList set
-    where
-      go q = S.fromList $ map snd $ fstAbstractEvalEdges fst' q bot
+prefixTests :: (Boolean pred, PartialOrder pred, Ord st) =>
+               FST st pred func
+            -> Bool
+            -> [st]
+            -> [([pred], [st])]
+prefixTests fst' singletonMode states =
+  [ (t, killed t) | t <- tests ]
+  where
+    ldps = [ ((if singletonMode then take 1 else id) $ ldp fst' q, q) | q <- states ]
+    tests = coarsestPrefixPartition [ ps | (ps,_) <- ldps ]
+    killed t = [ q | (ps, q) <- ldps, not (compatibleWith ps t) ]
 
--- | The conjunction of all predicates on outgoing transitions from all states
--- in the given set.
-commonPred :: (Boolean pred, Ord st) => FST st pred func -> S.Set st -> pred
-commonPred fst' set =
-  foldr conj bot $ do
-    q <- S.toList set
-    return $ foldr conj bot
-               [ p | Just xs <- [M.lookup q (eForward $ fstE fst')]
-                   , (p, _, _) <- xs ]
-
-lcp :: (Boolean pred, PartialOrder pred, Ord st) => FST st pred func -> st -> [pred]
-lcp fst' q = go (epsilonClosure fst' $ S.singleton q)
-    where go set =
-              let c = commonPred fst' set in
-              if c `eq` bot then
-                  []
-              else
-                  c:go (next fst' set)
+    compatibleWith [] _ = True
+    compatibleWith (p:ps) (t:ts) = not ((p `conj` t) `eq` bot) && compatibleWith ps ts
+    compatibleWith (_:_) [] = False
 
 {-- Simulation --}
 

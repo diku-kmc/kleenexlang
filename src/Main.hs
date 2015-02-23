@@ -29,8 +29,9 @@ import           KMC.Visualization
 
 data MainOptions =
     MainOptions
-    { optQuiet       :: Bool
-    , optOptimizeSST :: Int
+    { optQuiet         :: Bool
+    , optOptimizeSST   :: Int
+    , optLookahead     :: Bool
     }
 
 data CompileOptions =
@@ -83,6 +84,7 @@ instance Options MainOptions where
       MainOptions
       <$> simpleOption "quiet" False "Be quiet"
       <*> simpleOption "opt" 3 "SST optimization level (1-3)"
+      <*> simpleOption "la" True "Enable lookahead"
 
 instance Options CompileOptions where
     defineOptions =
@@ -129,10 +131,10 @@ compile mainOpts compileOpts args = do
    timeSSTgen <- getCurrentTime
    -- replace state and variable names with integers, which are much faster to
    -- compare (speeds up static analysis)
-   let sst = enumerateVariables $ enumerateStates $ sstFromFST fst'
+   let sst = enumerateVariables $ enumerateStates $ sstFromFST fst' (not $ optLookahead mainOpts)
    when (not $ optQuiet mainOpts) $ do
      putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
-     putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ eForward $ sstE sst)
+     putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ sstE sst)
    timeSSTgen' <- getCurrentTime
    timeSSTopt <- getCurrentTime
    let (sstopt, i) = optimize (optOptimizeSST mainOpts) sst
@@ -180,7 +182,7 @@ visualize mainOpts visOpts args = do
   let [hasedFile] = args
   hasedSrc <- readFile hasedFile
   let fst' = fstFromHased hasedSrc
-  let sst = enumerateVariables $ enumerateStates $ sstFromFST fst'
+  let sst = enumerateVariables $ enumerateStates $ sstFromFST fst' (not $ optLookahead mainOpts)
   let (sstopt, _) = optimize (optOptimizeSST mainOpts) sst
   let dg = case optVisStage visOpts of
              VisFST -> fstToDot fst'

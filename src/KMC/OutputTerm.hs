@@ -12,12 +12,12 @@ import KMC.RangeSet (RangeSet)
 import KMC.Theories
 import KMC.Coding
 
-data Ident a = Ident deriving (Eq, Ord)
-data InList f = InList f deriving (Eq, Ord)
-data Enumerator e dom rng = Enumerator e deriving (Eq, Ord)
-data Join f rng = Join [f] deriving (Eq, Ord)
+data Ident a = Ident deriving (Eq, Ord, Show)
+data InList f = InList f deriving (Eq, Ord, Show)
+data Enumerator e dom rng = Enumerator e deriving (Eq, Ord, Show)
+data Join f rng = Join [f] deriving (Eq, Ord, Show)
 data Const dom rng = Const rng deriving (Eq, Ord, Show)
-data f :+: g = Inl f | Inr g deriving (Eq, Ord)
+data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
 
 type OutputTerm sigma delta = Join (Const sigma [delta] :+: Enumerator (RangeSet sigma) sigma delta) [delta]
 
