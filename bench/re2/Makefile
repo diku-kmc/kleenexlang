@@ -1,17 +1,16 @@
-all: matchall linebased matchall-nc linebased-nc
+CXX=c++
+CXXFLAGS=-O3 -I/usr/local/include -L/usr/local/lib -lre2 -pthread
+BINDIR=bin
+SOURCES = $(wildcard re2_src/*.cpp)
+OBJECTS = $(SOURCES:.cpp=.o)
+
+all: testprogs
 
 clean:
-	rm -f matchall line_based
+	rm -f bin/*
 
-matchall:
-	c++ -O3 -I/usr/local/include -L/usr/local/lib match.cpp -lre2 -pthread -o matchall
+testprogs: $(OBJECTS)
 
-linebased:
-	c++ -O3 -I/usr/local/include -L/usr/local/lib line_based.cpp -lre2 -pthread -o line_based
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -o $(BINDIR)/$(*F) $<
 
-
-matchall-nc:
-	c++ -O3 -I/usr/local/include -D NO_CAPTURE -L/usr/local/lib match.cpp -lre2 -pthread -o matchall-nc
-
-linebased-nc:
-	c++ -O3 -I/usr/local/include -D NO_CAPTURE -L/usr/local/lib line_based.cpp -lre2 -pthread -o line_based-nc

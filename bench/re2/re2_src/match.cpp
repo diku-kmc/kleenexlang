@@ -1,8 +1,3 @@
-// From Kristoffer and Sebastians repository.
-
-#include <re2/re2.h>
-#include <iostream>
-#include <string>
 #include "common.hpp"
 
 using namespace std;

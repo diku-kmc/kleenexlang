@@ -1,6 +1,11 @@
+// common re2 things
+
+#include <re2/re2.h>
+#include <iostream>
+#include <string>
 #include <sys/time.h>
 
-// common re2 things
+using namespace std;
 
 // Size of the buffer to read input into
 #define BUFFER_SIZE (200*1024*1024)
@@ -8,6 +13,17 @@
 #define INPUT_BLOCK_SIZE (1024*1024)
 // Filename buffer for regex
 char buffer[BUFFER_SIZE] = {0};
+
+// Maximum line length
+#define LINE_LEN 100000000
+// Number of capturing parentheses
+#define NCAP 3
+// Should the library capture groups, or simply do matching?
+#ifndef NO_CAPTURE
+    #define CAPTURE true
+#else
+    #define CAPTURE false
+#endif
 
 /** Read an entire stream into a string */
 char *read_all(FILE *f) {
@@ -28,7 +44,7 @@ uint64_t getTimeMs() {
 
 /** Trims whitespace from end of a string
   * Taken from http://stackoverflow.com/a/217605/79061 */
-static inline std::string &rtrim(std::string &s) {
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+static inline string &rtrim(string &s) {
+    s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
     return s;
 }
