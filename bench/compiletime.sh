@@ -1,23 +1,22 @@
 #! /bin/bash
 # Measure compile times.
 
-# Assumes a link to the binary in ../repgbin
-REPGC=../repgbin
-HASDIR=hased_src/
-OPT_LEVELS=(1 2 3)
-CCS=(gcc gcc-mp-4.9)
-REPS=1
-BIN_POSTFIX=".benchbin"
-BIN_DIR="bin/"
-OUT_DIR="compiletimes/"
-COMPILETIME_POSTFIX=".compiletime"
-NAME=""
-SKIP="issuu"
-# SKIP="NONE" 
+repgc=../repgbin # Location of our compiler
+has_dir=hased_src/
+opt_levels=(3) # (1 2 3)
+ccs=(gcc gcc-mp-4.9)
+reps=1
+bin_dir="bin/"
+out_dir="compiletimes/"
+compiletime_postfix=".compiletime"
+name=""
+skip="issuu"
+timeoutseconds=10
+timeoutcmd="gtimeout"
 
 # Args: file name, opt level, C compiler
 function setname {
-    NAME="${1}__${2}__${3}"
+    name="${1}__${2}__${3}"
 }
 
 function areyousure {
@@ -33,19 +32,29 @@ function areyousure {
 
 prefix=""
 cleardata=false
-while getopts ":p:cn:" opt; do
+dryrun=false
+only_do=""
+while getopts ":dp:cn:o:" opt; do
   case $opt in
   c)
       cleardata=true
-      areyousure "This will clear old data in $OUT_DIR.  Proceed? "
+      areyousure "This will clear old data in $out_dir.  Proceed? "
       ;;
   p)
       prefix=$OPTARG
       ;;
+  o)
+      echo "# Only doing $OPTARG"
+      only_do=$OPTARG
+      ;;
+  d)
+      dryrun=true
+      echo "# Making a dry-run..."
+      ;;
   n)
-      areyousure "This will delete anything in $BIN_DIR and $OUT_DIR prefixed by $OPTARG.  Proceed? "
-      rm $BIN_DIR$OPTARG*
-      rm $OUT_DIR$OPTARG*
+      areyousure "This will delete anything in $bin_dir and $out_dir prefixed by $OPTARG.  Proceed? "
+      rm $bin_dir$OPTARG*
+      rm $bin_dir$OPTARG*
       exit
       ;;
   \?)
@@ -55,27 +64,33 @@ while getopts ":p:cn:" opt; do
   esac
 done
 
-for opt_level in ${OPT_LEVELS[@]}; do
-    for cc in ${CCS[@]}; do
-        for n in $(ls $HASDIR); do
-            if [[ ${n} != *".has" ]]; then
+for opt_level in ${opt_levels[@]}; do # for each SST optimization level
+    for cc in ${ccs[@]}; do # for each C compiler available
+        for n in $(ls $has_dir); do         # for each hased source file
+            if [[ ${n} != *".has" ]]; then  #
                 continue
             fi
-            if [[ ${n} !=  ${SKIP}* ]]; then
-                setname $n $opt_level $cc
-                timingdata=$OUT_DIR$prefix$NAME$COMPILETIME_POSTFIX
-                if [ "$cleardata" = true ]; then
-                    cat /dev/null > $timingdata
+            if [ $only_do != "" ]; then
+                if [ $n != $only_do ]; then
+                    continue;
                 fi
-                for i in `seq 1 $REPS`; do
-                    binary=$BIN_DIR$prefix$NAME #$BIN_POSTFIX
-                    CMD="$REPGC compile $HASDIR$n --out $binary --opt $opt_level --cc $cc >> $timingdata"
-                    echo $i
-                    echo $CMD
-                    eval "$CMD"
-                    echo ""
-                done
             fi
+            setname $n $opt_level $cc
+            timingdata=$out_dir$prefix$name$compiletime_postfix
+            if [ "$cleardata" = true ]; then
+                cat /dev/null > $timingdata
+            fi
+            for i in `seq 1 $reps`; do
+                binary=$bin_dir$prefix$name
+                precmd="$repgc compile $has_dir$n --out $binary --opt $opt_level --cc $cc >> $timingdata"
+                cmd="$timeoutcmd $timeoutseconds $precmd"
+                echo "#$i"
+                echo $cmd
+                if [ "$dryrun" = false ]; then
+                    eval "$cmd"
+                fi
+                echo ""
+            done
         done
     done
 done

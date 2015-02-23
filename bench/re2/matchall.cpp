@@ -1,15 +1,12 @@
 // From Kristoffer and Sebastians repository.
 
-#include <cstdio>
 #include <re2/re2.h>
 #include <iostream>
-#include <iterator>
 #include <string>
 #include <sys/time.h>
-#include <ctime>
-#include <algorithm>
 
 using std::string;
+// using namespace std;
 
 // Size of the buffer to read input into
 #define BUFFER_SIZE (200*1024*1024)
