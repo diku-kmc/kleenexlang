@@ -1,7 +1,7 @@
 #! /bin/bash
 # Measure compile times.
 
-repgc=../repgbin # Location of our compiler
+repgc=../dist/build/repg/repg # Location of our compiler
 has_dir=hased_src/
 opt_levels=(3) # (1 2 3)
 ccs=(gcc gcc-mp-4.9)
@@ -11,7 +11,7 @@ out_dir="compiletimes/"
 compiletime_postfix=".compiletime"
 name=""
 skip="issuu"
-timeoutseconds=10
+timeoutseconds=30
 timeoutcmd="gtimeout"
 
 # Args: file name, opt level, C compiler
@@ -70,7 +70,7 @@ for opt_level in ${opt_levels[@]}; do # for each SST optimization level
             if [[ ${n} != *".has" ]]; then  #
                 continue
             fi
-            if [ $only_do != "" ]; then
+            if [ "$only_do" != "" ]; then
                 if [ $n != $only_do ]; then
                     continue;
                 fi

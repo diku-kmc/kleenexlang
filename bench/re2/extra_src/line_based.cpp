@@ -1,8 +1,5 @@
 // Line based RE2 subgroup capturing
-#include <re2/re2.h>
-#include <string>
-#include <iostream>
-#include "common.hpp"
+#include "../common.hpp"
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {

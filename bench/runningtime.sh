@@ -78,7 +78,7 @@ done
 
 for bin in $(ls $BIN_DIR); do
     setprimname $bin
-    if [ $only_do != "" ]; then
+    if [ "$only_do" != "" ]; then
         if [ $only_do != $PRIMNAME ]; then
             continue;
         fi

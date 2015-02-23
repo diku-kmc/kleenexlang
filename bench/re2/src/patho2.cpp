@@ -1,13 +1,11 @@
 #include "../common.hpp"
 
-// RE2 program corresponding to csv_project3.has
-// Projects away all columns except number 2 and 5.
-// ([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*)\n
-
-string regex("([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*)\n");
+// RE2 program corresponding - approximately - to patho2.has
+// output the string if it ends with a "b". 
+string regex("(?:([a-z]*a)|([a-z]*b))?\n?");
 
 #undef NCAP
-#define NCAP 6
+#define NCAP 2
 
 int main(int argc, char *argv[]) {
   // Pre-compile pattern
@@ -34,7 +32,7 @@ int main(int argc, char *argv[]) {
       cerr << buffer;
       return 1;
     } else {
-      cout << target[1] << "\t" << target[4] << endl;
+      cout << target[1] << endl;
     }
   }
 

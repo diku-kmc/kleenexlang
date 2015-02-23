@@ -395,7 +395,10 @@ compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath = 
       hClose hin
       waitForProcess hproc
   where
-    compilerOpts binPath = ["-O" ++ show optLevel, "-xc", "-o", binPath, "-"]
+    compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
+                           , "-o", binPath
+                           , "-Wno-tautological-constant-out-of-range-compare"
+                           , "-"]
     appendNL s = s ++ "\\n"
     quote s = "\"" ++ s ++ "\""
     noOutInfo = quote $ intercalate "\\n"

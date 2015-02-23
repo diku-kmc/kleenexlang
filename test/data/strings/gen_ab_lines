@@ -1,0 +1,9 @@
+#! /bin/bash
+export LC_CTYPE=C
+cat /dev/urandom | perl -E 'while (<>) {
+    s/(.)/
+        if(ord($1) % 100 == 0) { "\n" }
+        elsif(ord($1) % 2 == 0) { "a" }
+        else { "b" }
+    /seg; print
+};'
