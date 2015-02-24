@@ -5,7 +5,7 @@ use Time::HiRes qw/ time /;
 
 # Perl variant of patho2.{cpp,has,py}
 
-my $regex = "(?:([a-z]*a)|([a-z]*b))?(?:\n)?";
+my $regex = "^(?:([a-z]*a)|([a-z]*b))?(?:\n)?\$";
 
 my $pre_compile = time;
 

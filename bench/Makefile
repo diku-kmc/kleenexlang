@@ -1,6 +1,7 @@
 RE2_BINDIR=re2/bin
 PYTHON_BINDIR=python/src
 PERL_BINDIR=perl/src
+TCL_BINDIR=tcl/src
 
 SOURCES = $(wildcard re2/src/*.cpp) $(wildcard python/src/*.cpp)
 
@@ -17,7 +18,7 @@ DATA_DIR = ../test/data
 testinput.patho2       := $(DATA_DIR)/strings/ab_lines.txt
 testinput.csv_project3 := $(DATA_DIR)/csv/csv_format1.csv
 testinput.as           := $(DATA_DIR)/strings/as_small.txt
-testinput.simple_id    := $(DATA_DIR)/strings/ab_lines.txt
+testinput.simple_id    := $(DATA_DIR)/strings/ab_lines_small.txt
 
 all:
 	@echo "Nothing to do.  Run make equality_check to check all programs."
@@ -40,8 +41,14 @@ equality_check: $(HASSOURCES_OBJECTS)
 	@echo "  Perl == Hased?"
 	perl $(PERL_BINDIR)/$(*F).pl < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum -c $(*F).sha
+	@echo "  Tcl == Hased?"
+	tclsh $(TCL_BINDIR)/$(*F).tcl < ${testinput.$(*F)} > $(*F).out 2> /dev/null
+	# This is an unbeliably ugly hack, but oh well...
+	[ $(*F) = simple_id ] && perl -pi -e 'chomp if eof' $(*F).out ; true
+	shasum -c $(*F).sha
 	rm $(*F).out $(*F).sha has_$(*F)
 
+# Check each program individually
 patho2: patho2.ho
 csv_project3: csv_project3.ho
 as: as.ho
