@@ -18,7 +18,7 @@ typedef %%BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
   buffer_unit_t *data;
   size_t size;         /* size in bytes */
-  size_t bitpos;       /* size in bits  */
+  size_t bitpos;       /* bit offset from data  */
 } buffer_t;
 
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
@@ -179,30 +179,13 @@ void concat(buffer_t *dst, buffer_t *src)
 INLINE
 void outputarray(const buffer_unit_t *arr, int bits)
 {
- if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
- {
-   buf_flush(&outbuf);
-   int word_count = bits / BUFFER_UNIT_BITS;
-   if (word_count == 0)
-   {
-     return;
-   }
-   if (fwrite(arr, BUFFER_UNIT_SIZE, word_count, stdout) == -1)
-//   if (write(fileno(stdout), arr, word_count * BUFFER_UNIT_SIZE) == -1)
-   {
-     fprintf(stderr, "Error writing to stdout.\n");
-     exit(1);
-   }
- }
- else
- {
-    // Write completed words
-    size_t word_index = 0;
-    for (word_index = 0; word_index < bits / BUFFER_UNIT_BITS; word_index++)
-    {
-      outputconst(arr[word_index], BUFFER_UNIT_BITS);
-    }
- }
+  int word_count = bits / BUFFER_UNIT_BITS;
+  // Write completed words
+  size_t word_index = 0;
+  for (word_index = 0; word_index < word_count; word_index++)
+  {
+    outputconst(arr[word_index], BUFFER_UNIT_BITS);
+  }
 
   int remaining = bits % BUFFER_UNIT_BITS;
   if (remaining != 0)
@@ -214,26 +197,7 @@ void outputarray(const buffer_unit_t *arr, int bits)
 INLINE
 void output(buffer_t *buf)
 {
-  if (outbuf.bitpos % BUFFER_UNIT_BITS == 0)
-  {
-    buf_flush(&outbuf);
-    buf_flush(buf);
-    // Important that we fall through to the "handle remaining bits" case.
-  }
-
-  // Write completed words
-  size_t word_index = 0;
-  for (word_index = 0; word_index < buf->bitpos / BUFFER_UNIT_BITS; word_index++)
-  {
-    outputconst(buf->data[word_index], BUFFER_UNIT_BITS);
-  }
-
-  // Handle remaining bits
-  if (buf->bitpos % BUFFER_UNIT_BITS != 0)
-  {
-    size_t remaining = buf->bitpos - (word_index * BUFFER_UNIT_BITS);
-    outputconst(buf->data[word_index], remaining);
-  }
+  outputarray(buf->data, buf->bitpos);
 }
 
 INLINE
