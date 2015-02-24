@@ -1,11 +1,10 @@
 #include "../common.hpp"
 
-// RE2 program corresponding - approximately - to patho2.has
-// output the string if it ends with a "b". 
-string regex("(?:([a-z]*a)|([a-z]*b))?\n?");
+// RE2 program corresponding to simple_id.has
+// It behaves like cat.
+string regex("(.*)");
 
-#undef NCAP
-#define NCAP 2
+#define NCAP 1
 
 int main(int argc, char *argv[]) {
   SETOPTS
@@ -23,8 +22,9 @@ int main(int argc, char *argv[]) {
   // START LINE-BASED TIMING
   uint64_t start = getTimeMs();
   uint64_t line = 0;
-  // from man fgets:
-  // "The newline, if any, is retained."
+
+  // Because fgets reads line by line, we rely on the C++-loop to output
+  // things correctly...
   while(fgets(buffer, LINE_LEN, stdin)) {
     line++;
     bool match = RE2::FullMatchN(buffer, pattern, args, NCAP);
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
       cerr << buffer;
       return 1;
     } else {
-      cout << target[1] << endl;
+      cout << target[0];
     }
   }
 

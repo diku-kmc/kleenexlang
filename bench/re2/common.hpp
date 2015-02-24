@@ -7,6 +7,19 @@
 
 using namespace std;
 
+#ifndef USE_UTF8
+  #define ENCODING_OPTION RE2::Options::EncodingLatin1
+#else
+  #define ENCODING_OPTION RE2::Options::EncodingUTF8
+#endif
+
+#define SETOPTS RE2::Options options;           \
+  options.set_dot_nl(true);                     \
+  options.set_encoding(ENCODING_OPTION);
+
+
+
+
 // Size of the buffer to read input into
 #define BUFFER_SIZE (200*1024*1024)
 // Size of the chunks we read in at a time
@@ -17,8 +30,6 @@ char buffer[BUFFER_SIZE] = {0};
 // Maximum line length
 #define LINE_LEN 100000000
 // Number of capturing parentheses
-#define NCAP 3
-// Should the library capture groups, or simply do matching?
 #ifndef NO_CAPTURE
     #define CAPTURE true
 #else

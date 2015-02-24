@@ -1,11 +1,10 @@
 #include "../common.hpp"
 
-// RE2 program corresponding - approximately - to patho2.has
-// output the string if it ends with a "b". 
-string regex("(?:([a-z]*a)|([a-z]*b))?\n?");
+// RE2 program corresponding to as.has
+// It matches the input string agains a* and outputs it.
+string regex("(a*)");
 
-#undef NCAP
-#define NCAP 2
+#define NCAP 1
 
 int main(int argc, char *argv[]) {
   SETOPTS
@@ -33,7 +32,7 @@ int main(int argc, char *argv[]) {
       cerr << buffer;
       return 1;
     } else {
-      cout << target[1] << endl;
+      cout << target[0];
     }
   }
 

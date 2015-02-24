@@ -10,9 +10,10 @@ string regex("([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*)\n");
 #define NCAP 6
 
 int main(int argc, char *argv[]) {
+  SETOPTS
   // Pre-compile pattern
   uint64_t preCompile = getTimeMs();
-  RE2 pattern(regex);
+  RE2 pattern(regex, options);
 
   // Initialize capture arguments
   RE2::Arg *args[NCAP];

@@ -75,6 +75,9 @@ while getopts ":dp:cn:o:" opt; do
   esac
 done
 
+function run_re2 {
+    
+}
 
 for bin in $(ls $BIN_DIR); do
     setprimname $bin
