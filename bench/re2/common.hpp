@@ -13,7 +13,8 @@ using namespace std;
   #define ENCODING_OPTION RE2::Options::EncodingUTF8
 #endif
 
-#define SETOPTS RE2::Options options;           \
+#define SETOPTS                                 \
+  RE2::Options options;                         \
   options.set_dot_nl(true);                     \
   options.set_encoding(ENCODING_OPTION);
 

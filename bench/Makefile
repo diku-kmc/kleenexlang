@@ -1,5 +1,6 @@
 RE2_BINDIR=re2/bin
 PYTHON_BINDIR=python/src
+PERL_BINDIR=perl/src
 
 SOURCES = $(wildcard re2/src/*.cpp) $(wildcard python/src/*.cpp)
 
@@ -28,13 +29,16 @@ equality_check: $(HASSOURCES_OBJECTS)
 	@echo ""
 	@echo "Checking $(*F)..."
 	$(REPG) compile $< --out has_$(*F) --quiet=true
-	$(RE2_BINDIR)/$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
-	shasum $(*F).out > $(*F).sha
-	python $(PYTHON_BINDIR)/$(*F).py < ${testinput.$(*F)} > $(*F).out 2> /dev/null
-	@echo "  Python and RE2 equivalent:"
-	shasum -c $(*F).sha
 	./has_$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
-	@echo "  Hased and Python equivalent:"
+	shasum $(*F).out > $(*F).sha
+	@echo "  RE2 == Hased?"
+	$(RE2_BINDIR)/$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
+	shasum -c $(*F).sha
+	@echo "  Python == Hased?"
+	python $(PYTHON_BINDIR)/$(*F).py < ${testinput.$(*F)} > $(*F).out 2> /dev/null
+	shasum -c $(*F).sha
+	@echo "  Perl == Hased?"
+	perl $(PERL_BINDIR)/$(*F).pl < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum -c $(*F).sha
 	rm $(*F).out $(*F).sha has_$(*F)
 
