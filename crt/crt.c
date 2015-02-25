@@ -12,7 +12,13 @@
 #define OUTBUFFER_SIZE       (16*1024)
 #define INBUFFER_SIZE        (16*1024)
 #define INITIAL_BUFFER_SIZE  (4096*8)
+
+#ifdef FLAG_NOINLINE
+#define INLINE static
+#endif
+#ifndef INLINE
 #define INLINE static inline
+#endif
 
 typedef %%BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
@@ -67,9 +73,13 @@ bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
   size_t offset = buf->bitpos % BUFFER_UNIT_BITS;
   size_t bits_available = BUFFER_UNIT_BITS - offset;
 
+#ifdef FLAG_WORDALIGNED
+  buf->data[word_index] = w;
+#else
   buf->data[word_index] |= w >> offset;
   // test for offset > 0 important; shifting by the word size is undefined behaviour.
   buf->data[word_index+1] = (offset == 0) ? 0 : (w << bits_available);
+#endif
 
   buf->bitpos += bits;
 
