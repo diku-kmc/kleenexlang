@@ -217,7 +217,7 @@ applyAbstractValuationUS rho = normalizeUpdateString . map subst
                      | otherwise = Left v
       subst a = a
 
-updateAbstractEnvironment :: (Show st, Show var, Show delta, Ord st, Ord var, Eq delta
+updateAbstractEnvironment :: (Ord st, Ord var, Eq delta
                              ,Function func, Rng func ~ [delta]) =>
                              Bool
                           -> SST st pred func var
@@ -243,7 +243,7 @@ updateAbstractEnvironment weak sst states gamma =
 
     updateRho = if weak then updateAbstractValuationWeak else updateAbstractValuation
 
-abstractInterpretation :: (Show st, Show var, Show delta, Ord st, Ord var, Eq delta
+abstractInterpretation :: (Ord st, Ord var, Eq delta
                           ,Function func, Rng func ~ [delta]) =>
                           Bool
                        -> SST st pred func var
@@ -278,7 +278,7 @@ applyAbstractEnvironment gamma sst =
       let rho = maybe M.empty id (M.lookup q gamma)
       in normalizeUpdateString $ applyAbstractValuationUS rho us
 
-optimize :: (Show st, Show delta, Show var, Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
+optimize :: (Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
             Int
          -> SST st pred func var
          -> (SST st pred func var, Int)

@@ -8,7 +8,6 @@ module KMC.OutputTerm where
 import Control.Applicative hiding (Const)
 import Data.Monoid
 
-import KMC.RangeSet (RangeSet)
 import KMC.Theories
 import KMC.Coding
 
