@@ -244,6 +244,7 @@ int cmp(char *str1, char *str2, int l)
 
 void match()
 {
+  int i = 0;
 %%PROG
   accept:
     return;

@@ -6,8 +6,8 @@ module KMC.Program.Backends.C where
 
 import           Control.Monad (when, join)
 import           Data.Bits
-import           Data.List (intercalate)
 import           Data.Char (ord, chr, isPrint, isAscii, isSpace)
+import           Data.List (intercalate)
 import qualified Data.Map as M
 import           Numeric
 import           System.Exit (ExitCode(..))
@@ -100,15 +100,28 @@ cast :: CType -- ^ Destination type
      -> CType -- ^ Source type
      -> Doc   -- ^ Inner pretty printed expression to apply the cast to
      -> Doc
-cast ctypeto ctypefrom doc = parens (parens (ctyp ctypeto) <> parens doc)
-                             <+> text "<<" <+> int (cbitSize ctypeto - cbitSize ctypefrom)
+cast ctypeto ctypefrom doc
+  | ctypeto == ctypefrom = doc
+  | otherwise =
+  parens (parens (ctyp ctypeto) <> parens doc)
+             <+> text "<<" <+> int (cbitSize ctypeto - cbitSize ctypefrom)
 
 -- | Pretty print a table lookup with cast
-tbl :: CType -- ^ Buffer unit type
-    -> CType -- ^ Table unit type
-    -> TableId -> Int -> Doc
-tbl ctypectx ctypetbl (TableId n) i =
-  cast ctypectx ctypetbl (text "tbl" <> brackets (int n) <> brackets (text "next" <> brackets (int i)))
+tbl :: CType        -- ^ Buffer unit type
+    -> CType        -- ^ Table unit type
+    -> TableId      -- ^ Table identifier
+    -> Int          -- ^ Table offset
+    -> Maybe String -- ^ Optional dynamic offset
+    -> Doc
+tbl ctypectx ctypetbl (TableId n) i mx =
+  let offsetdoc = maybe (int i)
+                        (\s -> int i <+> text "+" <+> text s)
+                        mx
+  in cast ctypectx ctypetbl
+     $ hcat [text "tbl"
+            ,brackets $ int n
+            ,brackets $ text "next" <> brackets offsetdoc
+            ]
 
 -- | Pretty print a block identifier
 blck :: BlockId -> Doc
@@ -172,6 +185,30 @@ splitAppends buftype digits = [ (decodeEnum bs, length bs * baseBits) | bs <- gr
     split [] = []
     split xs = let (l, r) = splitAt digitsPerAppend xs in l:split r
 
+-- | Pretty print an append table instruction, taking into account whether the
+-- destination buffer is the output buffer or a regular bufer. An optional
+-- dynamic offset variable can be specified for printing append instructions
+-- within a loop.
+prettyAppendTbl :: (Bounded delta, Enum delta) =>
+                   CType
+                -> CType
+                -> Program delta
+                -> BufferId
+                -> TableId
+                -> Int
+                -> Maybe String
+                -> Doc
+prettyAppendTbl buftype tbltype prog bid tid i mx =
+  let arg       = tbl buftype tbltype tid i mx
+      lendoc    = int (tblBitSize $ progTables prog M.! tid)
+      streamBuf = progStreamBuffer prog
+  in if bid == streamBuf then
+         text "outputconst" <> parens (hcat [arg, comma, lendoc]) <> semi
+     else
+         text  "append"
+         <> parens (hcat [buf bid, comma, arg, comma, lendoc])
+         <> semi
+
 -- | Pretty print an instruction. Note that the C runtime currently
 -- distinguishes between regular buffers and the output buffer, and hence the
 -- pretty printer needs to handle this case specially.
@@ -197,14 +234,7 @@ prettyInstr buftype tbltype prog instr =
              text "appendarray"
                <> parens (hcat [buf bid, comma, cid constid, comma, lendoc])
                <> semi
-    AppendTblI bid tid i -> let arg = tbl buftype tbltype tid i
-                                lendoc = int (tblBitSize $ progTables prog M.! tid)
-                            in if bid == streamBuf then
-                                   text "outputconst" <> parens (hcat [arg, comma, lendoc]) <> semi
-                               else
-                                   text  "append"
-                                   <> parens (hcat [buf bid, comma, arg, comma, lendoc])
-                                   <> semi
+    AppendTblI bid tid i -> prettyAppendTbl buftype tbltype prog bid tid i Nothing
     ConcatI bid1 bid2  -> if bid1 == streamBuf then
                               text "output" <> parens (buf bid2) <> semi
                           else
@@ -227,9 +257,37 @@ prettyInstr buftype tbltype prog instr =
                           rbrace
     ConsumeI i         -> text "consume" <> parens (int i) <> semi
 
+appendSpan :: BufferId -> TableId -> Int -> Block delta -> Maybe (Int, Block delta)
+appendSpan bid tid i is =
+  let (is1, is2) = span isAppendTbl is
+  in if not (null is1)
+        && and (zipWith (==) [ j | AppendTblI _ _ j <- is1 ] [i+1..])
+     then
+         Just (length is1, is2)
+     else
+         Nothing
+    where
+      isAppendTbl (AppendTblI bid' tid' _) = bid == bid' && tid == tid'
+      isAppendTbl _ = False
+
 -- | Pretty print a list of instructions.
 prettyBlock :: (Enum delta, Bounded delta) => CType -> CType -> Program delta -> Block delta -> Doc
-prettyBlock buftype tbltype prog is = vcat $ map (prettyInstr buftype tbltype prog) is
+prettyBlock buftype tbltype prog = go
+  where
+    go [] = empty
+    go (app@(AppendTblI bid tid i):is) =
+      case appendSpan bid tid i is of
+        Nothing       -> prettyInstr buftype tbltype prog app $+$ go is
+        Just (n, is') ->
+          vcat [hcat [text "for"
+                     ,parens (text "i = 0; i < " <> int (n+1) <> text "; i++")]
+               ,lbrace
+               ,nest 3
+                  (prettyAppendTbl buftype tbltype prog bid tid i (Just "i"))
+               ,rbrace
+               ,go is'
+               ]
+    go (instr:is) = prettyInstr buftype tbltype prog instr $+$ go is
 
 prettyStr :: [Int] -> Doc
 prettyStr = doubleQuotes . hcat . map prettyOrd

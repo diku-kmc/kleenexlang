@@ -28,13 +28,17 @@ instance (Eq a, Enum a) => PredicateListToExpr (RS.RangeSet a) where
     predListToExpr xs i =
       let (xsEq, xsRest') = span (\rs -> RS.size rs == 1) xs
           (xsComplex, xsRest) = span (\rs -> RS.size rs > 1) xsRest'
-          compareExpr  = CompareE i (map (fromEnum . fromSingleton) xsEq)
+          eqExprs =
+            case xsEq of
+             []    -> []
+             [sgl] -> [predToExpr sgl i]
+             _     -> [CompareE i $ map (fromEnum . fromSingleton) xsEq]
           complexExprs = zipWith predToExpr xsComplex [i + length xsEq..]
           recExpr      = predListToExpr xsRest (i + length xsEq + length xsComplex)
-          allExprs     = (if null xsEq then [] else [compareExpr])
+          allExprs     = eqExprs
                          ++ complexExprs
                          ++ [recExpr]
-      in foldr AndE TrueE allExprs
+      in foldr1 AndE allExprs
          where
           fromSingleton rs | [(l,h)] <- RS.ranges rs, l == h = l
                            | otherwise = error "not a singleton rangeset"
@@ -48,10 +52,13 @@ instance (Eq a, Enum a) => PredicateListToExpr (RS.RangeSet a) where
                   | otherwise = AndE (LteE (ConstE $ fromEnum l) (SymE j))
                                      (LteE (SymE j) (ConstE $ fromEnum h))
 
+-- | Tree of tests and actions.
 data KVTree a b =
   BranchT (Maybe b) [([a], KVTree a b)]
   deriving (Eq, Ord, Show)
 
+-- | Converts a list of test/action pairs to a KVTree such that tests with
+-- common prefixes share roots.
 kvtree :: (Ord a) => [([a], b)] -> KVTree a b
 kvtree xs = BranchT b [ (k, kvtree ts') | (k, ts') <- M.elems ts ]
     where
