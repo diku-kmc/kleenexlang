@@ -47,8 +47,6 @@ void buf_flush(buffer_t *buf)
     fprintf(stderr, "Error writing to stdout.\n");
     exit(1);
   }
-  // Zeroing is important, as we "or" bit fragments into buffer.
-  memset(buf->data, 0, word_index * BUFFER_UNIT_SIZE);
   // Since partially written words are not flushed, they need to be moved to the
   // beginning of the buffer.
   // Note: We assume word_index > 0 to avoid losing data!
@@ -70,11 +68,8 @@ bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
   size_t bits_available = BUFFER_UNIT_BITS - offset;
 
   buf->data[word_index] |= w >> offset;
-  // Test important; shifting by the word size is undefined behaviour.
-  if (offset > 0)
-  {
-    buf->data[word_index+1] |= w << bits_available;
-  }
+  // test for offset > 0 important; shifting by the word size is undefined behaviour.
+  buf->data[word_index+1] = (offset == 0) ? 0 : (w << bits_available);
 
   buf->bitpos += bits;
 
@@ -86,7 +81,7 @@ void buf_resize(buffer_t *buf, size_t shift)
 {
   size_t new_size = buf->size << shift;
   buffer_unit_t *data2 = malloc(new_size);
-  memset(data2, 0, new_size);
+  data2[0] = 0;
   memcpy(data2, buf->data, buf->size);
   free(buf->data);
   buf->data = data2;
@@ -119,11 +114,7 @@ void buf_writearray(buffer_t *dst, const buffer_unit_t *arr, int bits)
 INLINE
 void reset(buffer_t *buf)
 {
-  memset(buf->data, 0, buf->bitpos / 8);
-  if (buf->bitpos % BUFFER_UNIT_BITS != 0)
-  {
-    buf->data[buf->bitpos / BUFFER_UNIT_BITS] = 0;
-  }
+  buf->data[0] = 0;
   buf->bitpos = 0;
 }
 
@@ -132,7 +123,7 @@ void init_buffer(buffer_t *buf)
   buf->data = malloc(INITIAL_BUFFER_SIZE);
   buf->size = INITIAL_BUFFER_SIZE;
   buf->bitpos = 0;
-  memset(buf->data, 0, buf->size);
+  buf->data[0] = 0;
 }
 
 INLINE
