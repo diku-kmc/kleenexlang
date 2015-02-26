@@ -55,10 +55,16 @@ void buf_flush(buffer_t *buf)
   }
   // Since partially written words are not flushed, they need to be moved to the
   // beginning of the buffer.
-  // Note: We assume word_index > 0 to avoid losing data!
-  buf->data[0] = buf->data[word_index];
-  // ... and then zeroed
-  buf->data[word_index] = 0;
+  if (buf->bitpos % BUFFER_UNIT_BITS != 0)
+  {
+    buf->data[0] = buf->data[word_index];
+  }
+  else
+  {
+    // If we flushed everything, re-establish the invariant that the word at the
+    // cursor is garbage-free by simply zeroing it.
+    buf->data[0] = 0;
+  }
 
   // Rewind cursor
   buf->bitpos = buf->bitpos - word_index * BUFFER_UNIT_BITS;
@@ -90,8 +96,7 @@ bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
 void buf_resize(buffer_t *buf, size_t shift)
 {
   size_t new_size = buf->size << shift;
-  buffer_unit_t *data2 = malloc(new_size);
-  data2[0] = 0;
+  buffer_unit_t *data2 = calloc(new_size, 1);
   memcpy(data2, buf->data, buf->size);
   free(buf->data);
   buf->data = data2;
@@ -106,10 +111,11 @@ void buf_writearray(buffer_t *dst, const buffer_unit_t *arr, int bits)
     int count = (bits / BUFFER_UNIT_BITS) + (bits % BUFFER_UNIT_BITS ? 1 : 0);
     memcpy(&dst->data[dst->bitpos / BUFFER_UNIT_BITS], arr, count * BUFFER_UNIT_SIZE);
     dst->bitpos += bits;
+    dst->data[dst->bitpos / BUFFER_UNIT_BITS] = 0;
   } else
   {
     int word_index = 0;
-    for (word_index = 0; word_index <= bits / BUFFER_UNIT_BITS; word_index++)
+    for (word_index = 0; word_index < bits / BUFFER_UNIT_BITS; word_index++)
     {
       buf_writeconst(dst, arr[word_index], BUFFER_UNIT_BITS);
     }
