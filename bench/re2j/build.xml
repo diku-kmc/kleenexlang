@@ -1,0 +1,54 @@
+<project>
+  <property name="src.dir"     value="src"/>
+  <property name="build.dir"   value="build"/>
+  <property name="classes.dir" value="${build.dir}/classes"/>
+  <property name="jar.dir"     value="${build.dir}/jar"/>
+  <property name="re2j.loc"    value="lib/re2j-1.0.jar"/>
+
+  
+  <target name="clean">
+    <delete dir="${build.dir}"/>
+  </target>
+  
+  <target name="compile">
+    <mkdir dir="${classes.dir}"/>
+    <javac srcdir="${src.dir}"
+           destdir="${classes.dir}"
+           includeantruntime="false"
+           classpath="${re2j.loc}"
+           />
+  </target>
+
+  
+  <target name="jar" depends="compile">
+    <mkdir dir="${jar.dir}"/>
+    
+    <mkjar prog="As"          jarname="as.jar"           />
+    <mkjar prog="SimpleId"    jarname="simple_id.jar"    />
+    <mkjar prog="CSVProject3" jarname="csv_project3.jar" />
+    <mkjar prog="Patho2"      jarname="patho2.jar"       />
+  </target>
+
+
+  <macrodef name="mkjar">
+    <attribute name="prog" />
+    <attribute name="jarname" />
+    <sequential>
+      <jar destfile="${jar.dir}/@{jarname}" basedir="${classes.dir}">
+        <manifest>
+          <attribute name="Main-Class" value="@{prog}"/>
+        </manifest>
+        <!-- Include the whole RE2/J .jar-file! -->
+        <zipgroupfileset file="${re2j.loc}" />
+      </jar>
+    </sequential>
+  </macrodef>
+
+  
+  <!-- To lower case -->
+  <scriptdef language="javascript" name="lower">
+    <attribute name="string" /> 
+    <attribute name="to" />
+    project.setProperty(attributes.get("to"),attributes.get("string").toLowerCase());
+  </scriptdef>
+</project>
