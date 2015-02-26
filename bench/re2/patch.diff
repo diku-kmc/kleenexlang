@@ -1,0 +1,13 @@
+diff --git a/Makefile b/Makefile
+index 106b79b..43910dd 100644
+--- a/Makefile
++++ b/Makefile
+@@ -38,7 +38,7 @@ SONAME=0
+ # REBUILD_TABLES=1
+ 
+ ifeq ($(shell uname),Darwin)
+-MAKE_SHARED_LIBRARY=$(CXX) -dynamiclib $(LDFLAGS) -exported_symbols_list libre2.symbols.darwin
++MAKE_SHARED_LIBRARY=$(CXX) -dynamiclib $(LDFLAGS) # -exported_symbols_list libre2.symbols.darwin
+ else
+ MAKE_SHARED_LIBRARY=$(CXX) -shared -Wl,-soname,libre2.so.$(SONAME),--version-script=libre2.symbols $(LDFLAGS)
+ endif
