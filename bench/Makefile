@@ -2,6 +2,7 @@ RE2_BINDIR=re2/bin
 PYTHON_BINDIR=python/src
 PERL_BINDIR=perl/src
 TCL_BINDIR=tcl/src
+RE2J_BINDIR=re2j/build/jar
 
 SOURCES = $(wildcard re2/src/*.cpp) $(wildcard python/src/*.cpp)
 
@@ -32,20 +33,27 @@ equality_check: $(HASSOURCES_OBJECTS)
 	$(REPG) compile $< --out has_$(*F) --quiet=true
 	./has_$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum $(*F).out > $(*F).sha
+
 	@echo "  RE2 == Hased?"
 	$(RE2_BINDIR)/$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum -c $(*F).sha
+
 	@echo "  Python == Hased?"
 	python $(PYTHON_BINDIR)/$(*F).py < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum -c $(*F).sha
+
 	@echo "  Perl == Hased?"
 	perl $(PERL_BINDIR)/$(*F).pl < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum -c $(*F).sha
+
 	@echo "  Tcl == Hased?"
 	tclsh $(TCL_BINDIR)/$(*F).tcl < ${testinput.$(*F)} > $(*F).out 2> /dev/null
-	# This is an unbeliably ugly hack, but oh well...
-	[ $(*F) = simple_id ] && perl -pi -e 'chomp if eof' $(*F).out ; true
 	shasum -c $(*F).sha
+
+	@echo "  RE2/J == Hased?"
+	java -jar $(RE2J_BINDIR)/$(*F).jar < ${testinput.$(*F)} > $(*F).out 2> /dev/null
+	shasum -c $(*F).sha
+
 	rm $(*F).out $(*F).sha has_$(*F)
 
 # Check each program individually
