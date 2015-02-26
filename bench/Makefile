@@ -24,8 +24,15 @@ testinput.simple_id    := $(DATA_DIR)/strings/ab_lines_small.txt
 all:
 	@echo "Nothing to do.  Run make equality_check to check all programs."
 
+# Check that the test data is there.
+data_check:
+	@[ -f ${testinput.patho2} ] || (echo "Missing test data file: ${testinput.patho2}" && false)
+	@[ -f ${testinput.csv_project3} ] || (echo "Missing test data file: ${testinput.csv_project3}"  && false)
+	@[ -f ${testinput.as} ] || (echo "Missing test data file: ${testinput.as}" && false)
+	@[ -f ${testinput.simple_id} ] || (echo "Missing test data file: ${testinput.simple_id}" && false)
+
 # Check that RE2, Python, and Hased compute the same output
-equality_check: $(HASSOURCES_OBJECTS)
+equality_check: data_check $(HASSOURCES_OBJECTS)
 
 %.ho: $(HASEDDIR)/%.has
 	@echo ""
