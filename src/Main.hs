@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 module Main where
 
@@ -9,13 +11,15 @@ import           Data.Hash.MD5 (md5s, Str(..))
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Time (getCurrentTime, diffUTCTime)
+import           Data.Time (NominalDiffTime,getCurrentTime, diffUTCTime)
 import           Data.Word
 import           Options
 import           System.Environment
 import           System.Exit (ExitCode(..), exitWith)
 import           System.FilePath (takeExtension)
+import           System.IO
 
+import           KMC.Bitcoder
 import           KMC.FSTConstruction hiding (Var)
 import           KMC.Hased.Lang (HasedOutTerm, hasedToMuTerm)
 import           KMC.Hased.Parser (parseHased)
@@ -25,6 +29,9 @@ import           KMC.SSTCompiler (compileAutomaton)
 import           KMC.SSTConstruction (sstFromFST)
 import           KMC.SymbolicFST (FST, fstS)
 import           KMC.SymbolicSST
+import           KMC.Syntax.Config
+import           KMC.Syntax.Parser
+import           KMC.Theories
 import           KMC.Visualization
 
 data MainOptions =
@@ -32,6 +39,7 @@ data MainOptions =
     { optQuiet         :: Bool
     , optOptimizeSST   :: Int
     , optLookahead     :: Bool
+    , optExpressionArg :: Bool
     }
 
 data CompileOptions =
@@ -85,6 +93,7 @@ instance Options MainOptions where
       <$> simpleOption "quiet" False "Be quiet"
       <*> simpleOption "opt" 3 "SST optimization level (1-3)"
       <*> simpleOption "la" True "Enable lookahead"
+      <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
 
 instance Options CompileOptions where
     defineOptions =
@@ -115,78 +124,125 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
                      [ "SST optimization level: " ++ show (optOptimizeSST mainOpts)
                      , "Word size:              " ++ show (optWordSize compileOpts)
                      ]
-             
+
+-- | Existential type representing transducers that can be determinized,
+-- compiled and pretty-printed.
+data Transducer where
+    Transducer :: (Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta], Pretty f, Pretty delta
+                  ,Ord delta, Enum delta, Bounded delta)
+                  => FST Int (RangeSet Word8) f -> Transducer
+
+-- | Existential type representing determinized transducers that can be compiled.
+data DetTransducer where
+    DetTransducer :: (Function f, Ord f, Pretty f
+                     ,Ord delta, Enum delta, Bounded delta, Pretty delta
+                     ,Dom f ~ Word8, Rng f ~ [delta]) =>
+                     SST Int (RangeSet Word8) f Int -> DetTransducer
+
+transducerSize :: Transducer -> Int
+transducerSize (Transducer fst') = S.size $ fstS fst'
+
+buildTransducer :: MainOptions -> [String] -> IO (Transducer, String, String, NominalDiffTime)
+buildTransducer mainOpts args = do
+  when (length args /= 1) $ do
+    prog <- getProgName
+    putStrLn $ "Usage: " ++ prog ++ " <compile|visualize> [options] <hased_file|re_file|re>"
+    exitWith $ ExitFailure 1
+  let [arg] = args
+  let ext = takeExtension arg
+  timeFSTgen <- getCurrentTime
+  (fst', srcName, src) <-
+    if optExpressionArg mainOpts || ext == ".re" then do
+      (reSrcName, reSrc) <-
+        if optExpressionArg mainOpts then
+            return ("<CLI>", arg)
+        else do
+            src <- readFile arg
+            return (arg, src)
+      case parseRegex fancyRegexParser reSrc of
+        Left e -> do
+          hPutStrLn stderr $ e
+          exitWith $ ExitFailure 1
+        Right (_, re) -> return (Transducer (fromMu $ fromRegex re), reSrcName, reSrc)
+    else if ext == ".has" then do
+           hasedSrc <- readFile arg
+           return (Transducer (fstFromHased hasedSrc), arg, hasedSrc)
+         else do
+           hPutStrLn stderr $ "Unknown extension: " ++ ext
+           exitWith $ ExitFailure 1
+  when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (transducerSize fst')
+  timeFSTgen' <- getCurrentTime
+  return (fst', srcName, md5s (Str src), diffUTCTime timeFSTgen' timeFSTgen)
+
+compileTransducer :: MainOptions -> Transducer -> IO (DetTransducer, NominalDiffTime, NominalDiffTime)
+compileTransducer mainOpts (Transducer fst') = do
+  timeSSTgen <- getCurrentTime
+  let sst = enumerateVariables $ enumerateStates $ sstFromFST fst' (not $ optLookahead mainOpts)
+  when (not $ optQuiet mainOpts) $ do
+    putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
+    putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ sstE sst)
+  timeSSTgen' <- getCurrentTime
+  timeSSTopt <- getCurrentTime
+  let (sstopt, i) = optimize (optOptimizeSST mainOpts) sst
+  timeSSTopt' <- i `seq` getCurrentTime
+  return (DetTransducer sstopt
+         ,diffUTCTime timeSSTgen' timeSSTgen
+         ,diffUTCTime timeSSTopt' timeSSTopt)
+
+transducerToProgram :: MainOptions
+                    -> CompileOptions
+                    -> String
+                    -> String
+                    -> DetTransducer
+                    -> IO (ExitCode, NominalDiffTime)
+transducerToProgram mainOpts compileOpts srcFile srcMd5 (DetTransducer sst) = do
+  timeCompile <- getCurrentTime
+  let prog = compileAutomaton sst
+  let envInfo = intercalate "\\n" [ "Options:"
+                                  , prettyOptions mainOpts compileOpts
+                                  , ""
+                                  , "Time:        " ++ show timeCompile
+                                  , "Source file: " ++ srcFile
+                                  , "Source md5:  " ++ srcMd5
+                                  , "SST states:  " ++ show (S.size $ sstS sst)
+                                  ]
+  ret <- compileProgram (optWordSize compileOpts)
+                        (optOptimizeLevelCC compileOpts)
+                        (optQuiet mainOpts)
+                        prog
+                        (Just envInfo)
+                        (optAltCompiler compileOpts)
+                        (optOutFile compileOpts)
+                        (optCFile compileOpts)
+  timeCompile' <- getCurrentTime
+  return (ret, diffUTCTime timeCompile' timeCompile)
+
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
 compile mainOpts compileOpts args = do
-   when (length args /= 1) $ do
-     prog <- getProgName
-     putStrLn $ "Usage: " ++ prog ++ " compile [options] <hased_file>"
-     exitWith $ ExitFailure 1
-   let [hasedFile] = args
-   hasedSrc <- readFile hasedFile
-   timeFSTgen <- getCurrentTime
-   let fst' = fstFromHased hasedSrc
-   when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (S.size $ fstS fst')
-   timeFSTgen' <- getCurrentTime
-   timeSSTgen <- getCurrentTime
-   -- replace state and variable names with integers, which are much faster to
-   -- compare (speeds up static analysis)
-   let sst = enumerateVariables $ enumerateStates $ sstFromFST fst' (not $ optLookahead mainOpts)
-   when (not $ optQuiet mainOpts) $ do
-     putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
-     putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ sstE sst)
-   timeSSTgen' <- getCurrentTime
-   timeSSTopt <- getCurrentTime
-   let (sstopt, i) = optimize (optOptimizeSST mainOpts) sst
-   timeSSTopt' <- i `seq` getCurrentTime
-   let prog = compileAutomaton sstopt
-   timeCompile <- getCurrentTime
-   let envInfo = intercalate "\\n" [ "Options:"
-                                   , prettyOptions mainOpts compileOpts
-                                   , ""
-                                   , "Time:       " ++ show timeCompile
-                                   , "Hased file: " ++ hasedFile
-                                   , "Hased md5:  " ++ md5s (Str hasedSrc)
-                                   , "SST states: " ++ show (S.size $ sstS sst)
-                                   , "FST states: " ++ show (S.size $ fstS fst')
-                                   ]
-   ret <- compileProgram (optWordSize compileOpts)
-                         (optOptimizeLevelCC compileOpts)
-                         (optQuiet mainOpts)
-                         prog
-                         (Just envInfo)
-                         (optAltCompiler compileOpts)
-                         (optOutFile compileOpts)
-                         (optCFile compileOpts)
-   timeCompile' <- getCurrentTime
-   when (not $ optQuiet mainOpts) $ do
-     let fstGenDuration = diffUTCTime timeFSTgen' timeFSTgen
-         sstGenDuration = diffUTCTime timeSSTgen' timeSSTgen
-         sstOptDuration = diffUTCTime timeSSTopt' timeSSTopt
-         compileDuration = diffUTCTime timeCompile' timeCompile
-         fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
-                 in replicate (8 - length s) ' ' ++ s
-     putStrLn $ "FST generation (ms)   : " ++ fmt fstGenDuration
-     putStrLn $ "SST generation (ms)   : " ++ fmt sstGenDuration
-     putStrLn $ "SST optimization (ms) : " ++ fmt sstOptDuration
-     putStrLn $ "code generation (ms)  : " ++ fmt compileDuration
-     putStrLn $ "total (ms)            : " ++ fmt (fstGenDuration + sstGenDuration + sstOptDuration + compileDuration)
-   return ret
+  (transducer, srcName, srcMd5, fstGenDuration) <- buildTransducer mainOpts args
+  (detTransducer, sstGenDuration, sstOptDuration) <- compileTransducer mainOpts transducer
+  (ret, compileDuration) <- transducerToProgram mainOpts compileOpts srcName srcMd5 detTransducer
+  when (not $ optQuiet mainOpts) $ do
+    let fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
+                in replicate (8 - length s) ' ' ++ s
+    putStrLn $ "FST generation (ms)   : " ++ fmt fstGenDuration
+    putStrLn $ "SST generation (ms)   : " ++ fmt sstGenDuration
+    putStrLn $ "SST optimization (ms) : " ++ fmt sstOptDuration
+    putStrLn $ "code generation (ms)  : " ++ fmt compileDuration
+    putStrLn $ "total (ms)            : " ++ fmt (sum [fstGenDuration
+                                                      ,sstGenDuration
+                                                      ,sstOptDuration
+                                                      ,compileDuration])
+  return ret
 
 visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
 visualize mainOpts visOpts args = do
-  when (length args /= 1) $ do
-    prog <- getProgName
-    putStrLn $ "Usage: " ++ prog ++ " visualize [options] <hased_file>"
-    exitWith $ ExitFailure 1
-  let [hasedFile] = args
-  hasedSrc <- readFile hasedFile
-  let fst' = fstFromHased hasedSrc
-  let sst = enumerateVariables $ enumerateStates $ sstFromFST fst' (not $ optLookahead mainOpts)
-  let (sstopt, _) = optimize (optOptimizeSST mainOpts) sst
-  let dg = case optVisStage visOpts of
-             VisFST -> fstToDot fst'
-             VisSST -> sstToDot sstopt
+  (Transducer fst', _, _, _) <- buildTransducer mainOpts args
+  dg <- case optVisStage visOpts of
+          VisFST -> return $ fstToDot fst'
+          VisSST -> do
+            (DetTransducer sst,_,_) <- compileTransducer mainOpts (Transducer fst')
+            return $ sstToDot sst
   case optVisOut visOpts of
     Nothing -> do
         GC.runGraphvizCanvas GC.Dot dg GC.Xlib

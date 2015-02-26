@@ -16,17 +16,12 @@ import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
 
-import           KMC.Expression
-import           KMC.FSTConstruction
 import           KMC.OutputTerm
 import           KMC.RangeSet
 import           KMC.SSTConstruction
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
 import           KMC.Theories
-
-import           KMC.Syntax.Parser
-import           KMC.Syntax.Config
 
 class Pretty a where
   pretty :: a -> String
@@ -118,31 +113,6 @@ sstToDot sst = GV.graphElemsToDot params nodes edges
       statesMap = M.fromList (zip (S.toList (sstS sst)) [(0::Int)..])
       statesMap' = M.fromList (zip [(0::Int)..] (S.toList (sstS sst)))
 
-fancyToDot :: String -> GV.DotGraph Int
-fancyToDot str =
-  case parseRegex fancyRegexParser str of
-    Left e -> error e
-    Right (_, e) -> let fst' = fromMu (fromRegex e)
-                              :: FST Int
-                                     (RangeSet Word8)
-                                     (Join
-                                      (Const Word8 [Bool] :+: Enumerator (RangeSet Word8) Word8 Bool)
-                                      [Bool])
-                    in fstToDot fst'
-
-fancyToSSTDot :: Int -> String -> GV.DotGraph Int
-fancyToSSTDot opt str =
-  case parseRegex fancyRegexParser str of
-    Left e -> error e
-    Right (_, e) -> let sst = sstFromFST (fromMu (fromRegex e)) False
-                              :: SST (PathTree Var Int)
-                                     (RangeSet Word8)
-                                     (Join
-                                      (Const Word8 [Bool] :+: Enumerator (RangeSet Word8) Word8 Bool)
-                                      [Bool])
-                                     Var
-                    in sstToDot (fst $ optimize opt $ enumerateStates sst)
-
 mkViz :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> IO ()
 mkViz f x = do
     _ <- forkIO $ GC.runGraphvizCanvas GC.Dot (f x) GC.Xlib
@@ -152,12 +122,3 @@ mkVizToFile :: (GV.PrintDotRepr dg n) => (a -> dg n) -> a -> FilePath -> IO ()
 mkVizToFile f x p = do
     fp <- GC.runGraphvizCommand GC.Dot (f x) GC.Pdf p
     putStrLn $ "Wrote file " ++ fp
-
-vizFancyAsFST :: String -> IO ()
-vizFancyAsFST str = mkViz fancyToDot str
-
-vizFancyAsSST :: Int -> String -> IO ()
-vizFancyAsSST opt str = mkViz (fancyToSSTDot opt) str
-
-pngFancyAsSST :: Int -> String -> String -> IO FilePath
-pngFancyAsSST opt file str = GC.runGraphviz (fancyToSSTDot opt str) GC.Png file
