@@ -51,3 +51,22 @@ for data_chunk in ${data_chunks[@]} ; do
     fi
 done
 
+# Print the license.
+cat <<EOF
+
+************************************************************************
+This anonymized Issuu dataset is released under the Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International License:
+http://creativecommons.org/licenses/by-nc-sa/4.0/
+
+This includes the following restrictions:
+
+* If you use this data for any published work, you must mention Issuu as the source.
+* You cannot in any way use this data commercially
+* If you share it, you need to apply this same licence.
+
+Additionally we kindly ask the following:
+
+* Send us a mail to labs@issuu.com if you use the dataset. We'd love to hear what you are using it for or get comments and suggestions
+* Don't hit our servers hard, if you scrape Issuu for metadata when using the dataset.
+EOF
