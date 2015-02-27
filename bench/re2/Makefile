@@ -7,8 +7,6 @@ LIBRE2_DIR = ~
 CXX=c++
 CXXFLAGS=-O3 -I$(LIBRE2_DIR)/usr/local/include -L$(LIBRE2_DIR)/usr/local/lib -lre2 -pthread
 
-ifeq ($(OS, ))
-
 all: latin1
 
 # Fetch re2 and compile it!
