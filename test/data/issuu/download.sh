@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download script that fetches and unpacks the data set from Issuu.
-# To actually start the download, set dry_run to true.  The .xz files
+# To actually start the download, set invoke with -f.  The .xz files
 # take up about 5-7 GB each, and the uncompressed .json files between
 # 250 and 350 GB.  
 
@@ -38,6 +38,14 @@ data_chunks=( 2014-03-01.json.xz
               # 2014-03-30.json.xz
               # 2014-03-31.json.xz
             )
+
+while getopts ":f" opt ; do
+  case $opt in
+  f)
+      dry_run=false
+      ;;
+  esac
+done
 
 for data_chunk in ${data_chunks[@]} ; do
     if [ ! -f $data_chunk ] ; then
