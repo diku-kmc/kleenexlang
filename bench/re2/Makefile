@@ -26,7 +26,12 @@ utf8: $(UTF8_OBJS)
 
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -o $(BINDIR)/$(*F) $<
+	rm -f $(BINDIR)/$(*F)
+	$(CXX) $(CXXFLAGS) -o $(BINDIR)/$(*F).bin $<
+	echo "#!/bin/sh" >> $(BINDIR)/$(*F)
+	echo 'DIR=$$( cd "$$( dirname "$${BASH_SOURCE[0]}" )" && pwd )' >> $(BINDIR)/$(*F)
+	echo "DYLD_LIBRARY_PATH=$(LIBRE2_DESTDIR)/usr/local/lib/ LD_LIBRARY_PATH=\$$DYLD_LIBRARY_PATH \$$DIR/$(*F).bin" >> $(BINDIR)/$(*F)
+	chmod +x $(BINDIR)/$(*F)
 
 %.utf8o: %.cpp
 	$(CXX) $(CXXFLAGS) -D USE_UTF8 -o $(BINDIR)/$(*F)_utf8 $<
