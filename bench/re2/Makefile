@@ -12,7 +12,7 @@ libre2:
 	git clone https://github.com/google/re2.git libre2
 	patch libre2/Makefile patch.diff
 	cd libre2 ; make
-	cd libre2 ; make test LD_FLAGS=-pthread
+	cd libre2 ; make test LDFLAGS=-pthread
 	cd libre2 ; make install DESTDIR=~
 	cd libre2 ; make testinstall
 
