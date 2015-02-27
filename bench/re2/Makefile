@@ -2,7 +2,7 @@ BINDIR=bin
 SOURCES = $(wildcard src/*.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 UTF8_OBJS = $(OBJECTS:.o=.utf8o)
-LIBRE2_DIR = ~
+LIBRE2_DIR = $(HOME)
 
 CXX=c++
 CXXFLAGS=-O3 -I$(LIBRE2_DIR)/usr/local/include -L$(LIBRE2_DIR)/usr/local/lib -lre2 -pthread
@@ -16,17 +16,17 @@ libre2:
 	cd libre2 ; make
 	cd libre2 ; make test LDFLAGS=-pthread
 	cd libre2 ; make install DESTDIR=$(LIBRE2_DIR)
-	cd libre2 ; make testinstall DESTDIR=$(LIBRE2_DIR)
+	# cd libre2 ; make testinstall DESTDIR=$(LIBRE2_DIR)
 
 
 latin1: $(OBJECTS)
 utf8: $(UTF8_OBJS)
 
 
-%.o: libre2 %.cpp
+%.o: %.cpp
 	$(CXX) $(CXXFLAGS) -o $(BINDIR)/$(*F) $<
 
-%.utf8o: libre2 %.cpp
+%.utf8o: %.cpp
 	$(CXX) $(CXXFLAGS) -D USE_UTF8 -o $(BINDIR)/$(*F)_utf8 $<
 
 as : src/as.o
