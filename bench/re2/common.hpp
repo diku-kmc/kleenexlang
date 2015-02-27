@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 #include <sys/time.h>
+#include <stdio.h>
+#include <algorithm>
 
 using namespace std;
 
