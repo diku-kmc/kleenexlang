@@ -2,23 +2,25 @@ BINDIR=bin
 SOURCES = $(wildcard src/*.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 UTF8_OBJS = $(OBJECTS:.o=.utf8o)
-LIBRE2_DIR = $(HOME)
+LIBRE2_DESTDIR = $(HOME)
+LIBRE2_SRCDIR = libre2
 
 CXX=c++
-CXXFLAGS=-O3 -I$(LIBRE2_DIR)/usr/local/include -L$(LIBRE2_DIR)/usr/local/lib -lre2 -pthread
+CXXFLAGS=-O3 -I$(LIBRE2_DESTDIR)/usr/local/include -L$(LIBRE2_DESTDIR)/usr/local/lib -lre2 -pthread
 
 all: latin1
 
 # Fetch re2 and compile it!
 libre2:
-	git clone https://github.com/google/re2.git libre2
-	patch libre2/Makefile patch.diff
-	cd libre2 ; make
-	cd libre2 ; make test LDFLAGS=-pthread
-	cd libre2 ; make install DESTDIR=$(LIBRE2_DIR)
-	# cd libre2 ; make testinstall DESTDIR=$(LIBRE2_DIR)
+	git clone https://github.com/google/re2.git $(LIBRE2_SRCDIR)
+	(cd libre2 && make)
+	(cd libre2 && make test LDFLAGS=-pthread)
+	(cd libre2 && make install DESTDIR=$(LIBRE2_DESTDIR))
+# Does not work -- do not care!
+# cd libre2 ; make testinstall DESTDIR=$(LIBRE2_DESTDIR)
 
 
+# Build latin1 or UTF8 versions of the RE2 progs.
 latin1: $(OBJECTS)
 utf8: $(UTF8_OBJS)
 
@@ -40,6 +42,6 @@ clean:
 	rm -f bin/*
 
 cleanlibre2:
-	rm -f $(LIBRE2_DIR)/usr/local/include/re2
-	rm -f $(LIBRE2_DIR)/usr/local/lib/libre2.*
-	rm -f libre2/
+	rm -rf $(LIBRE2_DESTDIR)/usr/local/include/re2
+	rm -rf $(LIBRE2_DESTDIR)/usr/local/lib/libre2.*
+	rm -rf $(LIBRE2_SRCDIR)
