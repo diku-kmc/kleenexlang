@@ -1,9 +1,13 @@
-CXX=c++
-CXXFLAGS=-O3 -I/usr/local/include -L/usr/local/lib -lre2 -pthread
 BINDIR=bin
 SOURCES = $(wildcard src/*.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 UTF8_OBJS = $(OBJECTS:.o=.utf8o)
+LIBRE2_DIR = ~
+
+CXX=c++
+CXXFLAGS=-O3 -I$(LIBRE2_DIR)/usr/local/include -L$(LIBRE2_DIR)/usr/local/lib -lre2 -pthread
+
+ifeq ($(OS, ))
 
 all: latin1
 
@@ -13,8 +17,8 @@ libre2:
 	patch libre2/Makefile patch.diff
 	cd libre2 ; make
 	cd libre2 ; make test LDFLAGS=-pthread
-	cd libre2 ; make install DESTDIR=~
-	cd libre2 ; make testinstall
+	cd libre2 ; make install DESTDIR=$(LIBRE2_DIR)
+	cd libre2 ; make testinstall DESTDIR=$(LIBRE2_DIR)
 
 
 latin1: $(OBJECTS)
@@ -36,3 +40,8 @@ simple_id : src/simple_id.o
 
 clean:
 	rm -f bin/*
+
+cleanlibre2:
+	rm -f $(LIBRE2_DIR)/usr/local/include/re2
+	rm -f $(LIBRE2_DIR)/usr/local/lib/libre2.*
+	rm -f libre2/
