@@ -3,3 +3,4 @@
 # Except this file and sample files
 !.gitignore
 !sample.json
+!download.sh
