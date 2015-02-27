@@ -7,14 +7,21 @@ UTF8_OBJS = $(OBJECTS:.o=.utf8o)
 
 all: latin1
 
+# Fetch re2 and compile it!
+libre2:
+	git clone https://github.com/google/re2.git libre2
+	patch libre2/Makefile patch.diff
+	cd libre2 ; make && make test && make install DESTDIR=~ && make testinstall
+
+
 latin1: $(OBJECTS)
 utf8: $(UTF8_OBJS)
 
 
-%.o: %.cpp
+%.o: libre2 %.cpp
 	$(CXX) $(CXXFLAGS) -o $(BINDIR)/$(*F) $<
 
-%.utf8o: %.cpp
+%.utf8o: libre2 %.cpp
 	$(CXX) $(CXXFLAGS) -D USE_UTF8 -o $(BINDIR)/$(*F)_utf8 $<
 
 as : src/as.o
