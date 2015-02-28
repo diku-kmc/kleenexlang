@@ -4,6 +4,8 @@
     
 
 * Features
+** [#A] Support for Unicode, or at least ÆØÅ!
+
 ** DONE [#B] Limit constant propagation
 *** Description:
    Propagating constants seem to introduce a lot of copying in cases such as
