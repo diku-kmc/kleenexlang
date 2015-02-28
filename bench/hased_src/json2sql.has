@@ -1,0 +1,41 @@
+/* Convert (AWS) JSON to (AWS) SQL insert statements. */
+/* http://aws.dk/ */
+/*
+INSERT INTO  aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsnr, geom) VALUES 
+('fffecc7c-095b-4fc8-b7ed-3d59cde245c0', '0746', '0191', '11C', '8660', '13619', ST_SetSRID(ST_Point(559929.12,6381672.78), 25832))
+*/
+
+start := "INSERT INTO aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsnr) VALUES\n" json2sql
+
+json2sql := object ~<,[ ]> json2sql
+          | object ws
+
+object := "(" ~<\{> ws keyVals ws ~<}> ")\n"
+
+keyVals := ws keyVal keyVals
+         | ws keyVal
+
+keyVal := ~<"id">               sep qt someString qt keepComma
+        | ~<"kommunekode">      sep qt someInt qt keepComma
+        | ~<"vejkode">          sep qt someInt qt keepComma
+        | ~<"husnr">            sep qt someString qt keepComma
+        | ~<"postnr">           sep qt someInt qt keepComma
+        | ~<"esrejendomsnr">    sep qt someInt qt dropComma
+        | ~(<"> someString <"> sep ( <"> someString <">
+                                   | someInt
+                                   | someNumber
+                                   | <null>
+                                   )) (dropComma | "")
+//        | <"geom"> <:> <"> 
+
+// Replace double with single quote
+qt := "'" ~<">
+sep := ws ~<:> ws
+someString := <[^"\n]*>
+someInt := <[0-9]*>
+someNumber := someInt <\.> someInt
+
+// Skip whitespace
+ws := ~<[ \n]*>
+keepComma := ws <,>
+dropComma := ws ~<,>
