@@ -335,7 +335,7 @@ prettyExpr e =
     CompareE i str    -> text "cmp"
                            <> parens (hcat $ punctuate comma
                                         [text "&next" <> brackets (int i)
-                                        ,prettyStr str
+                                        ,text "(unsigned char *)" <+> prettyStr str
                                         ,int (length str)])
     ConstE n          -> let c = chr n in
                          if isPrint c && isAscii c && c /= '\\' && c /= '\'' then
