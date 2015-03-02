@@ -20,7 +20,12 @@
 #define INLINE static inline
 #endif
 
-typedef %%BUFFER_UNIT_T buffer_unit_t;
+#ifndef BUFFER_UNIT_T
+#warning "BUFFER_UNIT_T not defined. Falling back to default 'uint8_t'"
+#define BUFFER_UNIT_T uint8_t
+#endif
+
+typedef BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
   buffer_unit_t *data;
   size_t size;         /* size in bytes */
@@ -38,6 +43,12 @@ char inbuf[INBUFFER_SIZE*2];
 size_t in_size = 0;
 int in_cursor = 0;
 #define avail (in_size - in_cursor)
+
+// Program interface
+
+void printCompilationInfo();
+void init();
+void match();
 
 void buf_flush(buffer_t *buf)
 {
@@ -245,29 +256,6 @@ int cmp(char *str1, char *str2, int l)
   return 1;
 }
 
-%%TABLES
-
-%%DECLS
-
-void match()
-{
-  int i = 0;
-%%PROG
-  accept:
-    return;
-
-  fail:
-    fprintf(stderr, "Match error at input symbol %zu!\n", count);
-    exit(1);
-}
-
-void printCompilationInfo()
-{
-  fprintf(stdout,
-%%COMP_INFO
-          );
-}
-
 void printUsage(char *name)
 {
   fprintf(stdout, "Normal usage: %s < infile > outfile\n", name);
@@ -317,7 +305,7 @@ int main(int argc, char *argv[])
   outbuf.data = malloc(outbuf.size);
   reset(&outbuf);
 
-%%INIT
+  init();
 
   if(do_timing)
   {

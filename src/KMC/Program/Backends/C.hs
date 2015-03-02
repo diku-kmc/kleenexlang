@@ -35,9 +35,34 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
--- | The source code template of the C runtime
-crt :: String
-crt = [fileQ|crt/crt.c|]
+progTemplate :: String -> String -> String -> String -> String -> String -> String
+progTemplate buString tablesString declsString infoString initString progString =
+ [strQ|
+#define BUFFER_UNIT_T |] ++ buString ++ "\n"
+  ++ [fileQ|crt/crt.c|] ++ "\n"
+  ++ tablesString ++ "\n"
+  ++ declsString ++ [strQ|
+void printCompilationInfo()
+{
+  fprintf(stdout, |]++infoString++[strQ|);
+}
+
+void init()
+{
+|]++initString ++[strQ|
+}
+
+void match()
+{
+  int i = 0;
+|]++progString++[strQ|
+  accept:
+    return;
+  fail:
+    fprintf(stderr, "Match error at input symbol %zu!\n", count);
+    exit(1);
+}
+|]
 
 {- Types -}
 
@@ -403,28 +428,12 @@ programToC buftype prog =
 
 renderCProg :: String -> CProg -> String
 renderCProg compInfo cprog =
-  subst [ ("BUFFER_UNIT_T", render $ cBufferUnit cprog)
-        , ("TABLES"       , render $ cTables cprog)
-        , ("INIT"         , render $ cInit cprog)
-        , ("DECLS"        , render $ cDeclarations cprog)
-        , ("PROG"         , render $ cProg cprog)
-        , ("COMP_INFO"    , compInfo) ]
-        crt
-
-subst :: [(String, String)] -> String -> String
-subst s = go
-    where
-      go [] = []
-      go ('%':'%':xs) | Just (y, xs') <- lu s xs = y ++ go xs'
-      go (x:xs) = x:go xs
-
-      lu [] _ = Nothing
-      lu ((x, y):s') xs = let (xs1, xs2) = splitAt (length x) xs
-                          in if xs1 == x then
-                                 Just (y, xs2)
-                             else
-                                 lu s' xs
-
+  progTemplate (render $ cBufferUnit cprog)
+               (render $ cTables cprog)
+               (render $ cDeclarations cprog)
+               compInfo
+               (render $ cInit cprog)
+               (render $ cProg cprog)
 
 renderProgram :: (Enum delta, Bounded delta) => CType -> Program delta -> String
 renderProgram buftype = renderCProg "\"TODO: insert descriptive string from renderProgram\""
