@@ -1,0 +1,51 @@
+/* Convert (AWS) JSON to (AWS) SQL insert statements. */
+/* http://aws.dk/ */
+/*
+INSERT INTO  aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsnr, geom) VALUES 
+('fffecc7c-095b-4fc8-b7ed-3d59cde245c0', '0746', '0191', '11C', '8660', '13619', ST_SetSRID(ST_Point(559929.12,6381672.78), 25832))
+
+TODO:  Figure out what the third number in ST_SetSRID is supposed to mean...
+*/
+
+start := "INSERT INTO aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsnr, geom) VALUES\n" json2sql
+
+json2sql := object ",\n" ~<,[ ]> json2sql
+          | object ";\n" ws
+
+object := "(" ~<\{> ws keyVals ws ~<}> ")"
+
+keyVals := ws keyVal keyVals
+         | ws keyVal
+
+keyVal := ~<"id">               sep qt someString qt keepComma
+        | ~<"kommunekode">      sep qt someInt qt keepComma
+        | ~<"vejkode">          sep qt someInt qt keepComma
+        | ~<"husnr">            sep qt someString qt keepComma
+        | ~<"postnr">           sep qt someInt qt keepComma
+        | ~<"esrejendomsnr">    sep qt someInt qt keepComma
+        | "ST_Point(" geom ")" dropComma
+        | ~(<"> someString <"> sep ( <"> someString <">
+                                   | someInt
+                                   | someNumber
+                                   | <null>
+                                   )) (dropComma | "")
+
+// etrs89koordinat_øst X etrs89koordinat_nord Y
+// bliver til ST_SetSRID(X, Y)
+geom := ~<"etrs89koordinat_øst"> sep someNumber keepComma ws
+        ~<"etrs89koordinat_nord"> sep someNumber 
+
+
+stringReplaceQuotes := qt someString qt
+qt := "'" ~<"> // replace double with single quote
+sep := ws ~<:> ws
+
+someString := <([^"\n])*>
+someInt := <[0-9]*>
+someNumber := someInt <\.> someInt
+contryCode := <[A-Z]{2}>
+
+// Skip whitespace
+ws := ~<[ \n]*>
+keepComma := ws <,>
+dropComma := ws ~<,>

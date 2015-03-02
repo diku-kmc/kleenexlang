@@ -1,39 +1,33 @@
-/* Convert (AWS) JSON to (AWS) SQL insert statements. */
-/* http://aws.dk/ */
-/*
-INSERT INTO  aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsnr, geom) VALUES 
-('fffecc7c-095b-4fc8-b7ed-3d59cde245c0', '0746', '0191', '11C', '8660', '13619', ST_SetSRID(ST_Point(559929.12,6381672.78), 25832))
-*/
+/* Convert (Issuu) JSON to (Issuu) SQL insert statements. */
 
-start := "INSERT INTO aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsnr) VALUES\n" json2sql
+start := "INSERT INTO issuu_log (ts, visitor_uuid, visitor_useragent, visitor_country, env_doc_id, subject_doc_id) VALUES\n" json2sql
 
-json2sql := object ~<,[ ]> json2sql
-          | object ws
+json2sql := object ",\n" ws json2sql
+          | object ";\n" ws
 
-object := "(" ~<\{> ws keyVals ws ~<}> ")\n"
+object := "(" ~<\{> ws keyVals ws ~<}> ")"
 
 keyVals := ws keyVal keyVals
          | ws keyVal
 
-keyVal := ~<"id">               sep qt someString qt keepComma
-        | ~<"kommunekode">      sep qt someInt qt keepComma
-        | ~<"vejkode">          sep qt someInt qt keepComma
-        | ~<"husnr">            sep qt someString qt keepComma
-        | ~<"postnr">           sep qt someInt qt keepComma
-        | ~<"esrejendomsnr">    sep qt someInt qt dropComma
-        | ~(<"> someString <"> sep ( <"> someString <">
-                                   | someInt
-                                   | someNumber
-                                   | <null>
-                                   )) (dropComma | "")
-//        | <"geom"> <:> <"> 
+keyVal := ~<"ts">                sep someInt             keepComma
+        | ~<"visitor_uuid">      sep stringReplaceQuotes keepComma
+        | ~<"visitor_useragent"> sep stringReplaceQuotes keepComma
+        | ~<"visitor_country">   sep stringReplaceQuotes keepComma
+        | ~<"env_doc_id">        sep stringReplaceQuotes keepComma
+        | ~<"subject_doc_id">    sep stringReplaceQuotes dropComma
+        | ~(<"> someString <">   sep ( <"> someString <">
+                                     | someInt
+                                     ) (dropComma | ""))
 
-// Replace double with single quote
-qt := "'" ~<">
+
+stringReplaceQuotes := qt someString qt
+qt := "'" ~<"> // replace double with single quote
 sep := ws ~<:> ws
 someString := <[^"\n]*>
 someInt := <[0-9]*>
 someNumber := someInt <\.> someInt
+contryCode := <[A-Z]{2}>
 
 // Skip whitespace
 ws := ~<[ \n]*>
