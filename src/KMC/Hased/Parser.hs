@@ -206,7 +206,7 @@ hasedPrimTerm = start
 
 encodeString :: String -> ByteString
 encodeString = encodeUtf8 . T.pack
-                       
+
 regexP :: HasedParser Regex
 regexP = snd <$> (withHPState $
                   anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!<>" })

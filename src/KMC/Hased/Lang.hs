@@ -9,6 +9,8 @@ import           Data.Word (Word8)
 import           Data.ByteString (unpack, ByteString)
 import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust)
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 
 import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
 import           KMC.Visualization (Pretty(..))
@@ -19,8 +21,8 @@ import           KMC.Expression (Mu (..))
 import           KMC.Syntax.External (Regex (..), unparse)
 import qualified KMC.Hased.Parser as H
 
-fromChar :: (Enum a, Bounded a) => Char -> [a]
-fromChar c = codeFixedWidthEnumSized (ord c) (ord c)
+-- fromChar :: (Enum a, Bounded a) => Char -> [a]
+-- fromChar c = codeFixedWidthEnumSized (ord c) (ord c)
 
 toChar :: (Enum a, Bounded a) => [a] -> Char
 toChar = chr . decodeEnum
@@ -68,9 +70,6 @@ copyInput = Inl (InList Ident)
 -- | The term that outputs a fixed string (list of Word8).
 out :: [Word8] -> HasedOutTerm
 out = Inr . Const
--- | Friendlier version of 'out'.
-out' :: String -> HasedOutTerm
-out' = out . concat . map fromChar
 
 -- | Get the index of an element in a list, or Nothing.
 pos :: (Eq a) => a -> [a] -> Maybe Nat
@@ -123,7 +122,7 @@ simpleMuToMuTerm st ign sm =
       SMSeq l r    -> (simpleMuToMuTerm st ign l) `Seq` (simpleMuToMuTerm st ign r)
       SMWrite s    -> if ign
                       then W [] Accept
-                      else W (unpack s) Accept -- (concatMap fromChar s) Accept
+                      else W (unpack s) Accept
       SMRegex re   -> if ign
                       then regexToMuTerm (out []) re
                       else regexToMuTerm copyInput re
@@ -135,6 +134,9 @@ simpleMuToMuTerm st ign sm =
 hasedToMuTerm :: (H.Identifier, H.Hased) -> HasedMu a
 hasedToMuTerm (i, h) = simpleMuToMuTerm [] False $ hasedToSimpleMu i h
 
+encodeChar :: Char -> [Word8]
+encodeChar = unpack . encodeUtf8 . T.singleton
+
 -- | Translates a regular expression into a mu-term that performs the given
 -- action on the matched symbols: It either copies any matched symbols or
 -- ignores them.
@@ -143,7 +145,7 @@ regexToMuTerm o re =
     case re of
        One        -> Accept
        Dot        -> RW top o Accept
-       Chr a      -> foldr1 Seq $ map (\c -> RW (singleton c) o Accept) (fromChar a)
+       Chr a      -> foldr1 Seq $ map (\c -> RW (singleton c) o Accept) (encodeChar a)
        Group _ e  -> regexToMuTerm o e
        Concat l r -> (regexToMuTerm o l) `Seq` (regexToMuTerm o r)
        Branch l r -> (regexToMuTerm o l) `Alt` (regexToMuTerm o r)
