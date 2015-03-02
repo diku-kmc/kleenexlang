@@ -63,7 +63,7 @@ void buf_flush(buffer_t *buf)
   {
     return;
   }
-  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
+  if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, OUTSTREAM) == -1)
   {
     fprintf(stderr, "Error writing to output stream.\n");
     exit(1);
