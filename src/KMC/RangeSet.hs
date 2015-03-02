@@ -99,7 +99,17 @@ size (RangeSet ((l, h):rs)) = 1 + (fromEnum h - fromEnum l) + size (RangeSet rs)
 
 -- | TODO: Inefficient implementation based on complement.
 intersection :: (Enum a, Bounded a, Ord a) => RangeSet a -> RangeSet a -> RangeSet a
-intersection bc bc' = complement (union (complement bc) (complement bc'))
+intersection (RangeSet bc) (RangeSet bc') = RangeSet $ go sbc sbc'
+    where
+        sbc  = sort bc
+        sbc' = sort bc'
+        go [] _ = []
+        go _ [] = []
+        go xs@((l,h):xs') ys@((l',h'):ys')
+            | l' > h = go xs' ys 
+            | l > h' = go xs ys'
+            | h > h' = (max l l', h') : go xs ys'
+            | otherwise = (max l l', h) : go xs' ys
 
 member :: (Ord a) => a -> RangeSet a -> Bool
 member w (RangeSet rs) = any (\(l, h) -> l <= w && w <= h) rs
