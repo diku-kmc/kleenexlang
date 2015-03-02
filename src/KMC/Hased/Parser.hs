@@ -6,6 +6,9 @@ module KMC.Hased.Parser where
 
 import Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import Control.Monad.Identity (Identity)
+import Data.ByteString (ByteString)
+import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import Text.Parsec hiding (parseTest)
 import Text.Parsec.Prim (runParser)
 import Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
@@ -62,7 +65,7 @@ data Hased            = Hased [HasedAssignment] deriving (Eq, Ord)
 data HasedAssignment  = HA (Identifier, HasedTerm) deriving (Eq, Ord)
 
 -- | The terms describe how regexps are mapped to strings.
-data HasedTerm = Constant String -- ^ A constant output.
+data HasedTerm = Constant ByteString -- ^ A constant output.
                | RE Regex
                | Var Identifier
                | Seq HasedTerm HasedTerm
@@ -192,15 +195,18 @@ hasedPrimTerm = start
       sep = many $ spaceOrTab 
                    <|> try indentedNewline 
                    <|>  ignore (skipComment >> many spaceOrTab)
-      constant   = Constant <$> hasedConstant
+      constant   = Constant . encodeString <$> hasedConstant
                    <?> "Constant"
-      re         = RE <$> between (char '<') (char '>') regexP
+      re         = RE  <$> between (char '<') (char '>') regexP
                    <?> "RE"
       identifier = Var <$> try (hasedIdentifier <* notFollowedBy hasedBecomesToken)
                    <?> "Var"
       ignored    = Ignore <$> (char '~' *> elms)
                    <?> "Ignore"
 
+encodeString :: String -> ByteString
+encodeString = encodeUtf8 . T.pack
+                       
 regexP :: HasedParser Regex
 regexP = snd <$> (withHPState $
                   anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!<>" })

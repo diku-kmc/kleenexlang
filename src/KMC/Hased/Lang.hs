@@ -6,30 +6,33 @@ module KMC.Hased.Lang where
 
 import qualified Data.Map as M
 import           Data.Word (Word8)
+import           Data.ByteString (unpack, ByteString)
 import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust)
 
+import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
 import           KMC.Visualization (Pretty(..))
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
-import           KMC.RangeSet (singleton, complement, rangeSet, RangeSet)
+import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet)
 import           KMC.Theories (top)
 import           KMC.Expression (Mu (..))
 import           KMC.Syntax.External (Regex (..), unparse)
 import qualified KMC.Hased.Parser as H
 
-fromChar :: Enum a => Char -> a
-fromChar = toEnum . ord
+fromChar :: (Enum a, Bounded a) => Char -> [a]
+fromChar c = codeFixedWidthEnumSized (ord c) (ord c)
 
-toChar :: Enum a => a -> Char
-toChar = chr . fromEnum
-    
+toChar :: (Enum a, Bounded a) => [a] -> Char
+toChar = chr . decodeEnum
+
+
 {-- Intermediate internal data type for the mu-terms.  These use de Bruijn-indices. --}
 data Nat = Z | S Nat      deriving (Eq, Ord, Show)
 data SimpleMu = SMVar Nat
               | SMLoop SimpleMu
               | SMAlt SimpleMu SimpleMu
               | SMSeq SimpleMu SimpleMu
-              | SMWrite String
+              | SMWrite ByteString
               | SMRegex Regex
               | SMIgnore SimpleMu
               | SMAccept
@@ -54,7 +57,7 @@ type HasedOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
 instance Pretty HasedOutTerm where
     pretty (Inl (InList _)) = "COPY"
     pretty (Inr (Const [])) = "SKIP"
-    pretty (Inr (Const ws)) = "\"" ++ map toChar ws ++ "\""
+    pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
 
 type HasedMu a = Mu (RangeSet Word8) HasedOutTerm a
 
@@ -67,7 +70,7 @@ out :: [Word8] -> HasedOutTerm
 out = Inr . Const
 -- | Friendlier version of 'out'.
 out' :: String -> HasedOutTerm
-out' = out . map fromChar
+out' = out . concat . map fromChar
 
 -- | Get the index of an element in a list, or Nothing.
 pos :: (Eq a) => a -> [a] -> Maybe Nat
@@ -120,7 +123,7 @@ simpleMuToMuTerm st ign sm =
       SMSeq l r    -> (simpleMuToMuTerm st ign l) `Seq` (simpleMuToMuTerm st ign r)
       SMWrite s    -> if ign
                       then W [] Accept
-                      else W (map fromChar s) Accept
+                      else W (unpack s) Accept -- (concatMap fromChar s) Accept
       SMRegex re   -> if ign
                       then regexToMuTerm (out []) re
                       else regexToMuTerm copyInput re
@@ -140,7 +143,7 @@ regexToMuTerm o re =
     case re of
        One        -> Accept
        Dot        -> RW top o Accept
-       Chr a      -> RW (singleton (fromChar a)) o Accept
+       Chr a      -> foldr1 Seq $ map (\c -> RW (singleton c) o Accept) (fromChar a)
        Group _ e  -> regexToMuTerm o e
        Concat l r -> (regexToMuTerm o l) `Seq` (regexToMuTerm o r)
        Branch l r -> (regexToMuTerm o l) `Alt` (regexToMuTerm o r)
@@ -170,91 +173,3 @@ regexToMuTerm o re =
        NamedSet _ _    -> error "Named sets not yet supported"
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
-{-
-runFile :: FilePath -> String -> IO String
-runFile fp str = H.parseHasedFile fp >>= flip go str
-    where
-      go (Left e) _ = error e
-      go (Right ih) str = do
-        let sst = sstFromFST (fromMu (hasedToMuTerm ih))
-                :: SST (PathTree Var Int) (RangeSet Word8) HasedOutTerm Var
-        return $ showStream $ streamToString $ KMC.SymbolicSST.run sst $ map fromChar str
-
-showFile :: FilePath -> IO ()
-showFile fp = readFile fp >>= H.pf
-
-showStream :: Stream String -> String
-showStream (Chunk e es) = e ++ showStream es
-showStream Done = ""
-showStream (Fail s) = " [ERROR: " ++ s ++ "]"
-
-
-fileAsSimpleMu :: String -> FilePath -> IO SimpleMu
-fileAsSimpleMu n fp = readFile fp >>= H.pf' >>= return . hasedToSimpleMu (H.mkIdent n)
-
-runSimpleMu :: SimpleMu -> String -> Stream String
-runSimpleMu m str =
-    let sst = sstFromFST (fromMu (simpleMuToMuTerm [] False m))
-            :: SST (PathTree Var Int)
-               (RangeSet Word8) HasedOutTerm Var
-    in streamToString $ KMC.SymbolicSST.run sst (map fromChar str)
---------------------------------------------------------------------------------
---------------------------------------------------------------------------------
-
-
-hasedToFSTDot :: String -> GV.DotGraph Int
-hasedToFSTDot str =
-    case H.parseHased str of
-      Left e -> error e
-      Right ih -> let fst = fromMu (hasedToMuTerm ih)
-                  in fstToDot fst
-
-hasedToSSTDot :: String -> GV.DotGraph Int
-hasedToSSTDot str =
-    case H.parseHased str of
-      Left e -> error e
-      Right ih -> let sst = sstFromFST (fromMu (hasedToMuTerm ih))
-                          :: SST (PathTree Var Int)
-                             (RangeSet Word8)
-                             HasedOutTerm
-                             Var
-                  in trace (show $ sstF sst) $ sstToDot (enumerateStates sst)
-
--- Opening an Xlib canvas does not work in my cabal sandbox-version of GraphViz.
-vizHasedAsFST :: String -> IO ()
-vizHasedAsFST s = mkVizToFile hasedToFSTDot s "test_fst.pdf"
-
-vizHasedAsSST :: String -> IO ()
-vizHasedAsSST s = mkVizToFile hasedToSSTDot s "test_sst.pdf"
-
-vizHasedFileAsFST :: FilePath -> IO ()
-vizHasedFileAsFST fp = readFile fp >>= vizHasedAsFST
-vizHasedFileAsSST :: FilePath -> IO ()
-vizHasedFileAsSST fp = readFile fp >>= vizHasedAsSST
-
-streamToString :: Enum a => Stream [a] -> Stream String
-streamToString (Chunk e es) = Chunk (map toChar e) (streamToString es)
-streamToString Done = Done
-streamToString (Fail s) = Fail s
-
-runHasedSST :: String -> String -> Stream String
-runHasedSST str ws = streamToString $ 
-    case H.parseHased str of
-      Left e -> error e
-      Right ih -> let sst = sstFromFST (fromMu (hasedToMuTerm ih))
-                          :: SST (PathTree Var Int)
-                             (RangeSet Word8)
-                             HasedOutTerm
-                             Var
-                  in KMC.SymbolicSST.run sst (map fromChar ws)
-
--}
-{-
-iss1 = "{visitor_ip:255.233.123.213,visitor_device:browser}"
-iss1many = unlines $ replicate 4 iss1
-
-iss2 = "{\"ts\":1393631983,\"visitor_uuid\":\"04daa9ed9dde73d3\",\"visitor_source\":\"external\",\"visitor_device\":\"browser\",\"visitor_useragent\":\"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.117 Safari/537.36\",\"visitor_ip\":\"6a3273d508a9de04\"}"
-iss2many = unlines $ replicate 4 iss2
-
-iss3 = "{\"ts\":1,\"visitor_uuid\":\"04daa9ed9dde73d3\",\"visitor_source\":\"external\",\"visitor_device\":\"browser\",\"visitor_useragent\":\"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.1750.117 Safari/537.36\",\"visitor_ip\":\"6a3273d508a9de04\",\"visitor_country\":\"ES\",\"visitor_referrer\":\"64f729926497515c\",\"env_type\":\"reader\",\"env_doc_id\":\"140224195414-e5a9acedd5eb6631bb6b39422fba6798\",\"event_type\":\"impression\",\"subject_type\":\"doc\",\"subject_doc_id\":\"140224195414-e5a9acedd5eb6631bb6b39422fba6798\",\"subject_page\":0,\"cause_type\":\"impression\",\"env_ranking\":11}"
--}
