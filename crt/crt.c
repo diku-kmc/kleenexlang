@@ -25,6 +25,10 @@
 #define BUFFER_UNIT_T uint8_t
 #endif
 
+#ifndef OUTSTREAM
+#define OUTSTREAM stdout
+#endif
+
 typedef BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
   buffer_unit_t *data;
@@ -35,11 +39,11 @@ typedef struct {
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
 #define BUFFER_UNIT_BITS (BUFFER_UNIT_SIZE * 8)
 
-char *next;
+unsigned char *next;
 buffer_t outbuf;
 size_t count = 0;
 
-char inbuf[INBUFFER_SIZE*2];
+unsigned char inbuf[INBUFFER_SIZE*2];
 size_t in_size = 0;
 int in_cursor = 0;
 #define avail (in_size - in_cursor)
@@ -61,7 +65,7 @@ void buf_flush(buffer_t *buf)
   }
   if (fwrite(buf->data, BUFFER_UNIT_SIZE, word_index, stdout) == -1)
   {
-    fprintf(stderr, "Error writing to stdout.\n");
+    fprintf(stderr, "Error writing to output stream.\n");
     exit(1);
   }
   // Since partially written words are not flushed, they need to be moved to the
@@ -151,6 +155,13 @@ void init_buffer(buffer_t *buf)
   buf->size = INITIAL_BUFFER_SIZE;
   buf->bitpos = 0;
   buf->data[0] = 0;
+}
+
+void destroy_buffer(buffer_t *buf)
+{
+  if (buf->data != NULL)
+    free(buf->data);
+  buf->data = NULL;
 }
 
 INLINE
@@ -245,7 +256,7 @@ int readnext(int minCount, int maxCount)
 }
 
 INLINE
-int cmp(char *str1, char *str2, int l)
+int cmp(unsigned char *str1, unsigned char *str2, int l)
 {
   int i = 0;
   for (i = 0; i < l; i++)
@@ -264,9 +275,8 @@ void printUsage(char *name)
   fprintf(stdout, "- \"%s -t\": runs normally, but prints timing to stderr.\n", name);
 }
 
-void run()
+void flush_outbuf()
 {
-  match();
   if (outbuf.bitpos % BUFFER_UNIT_BITS != 0)
   {
     outputconst(0, BUFFER_UNIT_BITS);
@@ -274,6 +284,20 @@ void run()
   buf_flush(&outbuf);
 }
 
+void init_outbuf()
+{
+  outbuf.size = OUTBUFFER_SIZE + BUFFER_UNIT_SIZE;
+  outbuf.data = malloc(outbuf.size);
+  reset(&outbuf);
+}
+
+void run()
+{
+  match();
+  flush_outbuf();
+}
+
+#ifndef FLAG_NOMAIN
 int main(int argc, char *argv[])
 {
   bool do_timing = false;
@@ -301,10 +325,7 @@ int main(int argc, char *argv[])
     }
   }
     
-  outbuf.size = OUTBUFFER_SIZE + BUFFER_UNIT_SIZE;
-  outbuf.data = malloc(outbuf.size);
-  reset(&outbuf);
-
+  init_outbuf();
   init();
 
   if(do_timing)
@@ -326,3 +347,4 @@ int main(int argc, char *argv[])
 
   return 0;
 }
+#endif
