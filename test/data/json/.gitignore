@@ -2,6 +2,5 @@
 *
 # Except this file, description files, and sample files
 !.gitignore
-!desc_*.txt
-!*.sample.csv
+!aws.json
 !*.sh
