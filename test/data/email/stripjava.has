@@ -1,0 +1,9 @@
+strip := line ~<\n> strip
+       | line ~<\n?> "\n"
+
+line := assertLine "\n" | ~<[^\n]*>
+
+assertLine := ~<[ ]*(assertTrue|assertFalse)\(validator.isValid\(">
+               <(\\"|[^"])*>
+              ~<"[^\n]*>
+
