@@ -93,8 +93,8 @@ eof :: (Ord st) => FST st pred func -> st -> Closure st w st
 eof fst' q | S.member q (fstF fst') = visit q
            | otherwise = zero
 
-kill :: (Ord st) => [st] -> st -> Closure st (UpdateStringFunc var func) st
-kill kills q | elem q kills = zero
+kill :: (Ord st) => S.Set st -> st -> Closure st (UpdateStringFunc var func) st
+kill kills q | S.member q kills = zero
              | otherwise = return q
 
 closureAbstractTree :: (Ord a) =>
@@ -129,8 +129,8 @@ consumeTree :: (PartialOrder pred, Ord st)
 consumeTree fst' p i tr = runClosure (resume' tr >>= consume fst' p i)
 
 killTree :: (Ord st) =>
-            [st] -> PathTree (UpdateStringFunc var func) st
-                 -> PathTree (UpdateStringFunc var func) st
+            S.Set st -> PathTree (UpdateStringFunc var func) st
+                     -> PathTree (UpdateStringFunc var func) st
 killTree kills tr = runClosure (resume' tr >>= kill kills)
 
 {------------------------------------------------------------------------------}
