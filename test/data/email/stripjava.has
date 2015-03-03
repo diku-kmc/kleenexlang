@@ -1,5 +1,6 @@
+// Strip away everything but the e-mail addresses in the Apache email test suite source.
 strip := line ~<\n> strip
-       | line ~<\n?> "\n"
+       | line ~<\n?>
 
 line := assertLine "\n" | ~<[^\n]*>
 
