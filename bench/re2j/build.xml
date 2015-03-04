@@ -27,6 +27,7 @@
     <mkjar prog="SimpleId"    jarname="simple_id.jar"    />
     <mkjar prog="CSVProject3" jarname="csv_project3.jar" />
     <mkjar prog="Patho2"      jarname="patho2.jar"       />
+    <mkjar prog="Email"       jarname="email.jar"        />
   </target>
 
 
