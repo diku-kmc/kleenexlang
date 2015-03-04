@@ -4,10 +4,9 @@ PERL_BINDIR=perl/src
 TCL_BINDIR=tcl/src
 RE2J_BINDIR=re2j/build/jar
 SED_BINDIR=sed/src
+AWK_BINDIR=gawk/src
 
-SOURCES = $(wildcard re2/src/*.cpp) $(wildcard python/src/*.py)
-
-HASSOURCES = $(notdir $(SOURCES:.cpp=.has))
+HASSOURCES = $(notdir $(wildcard $(HASEDDIR)/*.has))
 HASSOURCES_OBJECTS = $(HASSOURCES:.has=.ho)
 HASEDDIR = hased_src
 
@@ -21,7 +20,7 @@ NC='\033[0m' # No Color
 # Through unimaginable hackery, we can get a hashmap-like thing in make.
 # Attach test input file to the programs, to check that the RE2 C++
 # programs called <NAME> are equivalent to the Hased programs <NAME>.has
-testinput.patho2         := $(DATA_DIR)/strings/ab_lines.txt
+testinput.patho2         := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.csv_project3   := $(DATA_DIR)/csv/csv_format1.sample.csv
 testinput.as             := $(DATA_DIR)/strings/as_small.txt
 testinput.simple_id      := $(DATA_DIR)/strings/ab_lines_small.txt
@@ -45,6 +44,10 @@ data_check:
 equality_check: data_check $(HASSOURCES_OBJECTS)
 
 %.ho: $(HASEDDIR)/%.has
+	@if [[ "${testinput.$(*F)}" == "" ]] ; then \
+		echo ${red}No test data for $(*F)${NC} ; \
+		false ; \
+	fi
 	@echo "------------------------------------------"
 	@echo "Checking $(*F)..."
 	$(REPG) compile $< --out has_$(*F) --quiet=true
@@ -101,10 +104,16 @@ equality_check: data_check $(HASSOURCES_OBJECTS)
 		echo "Can't find $(SED_BINDIR)/$(*F).sh  Skipping."; \
 	fi
 
+	@if [ -f $(AWK_BINDIR)/$(*F).awk ]; then \
+		printf "Awk == Hased?     " ; \
+		$(AWK_BINDIR)/$(*F).awk < ${testinput.$(*F)} > $(*F).out 2> /dev/null ; \
+		shasum -c $(*F).sha &> /dev/null && echo ${green}OK${NC} || echo ${red}FAIL${NC} ; \
+	else \
+		echo "Can't find $(AWK_BINDIR)/$(*F).awk  Skipping."; \
+	fi
 
-
-
-	rm $(*F).out $(*F).sha has_$(*F)
+# Do some cleanup!
+	@rm $(*F).out $(*F).sha has_$(*F)
 
 
 
@@ -115,5 +124,6 @@ as: as.ho
 simple_id: simple_id.ho
 issuu_json2sql: issuu_json2sql.ho
 email: email.ho
+aaa: aaa.ho
 
 .PHONY: clean
