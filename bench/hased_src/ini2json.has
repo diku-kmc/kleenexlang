@@ -1,0 +1,35 @@
+/* Converts the INI format to JSON */
+
+ini2json := "{\n" sections "}\n"
+
+sections := section ",\n" sections
+          | section "\n"
+          | comment sections
+
+section := ind "\"" header "\": {\n" keyvalues "\t}"
+
+header := skipWs ~<\[> <[^\n]*> ~<]> skipWs "\n"
+
+keyvalue := ind ind key ": " value
+
+keyvalues := keyvalue ",\n" keyvalues
+           | keyvalue "\n"
+           | comment keyvalues
+
+key := skipWs "\"" <[^ \t=]*> "\"" skipWs
+
+value := skipWs <"[^\n]*"> skipWs
+       | skipWs "\"" escapedValue "\"" skipWs
+
+escapedValue := escapedChar escapedValue
+              | ""
+
+escapedChar := ~<"> "\\\""
+             | <[^\n]>
+
+comment := skipWs ~<;[^\n]*\n>
+        |  skipWs ~<\n>
+
+skipWs := ~<[ \t]*>
+
+ind := "    "

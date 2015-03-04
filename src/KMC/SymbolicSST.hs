@@ -8,8 +8,9 @@ module KMC.SymbolicSST where
 
 import           Control.Applicative
 
-import qualified Data.Set as S
 import qualified Data.Map.Strict as M
+import           Data.Monoid
+import qualified Data.Set as S
 
 import           KMC.Theories
 
@@ -328,6 +329,11 @@ enumerateVariables sst =
 
 data Stream a = Chunk a (Stream a) | Done | Fail String
   deriving (Show)
+
+flattenStream :: (Monoid m) => Stream m -> m
+flattenStream (Fail e) = error e
+flattenStream Done = mempty
+flattenStream (Chunk x s) = mappend x (flattenStream s)
 
 valuate :: (Ord var) => Valuation var delta -> UpdateString var [delta] -> [delta]
 valuate _ [] = []

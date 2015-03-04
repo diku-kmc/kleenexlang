@@ -1,0 +1,35 @@
+/* Acts as a simple webserver! 
+   Try catting a GET request into it.
+
+   Doesn't work directly with netcat, due to netcat keeping stdin open,
+   waiting for more data, and the output being buffered. */
+
+webserver :=
+      get ws domain ~</> ws httpver nl headers nl frontpage
+    | notfound
+
+get := ~<GET>
+
+domain := ~<(http://[^/]*)?>
+
+ws := ~<[ ]+>
+
+nl := ~<.?\n>
+onl := "\n"
+
+httpver := ~<HTTP/1.[01]>
+
+header := ~<[^:\n]+:[ ]*[^\n]+> nl
+
+headers := header headers
+         | header
+
+frontpage := "200 OK" onl
+             "Content-Type: text/plain" onl
+             "Content-Length: 13" onl
+             onl
+             "Hello, World!"
+
+notfound := "404 Not Found" onl
+            "Content-Length: 0" onl
+            onl ~<.*>
