@@ -2,7 +2,7 @@
 
 // RE2 program corresponding to as.has
 // It matches the input string agains a* and outputs it.
-string regex("(a*)");
+string regex("(a*\\n)");
 
 #define NCAP 1
 

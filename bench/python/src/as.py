@@ -19,7 +19,7 @@ for line in sys.stdin:
     lno += 1
     m = pattern.match(line)
     if m:
-        sys.stdout.write(m.group(1))
+        sys.stdout.write("%s\n" % m.group(1))
     else:
         sys.stderr.write("match error on line %s\n" % str(lno))
         exit(1)

@@ -22,7 +22,7 @@ set start [clock clicks -milliseconds]
 while {[gets stdin line] >= 0} {
     set lno [incr $lno]
     if {[regexp -lineanchor $regex $line NULL g1]} {
-        puts -nonewline stdout $g1
+        puts stdout $g1
     } else {
         puts -nonewline stderr "match error on line "
         puts stderr $lno

@@ -18,7 +18,7 @@ my $start = time;
 while (<STDIN>) {
     $lno = $lno + 1;
     if ($_ =~ $pattern) {
-        print STDOUT "$1";
+        print STDOUT "$1\n";
     } else {
         print STDERR "match error on line ${lno}\n";
         exit 1;

@@ -25,7 +25,7 @@ public class As {
                 lno++;
                 matcher = pattern.matcher(line);
                 if(matcher.matches()) {
-                    System.out.print(matcher.group(1));
+                    System.out.println(matcher.group(1));
                 } else {
                     System.err.print(String.format("match error on line %d\n", lno));
                 }
