@@ -19,8 +19,6 @@ for line in sys.stdin:
     m = pattern.match(line)
     if m:
         sys.stdout.write("%s\n" % m.group(0))
-    else:
-        sys.stdout.write("invalid!\n")
 
 # End timing
 end = datetime.datetime.now()

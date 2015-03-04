@@ -22,8 +22,6 @@ set start [clock clicks -milliseconds]
 while {[gets stdin line] >= 0} {
     if {[regexp -lineanchor $regex $line]} {
         puts stdout $line
-    } else {
-        puts stdout "invalid!"
     }
 }
 # End timing

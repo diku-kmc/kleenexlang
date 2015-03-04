@@ -2,7 +2,7 @@
 
 // RE2 version of the email validator
 // Like the others, it matches each line of input and outputs it if it is a "valid"
-// e-mail address or it outputs "invalid!" otherwise.
+// e-mail address or skips it otherwise.
 
 // Differences to the Hased version:
 //    the \. has been turned into \\. because of c++ escaping
@@ -28,9 +28,7 @@ int main(int argc, char *argv[]) {
   while(fgets(buffer, LINE_LEN, stdin)) {
     line++;
     bool match = RE2::FullMatch(buffer, pattern);
-    if(!match) {
-      cout << "invalid!" << endl;
-    } else {
+    if(match) {
       cout << buffer;
     }
   }

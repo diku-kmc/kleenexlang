@@ -21,5 +21,6 @@ for tst in $(ls $test_dir); do
         echo "$tst FAIL!"
         echo "  Output: $out"
         echo "  Expected: $exp_out"
+        echo "  Cmd: $compile"
     fi
 done

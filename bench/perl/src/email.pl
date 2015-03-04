@@ -22,9 +22,7 @@ my $start = time;
 while (<STDIN>) {
     if ($_ =~ $pattern) {
         print STDOUT "$1\n";
-    } else {
-        print STDOUT "invalid!\n";
-    }
+    } 
 }
 
 # End timing

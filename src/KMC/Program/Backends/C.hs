@@ -457,8 +457,9 @@ compileProgram :: (Enum delta, Bounded delta) =>
                -> FilePath     -- ^ Path to C compiler
                -> Maybe FilePath
                -> Maybe FilePath
+               -> Bool -- ^ Use word alignment
                -> IO ExitCode
-compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath = do
+compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath wordAlign = do
   cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
   let cstr = renderCProg info . programToC buftype $ prog
@@ -481,6 +482,7 @@ compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath = 
     compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
                            , "-o", binPath
                            , "-Wno-tautological-constant-out-of-range-compare"
+                           , if wordAlign then "-D FLAG_WORDALIGNED" else ""
                            , "-"]
     quote s = "\"" ++ s ++ "\""
     noOutInfo = quote $ intercalate "\\n"

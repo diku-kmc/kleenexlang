@@ -10,23 +10,19 @@ import           Data.ByteString (unpack, ByteString)
 import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust)
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding (encodeUtf8)
 
 import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
-import           KMC.Visualization (Pretty(..))
+import           KMC.Expression (Mu (..))
+import qualified KMC.Hased.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet)
-import           KMC.Theories (top)
-import           KMC.Expression (Mu (..))
 import           KMC.Syntax.External (Regex (..), unparse)
-import qualified KMC.Hased.Parser as H
-
--- fromChar :: (Enum a, Bounded a) => Char -> [a]
--- fromChar c = codeFixedWidthEnumSized (ord c) (ord c)
+import           KMC.Theories (top)
+import           KMC.Visualization (Pretty(..))
 
 toChar :: (Enum a, Bounded a) => [a] -> Char
 toChar = chr . decodeEnum
-
 
 {-- Intermediate internal data type for the mu-terms.  These use de Bruijn-indices. --}
 data Nat = Z | S Nat      deriving (Eq, Ord, Show)
@@ -175,3 +171,7 @@ regexToMuTerm o re =
        NamedSet _ _    -> error "Named sets not yet supported"
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
+
+testHased :: String -> Either String (HasedMu a)
+testHased s = either Left (Right . hasedToMuTerm) (H.parseHased s)
+  

@@ -28,9 +28,7 @@ public class Email {
                 matcher = pattern.matcher(line);
                 if(matcher.matches()) {
                     System.out.println(matcher.group(0));
-                } else {
-                    System.out.print("invalid!\n");
-                }
+                } 
             }
         } catch(IOException e) {
             System.err.print(String.format("IOException at line %d\n", lno));

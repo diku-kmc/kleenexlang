@@ -49,6 +49,7 @@ data CompileOptions =
     , optCFile           :: Maybe FilePath
     , optWordSize        :: CType
     , optAltCompiler     :: FilePath
+    , optWordAlignment   :: Bool
     }
 
 data VisualizeOptions =
@@ -107,6 +108,7 @@ instance Options CompileOptions where
                        , optionDescription = "Buffer word size"
                        })
       <*> simpleOption "cc" "gcc" "C compiler"
+      <*> simpleOption "wa" True "Enable word alignment in C"
 
 instance Options VisualizeOptions where
     defineOptions =
@@ -214,6 +216,7 @@ transducerToProgram mainOpts compileOpts srcFile srcMd5 (DetTransducer sst) = do
                         (optAltCompiler compileOpts)
                         (optOutFile compileOpts)
                         (optCFile compileOpts)
+                        (optWordAlignment compileOpts)
   timeCompile' <- getCurrentTime
   return (ret, diffUTCTime timeCompile' timeCompile)
 
