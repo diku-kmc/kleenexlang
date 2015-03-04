@@ -45,7 +45,7 @@ equality_check: data_check $(HASSOURCES_OBJECTS)
 
 %.ho: $(HASEDDIR)/%.has
 	@if [[ "${testinput.$(*F)}" == "" ]] ; then \
-		echo ${red}No test data for $(*F)${NC} ; \
+		echo ${red}No test data specified for $(*F)${NC} ; \
 		false ; \
 	fi
 	@echo "------------------------------------------"
@@ -124,6 +124,5 @@ as: as.ho
 simple_id: simple_id.ho
 issuu_json2sql: issuu_json2sql.ho
 email: email.ho
-aaa: aaa.ho
 
 .PHONY: clean

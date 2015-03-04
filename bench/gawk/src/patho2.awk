@@ -1,4 +1,5 @@
-#!/usr/bin/env gawk -f
+#!/bin/sh
+REALLY_UGLY_SHEBANG_HACK==0 "exec" "gawk" "-f" "$0" "$@"
 
 # Awk version of the "patho2" program.
 
