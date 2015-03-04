@@ -1,0 +1,9 @@
+// IN: aabbaa
+// OUT: aabbaa
+
+test := ( keep <\n> | ~drop ~<\n> ) test
+      | ( keep <\n> | ~drop ~<\n> )
+
+keep := <(a|b)+(a|b)(a|b)+>
+
+drop := <[^\n]*>
