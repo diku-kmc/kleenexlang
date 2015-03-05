@@ -143,13 +143,13 @@ prefixTests :: (Boolean pred, PartialOrder pred, Ord st) =>
                FST st pred func
             -> Bool
             -> [st]
-            -> [([pred], [st])]
+            -> [([pred], S.Set st)]
 prefixTests fst' singletonMode states =
   [ (t, killed t) | t <- tests ]
   where
     ldps = [ ((if singletonMode then take 1 else id) $ ldp fst' q, q) | q <- states ]
     tests = coarsestPrefixPartition [ ps | (ps,_) <- ldps ]
-    killed t = [ q | (ps, q) <- ldps, not (compatibleWith ps t) ]
+    killed t = S.fromList [ q | (ps, q) <- ldps, not (compatibleWith ps t) ]
 
     compatibleWith [] _ = True
     compatibleWith (p:ps) (t:ts) = not ((p `conj` t) `eq` bot) && compatibleWith ps ts

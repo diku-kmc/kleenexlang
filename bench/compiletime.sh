@@ -14,6 +14,11 @@ skip="issuu"
 timeoutseconds=30
 timeoutcmd="gtimeout"
 
+if [ -n $(hash gcc-mp-4.9) ]; then # Linux stuff
+    ccs=gcc
+    timeoutcmd="timeout"
+fi
+
 # Args: file name, opt level, C compiler
 function setname {
     name="${1}__${2}__${3}"

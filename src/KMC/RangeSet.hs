@@ -24,14 +24,15 @@ module KMC.RangeSet
 
 import           Data.List (sort)
 
+-- invariant: The list is always sorted.
 data RangeSet a = RangeSet { ranges :: [(a, a)] }
   deriving (Eq, Ord, Show)
 
 normalize :: (Enum a, Ord a) => RangeSet a -> RangeSet a
-normalize (RangeSet rs) = RangeSet $ go $ sort $ filter validRange rs
+normalize (RangeSet rs) = RangeSet $ go $ filter validRange rs
   where
     validRange (l, h) = l <= h
-    
+
     go [] = []
     go [r] = [r]
     go ((l1, h1):(l2, h2):rs')
@@ -39,7 +40,7 @@ normalize (RangeSet rs) = RangeSet $ go $ sort $ filter validRange rs
        | otherwise = (l1, h1):go ((l2, h2):rs')
 
 rangeSet :: (Enum a, Ord a) => [(a, a)] -> RangeSet a
-rangeSet rs = normalize $ RangeSet rs
+rangeSet rs = normalize $ RangeSet $ sort rs
 
 singleton :: a -> RangeSet a
 singleton a = RangeSet [(a, a)]
@@ -91,15 +92,30 @@ isUniverse :: (Enum a, Bounded a, Ord a) => RangeSet a -> Bool
 isUniverse bc = isEmpty (complement bc)
 
 union :: (Enum a, Ord a) => RangeSet a -> RangeSet a -> RangeSet a
-union (RangeSet rs) (RangeSet rs') = normalize $ RangeSet (rs ++ rs')
+union (RangeSet rs) (RangeSet rs') = normalize $ RangeSet $ go rs rs'
+    where go [] ys = ys
+          go xs [] = xs
+          go xs@((l,h):xs') ys@((l',h'):ys')
+            | h  <  l'  = (l, h)   : go xs' ys
+            | h' <  l   = (l', h') : go xs  ys'
+            | h  <= h'  = go xs' ((min l l', h'):ys')
+            | h' <  h   = go ((min l l', h):xs') ys'
+            | otherwise = error "cannot happen"
 
 size :: (Enum a) => RangeSet a -> Int
 size (RangeSet []) = 0
 size (RangeSet ((l, h):rs)) = 1 + (fromEnum h - fromEnum l) + size (RangeSet rs)
 
--- | TODO: Inefficient implementation based on complement.
 intersection :: (Enum a, Bounded a, Ord a) => RangeSet a -> RangeSet a -> RangeSet a
-intersection bc bc' = complement (union (complement bc) (complement bc'))
+intersection (RangeSet bc) (RangeSet bc') = RangeSet $ go bc bc'
+    where
+        go [] _ = []
+        go _ [] = []
+        go xs@((l,h):xs') ys@((l',h'):ys')
+            | l' > h = go xs' ys 
+            | l > h' = go xs ys'
+            | h > h' = (max l l', h') : go xs ys'
+            | otherwise = (max l l', h) : go xs' ys
 
 member :: (Ord a) => a -> RangeSet a -> Bool
 member w (RangeSet rs) = any (\(l, h) -> l <= w && w <= h) rs

@@ -1,0 +1,58 @@
+/* Takes a FASTA file and counts how often each of the following patterns
+   occur in the DNA sequences.
+
+   1. agggtaaa|tttaccct
+   2. [cgt]gggtaaa|tttaccc[acg]
+   3. a[act]ggtaaa|tttacc[agt]t
+   4. ag[act]gtaaa|tttac[agt]ct
+   5. agg[act]taaa|ttta[agt]cct
+   6. aggg[acg]aaa|ttt[cgt]ccct
+   7. agggt[cgt]aa|tt[acg]accct
+   8. agggta[cgt]a|t[acg]taccct
+   9. agggtaa[cgt]|[acg]ttaccct
+
+   Output is given as an un-delimited sequence of these ID numbers.
+
+   Furthermore, the following aliases are respected in the input data:
+
+      B ::= (c|g|t)
+      D ::= (a|g|t)
+      H ::= (a|c|t)
+      K ::= (g|t)
+      M ::= (a|c)
+      N ::= (a|c|g|t)
+      R ::= (a|g)
+      S ::= (c|g)
+      V ::= (a|c|g)
+      W ::= (a|t)
+      Y ::= (c|t)
+*/
+
+fasta := sequenceIdent ~<\n> sequence ~<\n> fasta
+       | sequenceIdent ~<\n> sequence ~<\n?>
+
+/* for now we ignore the sequence separation */
+sequenceIdent := ~<\>[^\n]*>
+
+a := ~<\n?[aAdDhHmMnNrRvVwW]>
+c := ~<\n?[cCbBhHmMnNsSvVyY]>
+g := ~<\n?[gGbBdDkKnNrRsSvV]>
+t := ~<\n?[tTbBdDhHkKnNwWyY]>
+
+singleSeq :=
+    (
+      "1" (a g g g t a a a | t t t a c c t) |
+      "2" ((c|g|t) g g g t a a a | t t t a c c c (a|c|g)) |
+      "3" (a (a|c|t) g g t a a a | t t t a c c (a|g|t) t) |
+      "4" (a g (a|c|t) g t a a a | t t t a c (a|g|t) c t) |
+      "5" (a g g (a|c|t) t a a a | t t t a (a|g|t) c c t) |
+      "6" (a g g g (a|c|g) a a a | t t t (c|g|t) c c c t) |
+      "7" (a g g g t (c|g|t) a a | t t (a|c|g) a c c c t) |
+      "8" (a g g g t a (c|g|t) a | t (a|c|g) t a c c c t) |
+      "9" (a g g g t a a (c|g|t) | (a|c|g) t t a c c c t) |
+      (a|c|g|t)
+    )
+
+sequence := singleSeq sequence
+          | singleSeq
+
