@@ -1,4 +1,4 @@
-#! /opt/local/bin/bash
+#!/bin/bash
 # Measure run time
 # Run after compiletime.sh, so the binaries are built.
 
