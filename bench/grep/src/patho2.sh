@@ -1,0 +1,24 @@
+#!/bin/bash
+source "${BASH_SOURCE%/*}"/../setup.sh
+
+# GNU grep version of the "patho2" program.
+
+# We can't really produce this program with pure Grep.
+# Grep has no way of referring to subgroups, so we would be forced to
+# use the regex ([a-z]*b) to filter out all lines ending with b, in
+# which case the expression is not pathological for backtracking engines
+# anymore.  Furhermore, the "patho2" program is supposed to emit blank lines
+# for all lines ending in an "a", but grep skips those lines.
+
+echo "fail"
+
+# regex="([a-z]*a)|([a-z]*b)"
+
+# start=$(get_millisecond_time)
+
+# $grep -x -E "^${regex}$" $@
+
+# end=$(get_millisecond_time)
+# elaps=$(expr $end - $start)
+
+# printf "matching time (ms): %d\n" $elaps > /dev/stderr

@@ -5,6 +5,7 @@ TCL_BINDIR=tcl/src
 RE2J_BINDIR=re2j/build/jar
 SED_BINDIR=sed/src
 AWK_BINDIR=gawk/src
+GREP_BINDIR=grep/src
 
 HASSOURCES = $(notdir $(wildcard $(HASEDDIR)/*.has))
 HASSOURCES_OBJECTS = $(HASSOURCES:.has=.ho)
@@ -112,6 +113,14 @@ equality_check: data_check $(HASSOURCES_OBJECTS)
 		echo "Can't find $(AWK_BINDIR)/$(*F).awk  Skipping."; \
 	fi
 
+	@if [ -f $(GREP_BINDIR)/$(*F).sh ]; then \
+		printf "Grep == Hased?    " ; \
+		$(GREP_BINDIR)/$(*F).sh < ${testinput.$(*F)} > $(*F).out 2> /dev/null ; \
+		shasum -c $(*F).sha &> /dev/null && echo ${green}OK${NC} || echo ${red}FAIL${NC} ; \
+	else \
+		echo "Can't find $(GREP_BINDIR)/$(*F).sh  Skipping."; \
+	fi
+
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha has_$(*F)
 
@@ -125,4 +134,4 @@ simple_id: simple_id.ho
 issuu_json2sql: issuu_json2sql.ho
 email: email.ho
 
-.PHONY: clean
+.PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email
