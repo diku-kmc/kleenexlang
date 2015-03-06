@@ -2,21 +2,23 @@
 
 ini2json := "{\n" sections "}\n"
 
-sections := section ",\n" sections
-          | section "\n"
+sections := section "," <\n> sections
+          | section "\n" ~<\n?>
           | comment sections
+          | comment
 
-section := ind "\"" header "\": {\n" keyvalues "\t}"
+section := ind "\"" header "\": {\n" keyvalues ind "}"
 
-header := skipWs ~<\[> <[^\n]*> ~<]> skipWs "\n"
+header := skipWs ~<\[> <[^\n\]]*> ~<]> skipWs ~<\n>
 
-keyvalue := ind ind key ": " value
+keyvalue := ind ind key ": " ~<=> value
 
-keyvalues := keyvalue ",\n" keyvalues
+keyvalues := keyvalue "," <\n> keyvalues
            | keyvalue "\n"
            | comment keyvalues
+           | comment
 
-key := skipWs "\"" <[^ \t=]*> "\"" skipWs
+key := skipWs "\"" <[^; \t=\[]*> "\"" skipWs
 
 value := skipWs <"[^\n]*"> skipWs
        | skipWs "\"" escapedValue "\"" skipWs
