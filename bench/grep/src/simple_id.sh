@@ -12,4 +12,4 @@ $grep -E "^.*$" $@
 end=$(get_millisecond_time)
 elaps=$(expr $end - $start)
 
-printf "matching time (ms): %d\n" $elaps > /dev/stderr
+printf "matching (ms): %d\n" $elaps > /dev/stderr
