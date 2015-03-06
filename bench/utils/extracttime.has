@@ -1,0 +1,8 @@
+// Simple hased script to extract the timing information from the test progs.
+// The number on the line starting with "matching (ms):" is what we are
+// interested in.
+
+timing := (matchTime | ~<[^\n]*>) ~<\n> timing
+        | (matchTime | ~<[^\n]*>) ~<\n>
+
+matchTime := ~<matching[ ]\(ms\):[ ]*> <[0-9]+>
