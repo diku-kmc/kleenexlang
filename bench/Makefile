@@ -42,9 +42,12 @@ data_check:
 # Check that RE2, Python, and Hased compute the same output
 equality_check: data_check $(HASSOURCES_OBJECTS)
 
-%.ho: $(HASEDDIR)/%.has
+utils/extracttime:
+	@$(REPG) compile --out utils/extracttime --quiet utils/extracttime.has
+
+%.ho: $(HASEDDIR)/%.has utils/extracttime
 	@if [[ "${testinput.$(*F)}" == "" ]] ; then \
-		echo ${red}No test data specified for $(*F)${NC} ; \
+		echo No test data specified for $(*F) ; \
 		false ; \
 	fi
 	@echo "------------------------------------------"
