@@ -77,14 +77,28 @@ evalEdges (OrderedEdgeSet { eForward = me }) q x =
           | member x p = [(eval f x, q')]
           | otherwise = []
 
-abstractEvalEdges :: (Ord st
-                     ,PartialOrder pred)
-                  => OrderedEdgeSet st pred func
-                  -> st -> pred -> [(func, st)]
-abstractEvalEdges (OrderedEdgeSet { eForward = me}) q p =
+-- | If abstractEvalEdgesAll fst q phi == [(f1, q1), ..., (fn, qn)], then
+--   for all qi and for all a in [[phi]], q steps to qi reading a.
+abstractEvalEdgesAll :: (Ord st
+                        ,PartialOrder pred)
+                       =>
+                       OrderedEdgeSet st pred func
+                     -> st -> pred -> [(func, st)]
+abstractEvalEdgesAll (OrderedEdgeSet { eForward = me}) q p =
   case M.lookup q me of
     Nothing -> []
     Just es -> [ (f, q') | (p', f, q') <- es, p `lte` p' ]
+
+-- | If abstractEvalEdgesExi fst q phi == [(f1, q1) ..., (fn, qn)], then
+--   for all qi there exists an a in [[phi]] such that q steps to qi reading a.
+abstractEvalEdgesExi :: (Ord st, PartialOrder pred, Boolean pred)
+                        =>
+                        OrderedEdgeSet st pred func
+                     -> st -> pred -> [(func, st)]
+abstractEvalEdgesExi (OrderedEdgeSet { eForward = me}) q p =
+  case M.lookup q me of
+    Nothing -> []
+    Just es -> [ (f, q') | (p', f, q') <- es, not $ (p `conj` p') `eq` bot ]
 
 evalEpsilonEdges :: (Ord st) => OrderedEdgeSet st pred func
                  -> st -> [(Rng func, st)]
@@ -102,10 +116,15 @@ fstEvalEdges :: (Ord st
                 => FST st pred func -> st -> Dom func -> [(Rng func, st)]
 fstEvalEdges fst' q a = evalEdges (fstE fst') q a
 
-fstAbstractEvalEdges :: (Ord st
-                        ,PartialOrder pred)
-                     => FST st pred func -> st -> pred -> [(func, st)]
-fstAbstractEvalEdges aut = abstractEvalEdges (fstE aut)
+fstAbstractEvalEdgesAll :: (Ord st
+                           ,PartialOrder pred)
+                          => FST st pred func -> st -> pred -> [(func, st)]
+fstAbstractEvalEdgesAll aut = abstractEvalEdgesAll (fstE aut)
+
+fstAbstractEvalEdgesExi :: (Ord st
+                           ,PartialOrder pred, Boolean pred)
+                          => FST st pred func -> st -> pred -> [(func, st)]
+fstAbstractEvalEdgesExi aut = abstractEvalEdgesExi (fstE aut)
 
 -- | Is the given state a non-deterministic choice state, or an input action
 -- state?

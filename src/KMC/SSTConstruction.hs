@@ -84,7 +84,7 @@ closureFunc fst' q = genclosure fst' (\c -> [ConstA c]) q
 consume :: (PartialOrder pred, Ord st)
         => FST st pred func -> pred -> Int -> st -> Closure st (UpdateStringFunc var func) st
 consume fst' p i q =
-  case fstAbstractEvalEdges fst' q p of
+  case fstAbstractEvalEdgesAll fst' q p of
     []        -> zero
     [(f, q')] -> tell [FuncA f i] >> visit q'
     _ -> error "Stepping for FSTs with read-fanout greater than one is not supported yet"
