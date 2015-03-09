@@ -9,7 +9,6 @@ module KMC.SSTCompiler where
 
 import           Control.Monad.Reader
 import           Control.Applicative ((<$>), (<*>), pure)
-import           Data.List (sortBy)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -134,13 +133,22 @@ compileAssignment var atoms = do
 -- | Order assignments in a register update based on data dependencies. An
 -- assignment `a' should come before an assignment `b' if `a' uses the variable
 -- that `b' assigns to.
-orderAssignments :: (Eq var) => [(var, UpdateStringFunc var func)] -> [(var, UpdateStringFunc var func)]
-orderAssignments = sortBy dataDependent
+orderAssignments :: (Ord var) => RegisterUpdate var func -> [(var, UpdateStringFunc var func)]
+orderAssignments ru
+  | M.null ru = []
+  | otherwise = snd $ foldl (visit S.empty) (S.empty, []) (M.keys ru)
     where
-      dataDependent (v, as) (v', as')
-        | v' `elem` fv as = LT
-        | v `elem` fv as' = GT
-        | otherwise = EQ
+      visit temp (mark, acc) v
+          | S.member v temp = error "Not a DAG"
+          | S.member v mark || not (M.member v ru) = (S.insert v mark, acc)
+          | otherwise =
+              let (mark', acc') =
+                    foldl (visit (S.insert v temp))
+                          (mark, acc)
+                          (maybe [] id (M.lookup v dag))
+              in (S.insert v mark', (v, ru M.! v):acc')
+
+      dag = M.mapWithKey (\k us -> filter (/=k) $ fv us) ru
 
       fv [] = []
       fv (VarA v:xs) = v:fv xs
@@ -150,7 +158,7 @@ compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
                       RegisterUpdate var func   -- ^ Register update
                       -> EnvReader st var func delta (Block delta)
 compileRegisterUpdate rup = 
-  liftM concat $ mapM (uncurry compileAssignment) $ orderAssignments $ M.toList rup
+  liftM concat $ mapM (uncurry compileAssignment) $ orderAssignments rup
 
 compileTransitions :: (Ord st, Ord var, Ord pred, Ord func, Ord delta
                       ,Rng func ~ [delta], PredicateListToExpr pred) =>
