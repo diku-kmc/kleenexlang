@@ -6,53 +6,94 @@ test_case_table="${BASH_SOURCE%/*}/benchmarks.txt"
 input_table="${BASH_SOURCE%/*}/inputs.txt"
 all_test_cases=$(cat ${test_case_table} | awk '$1 !~ /#/ { print $1 }')
 
+time_suffix=".runningtime"
 
-# Get invocation command
-function invocation {
+data_dir="../test/data/"
+time_dir="times/"
+
+# Default settings
+warmup_reps=0   # Number of warm-up runs
+reps=1          # Number of measured runs
+dryrun=true     # Do a dry-run (i.e., only show what to do)
+only_case=""    # If set, do /only/ this test case
+only_prog=""    # If set, do /only/ this program
+
+
+invocation_cmds=()
+invocation_cmds_names=()
+# Get invocation commands and names
+function set_invocation_names {
     prog=$2
-    if   [ $1 == "hased"     ]; then cmd="hased/bin/$prog -t"
-    elif [ $1 == "re2"       ]; then cmd="re2/bin/$prog"
-    elif [ $1 == "re2j"      ]; then cmd="java -jar re2j/build/jar/$prog.jar"
-    elif [ $1 == "gawk"      ]; then cmd="gawk/src/$prog.awk"
-    elif [ $1 == "python"    ]; then cmd="python python/src/$prog.py"
-    elif [ $1 == "perl"      ]; then cmd="perl perl/src/$prog.pl"
-    elif [ $1 == "tcl"       ]; then cmd="tcl/src/$prog.tcl"
-    elif [ $1 == "sed"       ]; then cmd="sed/src/$prog.sh"
-    elif [ $1 == "grep"      ]; then cmd="grep/src/$prog.sh"
-    elif [ $1 == "cpp11"     ]; then cmd="cpp11/bin/$prog"
-    elif [ $1 == "oniguruma" ]; then cmd="oniguruma/bin/$prog"
+    a=()
+    b=()
+    if   [ $1 == "hased"     ]; then
+        # Many different versions!
+        i=0
+        for p in $(ls hased/bin/${prog}*); do
+            a[$i]="$p -t"
+            b[$i]=$(basename $p)
+            i=$(expr $i + 1)
+        done
+    elif [ $1 == "re2"       ]; then a=("re2/bin/$prog")
+    elif [ $1 == "re2j"      ]; then a=("java -jar re2j/build/jar/$prog.jar")
+    elif [ $1 == "gawk"      ]; then a=("gawk/src/$prog.awk")
+    elif [ $1 == "python"    ]; then a=("python python/src/$prog.py")
+    elif [ $1 == "perl"      ]; then a=("perl perl/src/$prog.pl")
+    elif [ $1 == "tcl"       ]; then a=("tcl/src/$prog.tcl")
+    elif [ $1 == "sed"       ]; then a=("sed/src/$prog.sh")
+    elif [ $1 == "grep"      ]; then a=("grep/src/$prog.sh")
+    elif [ $1 == "cpp11"     ]; then a=("cpp11/bin/$prog")
+    elif [ $1 == "oniguruma" ]; then a=("oniguruma/bin/$prog")
     else
         echo "Could not find invocation for $1"
         exit 1
     fi
-    printf "$cmd"
+    # Now we "return" the arrays by copying them into the global vars!
+    invocation_cmds=( "${a[@]}" )
+    if [ ${#b[@]} -eq 0 ] ; then
+        invocation_cmds_names=( $prog )
+    else
+        invocation_cmds_names=( "${b[@]}" )
+    fi
 }
 
 
-time_postfix=".runningtime"
-data_dir="../test/data/"
-time_dir="times/"
-warmup_reps=0
-reps=1 # number of repetitions of each run
-
-function areyousure {
-    while true; do
-        read -p "$1" yn
-        case $yn in
-            [Yy]* ) break;;
-            [Nn]* ) exit;;
-            * ) echo "Please answer yes or no.";;
-        esac
+function run {
+    testname=$1
+    flavor=$2
+    # Get names of input files.
+    IFS=';' read -a inputs <<< $(cat ${input_table} | awk "\$1 ~ /${testname}/ { print \$2 }")
+    out_dir="$flavor/$time_dir"
+    mkdir -p $out_dir
+    # Set prog names and invocation commands.
+    set_invocation_names $flavor $testname
+    for input in ${inputs[@]}; do
+        for i in $(seq 0 $(expr ${#invocation_cmds[@]} - 1)); do
+            inv=${invocation_cmds[i]}
+            inv_name=${invocation_cmds_names[i]}
+            # Stitch together the actual command to run
+            pf=$(echo $input | sed 's/\//_/g')
+            outfile="${out_dir}${inv_name}-${pf}${time_suffix}"
+            _cmd="${inv} < ${data_dir}${input} > /dev/null"
+            warmup_cmd="$_cmd 2> /dev/null"
+            cmd="$_cmd 2>> ${outfile}"
+            if [ $warmup_reps -gt 0 ]; then
+                for i in $(seq 1 $warmup_reps); do
+                    echo "# WARMUP #$i: "
+                    echo $warmup_cmd
+                    if [ "$dryrun" = false ]; then eval $warmup_cmd ; fi
+                done
+            fi
+            for i in $(seq 1 $reps); do
+                echo "# Run #$i: "
+                echo $cmd
+                if [ "$dryrun" = false ]; then eval $cmd ; fi
+            done
+        done
     done
 }
 
-
-prefix=""
-cleardata=false
-dryrun=true
-only_case=""
-only_prog=""
-
+# Parse command-line parameters.
 while getopts ":fc:p:w:r:" opt; do
     case $opt in
         c)
@@ -77,41 +118,12 @@ while getopts ":fc:p:w:r:" opt; do
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
-            exit
+            exit 100
             ;;
     esac
 done
 
-function run {
-    testname=$1
-    flavor=$2
-    # Get names of input files.
-    IFS=';' read -a inputs <<< $(cat ${input_table} | awk "\$1 ~ /${testname}/ { print \$2 }")
-    out_dir="$flavor/$time_dir"
-    mkdir -p $out_dir
-    printf "# Called with %s %s\n" $testname $flavor
-    for input in ${inputs[@]}; do
-        pf=$(echo $input | sed 's/\//_/g')
-        outfile="${out_dir}${prefix}${testname}-${pf}${time_postfix}"
-        _cmd="$(invocation $flavor $testname) < ${data_dir}${input} > /dev/null"
-        warmup_cmd="$_cmd 2> /dev/null"
-        cmd="$_cmd 2>> ${outfile}"
-        if [ $warmup_reps -gt 0 ]; then
-            for i in $(seq 1 $warmup_reps); do
-                echo "# WARMUP #$i: "
-                echo $warmup_cmd
-                if [ "$dryrun" = false ]; then eval $warmup_cmd ; fi
-            done
-        fi
-        for i in $(seq 1 $reps); do
-            echo "# Run #$i: "
-            echo $cmd
-            if [ "$dryrun" = false ]; then eval $cmd ; fi
-        done
-    done
-}
-
-
+# Run!
 for test_case in $all_test_cases; do
     IFS=',' read -a progs <<< $(cat ${test_case_table} | awk "\$1 ~ /${test_case}/ { print \$2 }")
     if [ "$only_case" != "" ] && [ "$only_case" == "$test_case" ] ||
