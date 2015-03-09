@@ -65,6 +65,7 @@ regressionTests :: [TS.Test]
 regressionTests =
     [ simpleTest "unsound_lookahead" unsound_lookahead
     , simpleTest "character class accepts dash" charclass_accept_dash
+    , simpleTest "newline bug" newline_bug
     ]
 
 unsound_lookahead :: IO TS.Result
