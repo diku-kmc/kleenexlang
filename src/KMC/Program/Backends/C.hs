@@ -482,8 +482,9 @@ compileProgram buftype optLevel optQuiet prog desc comp moutPath cCodeOutPath wo
     compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
                            , "-o", binPath
                            , "-Wno-tautological-constant-out-of-range-compare"
-                           , if wordAlign then "-D FLAG_WORDALIGNED" else ""
-                           , "-"]
+                           ]
+                           ++ (if wordAlign then ["-D FLAG_WORDALIGNED"] else [])
+                           ++ ["-"]
     quote s = "\"" ++ s ++ "\""
     noOutInfo = quote $ intercalate "\\n"
                 [ "No object file generated!"

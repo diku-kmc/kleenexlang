@@ -3,8 +3,8 @@
 test_dir=src
 repgc=../../dist/build/repg/repg
 
-getinput="gsed -n 's/\/\/ IN: \(.*\)/\1/p'"
-getoutput="gsed -n 's/\/\/ OUT: \(.*\)/\1/p'"
+getinput="sed -n 's/\/\/ IN: \(.*\)/\1/p'"
+getoutput="sed -n 's/\/\/ OUT: \(.*\)/\1/p'"
 
 for tst in $(ls $test_dir); do
     if [[ $tst != *".has" ]]; then  #
@@ -12,8 +12,8 @@ for tst in $(ls $test_dir); do
     fi
     compile="${repgc} compile --opt 0 --la=false --wa=false --out ${tst}_bin $test_dir/${tst}"
     eval "$compile > /dev/null"
-    input=$(gsed -n 's/\/\/ IN: \(.*\)/\1/p' < $test_dir/$tst)
-    exp_out=$(gsed -n 's/\/\/ OUT: \(.*\)/\1/p' < $test_dir/$tst)
+    input=$(sed -n 's/\/\/ IN: \(.*\)/\1/p' < $test_dir/$tst)
+    exp_out=$(sed -n 's/\/\/ OUT: \(.*\)/\1/p' < $test_dir/$tst)
     out=$(echo "$input" | ./"$tst"_bin)
     if [[ $out == $exp_out ]]; then
         echo "$tst Pass"

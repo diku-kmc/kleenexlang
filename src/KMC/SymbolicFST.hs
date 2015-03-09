@@ -187,7 +187,7 @@ prefixTests fst' singletonMode states =
   [ (t, killed t) | t <- tests ]
   where
     ldps = [ (ldp fst' (S.fromList states) q, q) | not singletonMode, q <- states ]
-    tests = [ [p] | p <- coarsestPredicateSet fst' states ] ++ map fst ldps
+    tests = S.toList $ S.fromList $ [ [p] | p <- coarsestPredicateSet fst' states ] ++ map fst ldps
     killed t = S.fromList [ q | (ps, q) <- ldps, not (t `entails` ps) ]
 
     entails _ [] = True

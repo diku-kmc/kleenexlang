@@ -1,24 +1,22 @@
-/* Converts the INI format to JSON */
+/* Converts the INI format to JSON
+   Assumes that comments and blank lines have been stripped from the file. */
 
 ini2json := "{\n" sections "}\n"
 
 sections := section "," <\n> sections
           | section "\n" ~<\n?>
-          | comment sections
-          | comment
 
-section := ind "\"" header "\": {\n" keyvalues ind "}"
+section := ind "\"" header ~<\n> "\": {\n" keyvalues ind "}"
+         | ind "\"" header "\": {\n" ind "}"
 
-header := skipWs ~<\[> <[^\n\]]*> ~<]> skipWs ~<\n>
+header := skipWs ~<\[> <[^\n\]]*> ~<]> skipWs
 
 keyvalue := ind ind key ": " ~<=> value
 
 keyvalues := keyvalue "," <\n> keyvalues
            | keyvalue "\n"
-           | comment keyvalues
-           | comment
 
-key := skipWs "\"" <[^; \t=\[]*> "\"" skipWs
+key := skipWs "\"" <[^; \t=\[\n]*> "\"" skipWs
 
 value := skipWs <"[^\n]*"> skipWs
        | skipWs "\"" escapedValue "\"" skipWs
@@ -28,9 +26,6 @@ escapedValue := escapedChar escapedValue
 
 escapedChar := ~<"> "\\\""
              | <[^\n]>
-
-comment := skipWs ~<;[^\n]*\n>
-        |  skipWs ~<\n>
 
 skipWs := ~<[ \t]*>
 
