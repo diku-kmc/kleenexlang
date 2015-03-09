@@ -7,6 +7,7 @@ SED_BINDIR=sed/src
 AWK_BINDIR=gawk/src
 GREP_BINDIR=grep/src
 CPP11_BINDIR=cpp11/bin
+ONIGURUMA_BINDIR=oniguruma/bin
 
 HASSOURCES = $(notdir $(wildcard $(HASEDDIR)/*.has))
 HASSOURCES_OBJECTS = $(HASSOURCES:.has=.ho)
@@ -28,6 +29,9 @@ testinput.email          := $(DATA_DIR)/email/emails_from_apache.txt
 
 all:
 	@echo "Nothing to do.  Run make equality_check to check all programs."
+
+benchmark:
+	@echo "TODO..."
 
 # Check that the test data is there.
 data_check:
@@ -56,24 +60,26 @@ utils/extracttime:
 	./has_$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum $(*F).out > $(*F).sha
 
-	@bash utils/runequalstest.sh "RE2 == Hased?    " \
+	@bash utils/runequalstest.sh "RE2 == Hased       " \
 		$(*F) $(RE2_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
-	@bash utils/runequalstest.sh "Python == Hased? " \
+	@bash utils/runequalstest.sh "Python == Hased    " \
 		$(*F) $(PYTHON_BINDIR)/$(*F).py ${testinput.$(*F)} $(*F).out python
-	@bash utils/runequalstest.sh "Perl == Hased?   " \
+	@bash utils/runequalstest.sh "Perl == Hased      " \
 		$(*F) $(PERL_BINDIR)/$(*F).pl ${testinput.$(*F)} $(*F).out perl
-	@bash utils/runequalstest.sh "Tcl == Hased?    " \
+	@bash utils/runequalstest.sh "Tcl == Hased       " \
 		$(*F) $(TCL_BINDIR)/$(*F).tcl ${testinput.$(*F)} $(*F).out tclsh
-	@bash utils/runequalstest.sh "RE2/J == Hased?  " \
+	@bash utils/runequalstest.sh "RE2/J == Hased     " \
 		$(*F) $(RE2J_BINDIR)/$(*F).jar ${testinput.$(*F)} $(*F).out "java -jar"
-	@bash utils/runequalstest.sh "Sed == Hased?    " \
+	@bash utils/runequalstest.sh "Sed == Hased       " \
 		$(*F) $(SED_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
-	@bash utils/runequalstest.sh "Awk == Hased?    " \
+	@bash utils/runequalstest.sh "Awk == Hased       " \
 		$(*F) $(AWK_BINDIR)/$(*F).awk ${testinput.$(*F)} $(*F).out
-	@bash utils/runequalstest.sh "Grep == Hased?   " \
+	@bash utils/runequalstest.sh "Grep == Hased      " \
 		$(*F) $(GREP_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
-	@bash utils/runequalstest.sh "C++11 == Hased?  " \
+	@bash utils/runequalstest.sh "C++11 == Hased     " \
 		$(*F) $(CPP11_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Oniguruma == Hased " \
+		$(*F) $(ONIGURUMA_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha has_$(*F) tmp_timing
