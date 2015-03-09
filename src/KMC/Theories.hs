@@ -64,16 +64,6 @@ coarsestPartition elems =
       | Just (x', y, xs') <- findOverlap xs = Just (x', y, x:xs')
       | otherwise = Nothing
 
-coarsestPrefixPartition :: (Boolean pred, PartialOrder pred) => [[pred]] -> [[pred]]
-coarsestPrefixPartition = go
-    where
-      go xs =
-        [ p:ps
-        | p <- coarsestPartition [ p' | (p':_) <- xs ]
-        , ps <- go [ ps' | (p':ps') <- xs, p `lte` p' ]
-        ]
-        ++ [ [] | any null xs ]
-
 {----------------------------------------------------------------------}
 {- Functions, terms                                                   -}
 {----------------------------------------------------------------------}

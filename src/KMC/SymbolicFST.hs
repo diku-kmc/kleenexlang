@@ -89,13 +89,13 @@ abstractEvalEdgesAll (OrderedEdgeSet { eForward = me}) q p =
     Nothing -> []
     Just es -> [ (f, q') | (p', f, q') <- es, p `lte` p' ]
 
--- | If abstractEvalEdgesExi fst q phi == [(f1, q1) ..., (fn, qn)], then
+-- | If abstractEvalEdgesAny fst q phi == [(f1, q1) ..., (fn, qn)], then
 --   for all qi there exists an a in [[phi]] such that q steps to qi reading a.
-abstractEvalEdgesExi :: (Ord st, PartialOrder pred, Boolean pred)
+abstractEvalEdgesAny :: (Ord st, PartialOrder pred, Boolean pred)
                         =>
                         OrderedEdgeSet st pred func
                      -> st -> pred -> [(func, st)]
-abstractEvalEdgesExi (OrderedEdgeSet { eForward = me}) q p =
+abstractEvalEdgesAny (OrderedEdgeSet { eForward = me}) q p =
   case M.lookup q me of
     Nothing -> []
     Just es -> [ (f, q') | (p', f, q') <- es, not $ (p `conj` p') `eq` bot ]
@@ -121,10 +121,10 @@ fstAbstractEvalEdgesAll :: (Ord st
                           => FST st pred func -> st -> pred -> [(func, st)]
 fstAbstractEvalEdgesAll aut = abstractEvalEdgesAll (fstE aut)
 
-fstAbstractEvalEdgesExi :: (Ord st
+fstAbstractEvalEdgesAny :: (Ord st
                            ,PartialOrder pred, Boolean pred)
                           => FST st pred func -> st -> pred -> [(func, st)]
-fstAbstractEvalEdgesExi aut = abstractEvalEdgesExi (fstE aut)
+fstAbstractEvalEdgesAny aut = abstractEvalEdgesAny (fstE aut)
 
 -- | Is the given state a non-deterministic choice state, or an input action
 -- state?
@@ -147,18 +147,38 @@ coarsestPredicateSet fst' qs = coarsestPartition ps
            [ p | q <- qs
                , (p, _, _) <- maybe [] id (M.lookup q (eForward . fstE $ fst')) ]
 
+-- | Compute an unordered right epsilon closure on the input automaton of an FST.
+rightClosure :: (Ord st) => FST st pred func -> st -> S.Set st
+rightClosure fst' = snd . go S.empty
+    where
+      go vis q =
+          foldl (\(vis', acc) q' ->
+                     if S.member q' vis' then
+                         (vis', acc)
+                     else
+                         let (vis'', ys) = go (S.insert q' vis') q' in
+                         (vis'', S.union acc ys))
+                (vis, S.singleton q)
+                (map snd $ fstEvalEpsilonEdges fst' q)
+
+stepAll :: (Ord st, PartialOrder pred) => FST st pred func -> pred -> S.Set st -> S.Set st
+stepAll fst' p = S.unions . map aux . S.toList
+    where
+      aux q = S.unions $ map (rightClosure fst' . snd) $ fstAbstractEvalEdgesAll fst' q p
+
 {-- LCP analysis --}
 
--- | Longest deterministic prefix.
-ldp :: (Boolean pred, PartialOrder pred, Ord st) => FST st pred func -> st -> [pred]
+ldp :: (Ord st, Ord pred, PartialOrder pred, Boolean pred) =>
+       FST st pred func -> S.Set st -> st -> [pred]
 ldp fst' = go
     where
-      go q =
-        case M.lookup q (eForward $ fstE fst') of
-          Just [(p,_,q')] -> p:go q'
-          _ -> []
+      go ctx q =
+          case M.lookup q (eForward $ fstE fst') of
+            Just [(p,_,q')] | p `elem` (coarsestPredicateSet fst' $ S.toList ctx) ->
+                                p:go (stepAll fst' p ctx) q'
+            _ -> []
 
-prefixTests :: (Boolean pred, PartialOrder pred, Ord st) =>
+prefixTests :: (Boolean pred, PartialOrder pred, Ord st, Ord pred) =>
                FST st pred func
             -> Bool
             -> [st]
@@ -166,13 +186,13 @@ prefixTests :: (Boolean pred, PartialOrder pred, Ord st) =>
 prefixTests fst' singletonMode states =
   [ (t, killed t) | t <- tests ]
   where
-    ldps = [ ((if singletonMode then take 1 else id) $ ldp fst' q, q) | q <- states ]
-    tests = coarsestPrefixPartition [ ps | (ps,_) <- ldps ]
-    killed t = S.fromList [ q | (ps, q) <- ldps, not (compatibleWith ps t) ]
+    ldps = [ (ldp fst' (S.fromList states) q, q) | not singletonMode, q <- states ]
+    tests = [ [p] | p <- coarsestPredicateSet fst' states ] ++ map fst ldps
+    killed t = S.fromList [ q | (ps, q) <- ldps, not (t `entails` ps) ]
 
-    compatibleWith [] _ = True
-    compatibleWith (p:ps) (t:ts) = not ((p `conj` t) `eq` bot) && compatibleWith ps ts
-    compatibleWith (_:_) [] = False
+    entails _ [] = True
+    entails (t:ts) (p:ps) = (t `eq` p) && (ts `entails` ps)
+    entails [] (_:_) = False
 
 {-- Simulation --}
 
