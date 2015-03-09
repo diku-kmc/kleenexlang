@@ -1,0 +1,15 @@
+# Determine for each test case which of the programs can run that case.
+simple_id       	hased,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
+patho2          	hased,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
+as              	hased,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
+csv_project3    	hased,re2,re2j,gawk,cpp11,oniguruma,perl,python,sed,tcl
+email           	hased,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
+issuu_json2sql  	hased,python
+id_ints         	hased
+patho1          	hased
+flip_ab             hased
+issuu_fallback  	hased
+issuu_nofallback    hased
+csv2json            hased
+csv2json_nows       hased
+json2csv            hased

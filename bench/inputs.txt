@@ -1,0 +1,13 @@
+# Benchmark name    Semicolon-separated input data 
+simple_id           issuu/sample.json
+id_ints             ints.txt
+patho1	            ab_strings/ab1.txt
+flip_ab             ab_strings/ab1.txt
+issuu_fallback	    issuu/big.json
+issuu_nofallback    issuu/big.json
+csv2json            csv/csv_format1.csv
+csv2json_nows	    csv/csv_format1.csv
+json2csv            csv/csv_format1.csv.ws.json;csv/csv_format1.csv.nows.json
+as                  strings/as_small.txt
+csv_project3        csv/csv_format1.csv;csv/adresser.csv
+

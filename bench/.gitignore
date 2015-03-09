@@ -1,3 +1,4 @@
 # ignore binaries
 formatcompiletime
 formatrunningtime
+times/
