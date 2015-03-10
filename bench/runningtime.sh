@@ -8,8 +8,8 @@ all_test_cases=$(cat ${test_case_table} | awk '$1 !~ /#/ { print $1 }')
 
 time_suffix=".runningtime"
 
-data_dir="../test/data/"
-time_dir="times/"
+data_dir="../test/data"
+time_dir="times"
 
 # Default settings
 warmup_reps=0   # Number of warm-up runs
@@ -63,8 +63,6 @@ function run {
     flavor=$2
     # Get names of input files.
     IFS=';' read -a inputs <<< $(cat ${input_table} | awk "\$1 ~ /${testname}/ { print \$2 }")
-    out_dir="$flavor/$time_dir"
-    mkdir -p $out_dir
     # Set prog names and invocation commands.
     set_invocation_names $flavor $testname
     for input in ${inputs[@]}; do
@@ -73,8 +71,10 @@ function run {
             inv_name=${invocation_cmds_names[i]}
             # Stitch together the actual command to run
             pf=$(echo $input | sed 's/\//_/g')
-            outfile="${out_dir}${inv_name}-${pf}${time_suffix}"
-            _cmd="${inv} < ${data_dir}${input} > /dev/null"
+            out_dir="${flavor}/${time_dir}/${inv_name}"
+            mkdir -p "$out_dir"
+            outfile="${out_dir}/${pf}${time_suffix}"
+            _cmd="${inv} < ${data_dir}/${input} > /dev/null"
             warmup_cmd="$_cmd 2> /dev/null"
             cmd="$_cmd 2>> ${outfile}"
             if [ $warmup_reps -gt 0 ]; then
@@ -93,8 +93,19 @@ function run {
     done
 }
 
+function usage {
+    echo "Usage: ${BASH_SOURCE} [-c test_case] [-p program] [-fh] [-w n] [-r n]"
+    echo "  -c TC: only do the case \"TC\""
+    echo "  -p P:  only run the program \"P\""
+    echo "  -f:    force -- actually run the tests instead of printing what to do"
+    echo "  -h:    print this message"
+    echo "  -w n:  do n warm-up runs of each test (default 0)"
+    echo "  -r n:  do n repetitions of each test (default 1)"
+    exit 1
+}
+
 # Parse command-line parameters.
-while getopts ":fc:p:w:r:" opt; do
+while getopts ":fhc:p:w:r:" opt; do
     case $opt in
         c)
             echo "# Only doing case $OPTARG"
@@ -116,9 +127,12 @@ while getopts ":fc:p:w:r:" opt; do
             echo "# Doing $OPTARG benchmark runs."
             reps=$OPTARG
             ;;
+        h)
+            usage
+            ;;
         \?)
-            echo "Invalid option: -$OPTARG" >&2
-            exit 100
+            echo "Invalid option: -$OPTARG"
+            usage
             ;;
     esac
 done
