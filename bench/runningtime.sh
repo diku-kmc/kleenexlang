@@ -95,8 +95,8 @@ function run {
 
 function usage {
     echo "Usage: ${BASH_SOURCE} [-c test_case] [-p program] [-fh] [-w n] [-r n]"
-    echo "  -c TC: only do the case \"TC\""
-    echo "  -p P:  only run the program \"P\""
+    echo "  -c TC: only do the program \"TC\""
+    echo "  -i P:  only run the implementation \"P\""
     echo "  -f:    force -- actually run the tests instead of printing what to do"
     echo "  -h:    print this message"
     echo "  -w n:  do n warm-up runs of each test (default 0)"
@@ -105,14 +105,14 @@ function usage {
 }
 
 # Parse command-line parameters.
-while getopts ":fhc:p:w:r:" opt; do
+while getopts ":fhi:p:w:r:" opt; do
     case $opt in
-        c)
-            echo "# Only doing case $OPTARG"
-            only_case=$OPTARG
-            ;;
         p)
             echo "# Only doing program $OPTARG"
+            only_case=$OPTARG
+            ;;
+        i)
+            echo "# Only doing implementation $OPTARG"
             only_prog=$OPTARG
             ;;
         f)
