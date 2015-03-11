@@ -1,0 +1,7 @@
+# List of C compilers to use, along with their "pretty" name
+# On OS X, the "gcc" compiler is really the clang compiler  
+# System       Cmd name          pretty name
+Darwin         gcc               clang
+Darwin         gcc-mp-4.9        gcc
+Linux          gcc               gcc
+Linux          clang             clang
