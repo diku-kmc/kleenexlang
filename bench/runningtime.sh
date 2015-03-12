@@ -52,6 +52,7 @@ function set_invocation_names {
     elif [ $1 == "grep"      ]; then a=("grep/src/$prog.sh")
     elif [ $1 == "cpp11"     ]; then a=("cpp11/bin/$prog")
     elif [ $1 == "oniguruma" ]; then a=("oniguruma/bin/$prog")
+    elif [ $1 == "cat"       ]; then a=("cat/src/$prog.sh")
     else
         echo "Could not find invocation for $1"
         exit 1
@@ -78,7 +79,8 @@ function run {
             inv=${invocation_cmds[i]}
             inv_name=${invocation_cmds_names[i]}
             # Stitch together the actual command to run
-            pf=$(echo $input | sed 's/\//_/g')
+            # pf=$(echo $input | sed 's/\//_/g')
+            pf=$(basename $input)
             out_dir="${flavor}/${time_dir}/${inv_name}"
             mkdir -p "$out_dir"
             outfile="${out_dir}/${pf}${time_suffix}"

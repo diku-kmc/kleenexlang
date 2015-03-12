@@ -8,6 +8,7 @@ AWK_BINDIR=gawk/src
 GREP_BINDIR=grep/src
 CPP11_BINDIR=cpp11/bin
 ONIGURUMA_BINDIR=oniguruma/bin
+CAT_BINDIR=cat/src
 
 KLEENEXSOURCES = $(notdir $(wildcard $(KLEENEXDIR)/*.kex))
 KLEENEXSOURCES_OBJECTS = $(KLEENEXSOURCES:.kex=.ko)
@@ -84,6 +85,8 @@ utils/extracttime:
 		$(*F) $(CPP11_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Oniguruma == Kleenex " \
 		$(*F) $(ONIGURUMA_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Cat == Kleenex       " \
+		$(*F) $(CAT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
