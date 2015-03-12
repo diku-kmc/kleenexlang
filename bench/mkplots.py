@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import glob
 import re
+import locale
 import os
 
 def trans_Gbit_per_s(inputsize_bytes):
@@ -40,7 +42,7 @@ def get_plot_full_name(n):
     return os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots", n)
 
 def g(): # For testing purposes.
-    go("simple_id", ["cpp11"], "Gbit/s")
+    go("simple_id", ["cpp11"])
 
 def go(prog = None, skip = None, transform = "ms"):
     skipFun = lambda p, i : False
@@ -231,7 +233,10 @@ def plot_benchmark(prog, data, inputname, outfilename, skipThis, data_trans):
     ax.tick_params(axis = 'x', length = 0)
     ax.tick_params(axis = 'y', colors = "grey")
     # TODO make y tick labels formatted
-#    ax.ticklabel_format(axis = 'y', useLocale = True)
+    locale.setlocale(locale.LC_ALL, 'en_US')
+    def locale_formatter(x, p):
+        return locale.format("%d", x, grouping=True)
+    ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(locale_formatter))
     ax.set_ylim(bottom=0)
     ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls), rotation = 90)
     plt.tight_layout()
