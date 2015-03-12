@@ -11,7 +11,7 @@ ONIGURUMA_BINDIR=oniguruma/bin
 
 HASSOURCES = $(notdir $(wildcard $(HASEDDIR)/*.has))
 HASSOURCES_OBJECTS = $(HASSOURCES:.has=.ho)
-HASEDDIR = hased_src
+HASEDDIR = hased/src
 
 REPG = ../dist/build/repg/repg
 DATA_DIR = ../test/data
@@ -60,8 +60,12 @@ utils/extracttime:
 	./has_$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum $(*F).out > $(*F).sha
 
-	@bash utils/runequalstest.sh "RE2 == Hased       " \
-		$(*F) $(RE2_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "RE2-f == Hased     " \
+		$(*F) $(RE2_BINDIR)/$(*F)-f ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "RE2-glns == Hased  " \
+		$(*F) $(RE2_BINDIR)/$(*F)-glns ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "RE2-gls == Hased   " \
+		$(*F) $(RE2_BINDIR)/$(*F)-gls ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Python == Hased    " \
 		$(*F) $(PYTHON_BINDIR)/$(*F).py ${testinput.$(*F)} $(*F).out python
 	@bash utils/runequalstest.sh "Perl == Hased      " \

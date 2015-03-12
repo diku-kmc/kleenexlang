@@ -21,22 +21,21 @@ int main(int argc, char *argv[]) {
 
   // START LINE-BASED TIMING
   uint64_t start = getTimeMs();
-  uint64_t line = 0;
 
-  // Because fgets reads line by line, we rely on the C++-loop to output
-  // things correctly...
-  while(fgets(buffer, LINE_LEN, stdin)) {
-    line++;
-    bool match = RE2::FullMatchN(buffer, pattern, args, NCAP);
-    if(!match) {
-      cerr << "match error on line " << line << endl;
-      cerr << buffer;
-      return 1;
-    } else {
-      cout << target[0];
-    }
-  }
-
+  FOR_EACH_LINE(
+                bool match = RE2::FullMatchN(buffer, pattern, args, NCAP);
+                if(!match) {
+                  cerr << "match error on line " << line << endl;
+                  cerr << buffer;
+                  return 1;
+                } else {
+                  #ifdef USE_FGETS
+                    cout << target[0];
+                  #else
+                    cout << target[0] << endl;
+                  #endif
+                }
+                )
   uint64_t stop = getTimeMs();
   // END LINE-BASED TIMING
 

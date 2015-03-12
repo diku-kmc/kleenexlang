@@ -8,7 +8,12 @@
 //    the \. has been turned into \\. because of c++ escaping
 //    added \\n at the end, because the line iteration keeps the newlines
 string regexprime("[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?");
-string regex(regexprime + "\\n");
+
+#ifdef USE_FGETS
+  string regex(regexprime + "\\n");
+#else
+  string regex(regexprime);
+#endif
 
 #define NCAP 0
 
@@ -22,16 +27,16 @@ int main(int argc, char *argv[]) {
 
   // START LINE-BASED TIMING
   uint64_t start = getTimeMs();
-  uint64_t line = 0;
-  // from man fgets:
-  // "The newline, if any, is retained."
-  while(fgets(buffer, LINE_LEN, stdin)) {
-    line++;
-    bool match = RE2::FullMatch(buffer, pattern);
-    if(match) {
-      cout << buffer;
-    }
-  }
+  FOR_EACH_LINE(
+                bool match = RE2::FullMatch(buffer, pattern);
+                if(match) {
+                  #ifdef USE_FGETS
+                    cout << buffer;
+                  #else
+                    cout << buffer << endl;
+                  #endif
+                }
+                )
 
   uint64_t stop = getTimeMs();
   // END LINE-BASED TIMING

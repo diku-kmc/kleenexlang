@@ -13,3 +13,4 @@ issuu_nofallback    hased
 csv2json            hased
 csv2json_nows       hased
 json2csv            hased
+re2_readlinespeed   re2

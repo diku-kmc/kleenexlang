@@ -15,8 +15,8 @@ def default_version_name():
 def get_plot_full_name(n):
     return os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots", n)
 
-def g():
-    go("simple_id", {"simple_asdid":"cpp11"})
+def g(): # For testing purposes.
+    go("simple_id")
 
 def go(prog = None, skip = None):
     skipFun = lambda p, i : False
@@ -195,21 +195,28 @@ def get_box_coords(box):
     return zip(boxX,boxY)
         
 def format_label(name, version):
-    if name == "hased":
-        v = format_hased_version(version)
+    if version != None:
+        v = format_version(version)
         n = "\n"
     else:
         v = ""
         n = ""
     return "%s%s%s" % (name, n, v)
 
-def format_hased_version(vstring):
+def format_version(vstring):
     if vstring == None:
         return ""
-    m = re.match(".*__([0-9]+)__(.*)", vstring)
-    opt_level = m.group(1)
-    compiler = m.group(2)
-    return "%s, %s" % (opt_level, compiler)
+    ret_string = ""
+    try:
+        m = re.match(".*__([0-9]+)__(.*)", vstring)
+        opt_level = m.group(1)
+        compiler = m.group(2)
+        ret_string = "%s, %s" % (opt_level, compiler)
+    except AttributeError:
+        m = re.match(".*-(.*)", vstring)
+        vname = m.group(1)
+        ret_string = "%s" % (vname)
+    return ret_string
 
 # Start main program; do everything!
 if __name__ == "__main__":

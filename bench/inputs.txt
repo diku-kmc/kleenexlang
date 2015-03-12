@@ -11,3 +11,4 @@ json2csv            csv/csv_format1.csv.ws.json;csv/csv_format1.csv.nows.json
 as                  strings/as_small.txt
 csv_project3        csv/csv_format1.csv
 email               email/emails_from_apache.txt
+re2_readlinespeed   strings/ab_lines.txt

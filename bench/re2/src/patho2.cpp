@@ -22,21 +22,19 @@ int main(int argc, char *argv[]) {
 
   // START LINE-BASED TIMING
   uint64_t start = getTimeMs();
-  uint64_t line = 0;
   // from man fgets:
   // "The newline, if any, is retained."
-  while(fgets(buffer, LINE_LEN, stdin)) {
-    line++;
-    bool match = RE2::FullMatchN(buffer, pattern, args, NCAP);
-    if(!match) {
-      cerr << "match error on line " << line << endl;
-      cerr << buffer;
-      return 1;
-    } else {
-      cout << target[1] << endl;
-    }
-  }
-
+  FOR_EACH_LINE(
+                bool match = RE2::FullMatchN(buffer, pattern, args, NCAP);
+                if(!match) {
+                  cerr << "match error on line " << line << endl;
+                  cerr << buffer;
+                  return 1;
+                } else {
+                  cout << target[1] << endl;
+                }
+                )
+    
   uint64_t stop = getTimeMs();
   // END LINE-BASED TIMING
 
