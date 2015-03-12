@@ -1,0 +1,89 @@
+/* Converts a markdown document to HTML
+
+   Known limitations:
+   * Missing some features:
+       * Code blocks
+       * Horizontal rules (implemented but commented out)
+       * Images (implemented but commented out)
+   * Doesn't handle lists well
+       * Doesn't handle nested lists
+   * Can't do links. (Wrong order of arguments.)
+       * Especially can't do links with references.
+*/
+
+markdown := markdownElement <\n> markdown
+          | <\n?>
+
+markdownElement :=
+     header
+   | list
+   | blockquote
+   | fancyHeader
+   | horizontalRule
+   | catchall
+
+header := ~<\#{6}[ ]> "<h6>" line "</h6>"
+       |  ~<\#{5}[ ]> "<h5>" line "</h5>"
+       |  ~<\#{4}[ ]> "<h4>" line "</h4>"
+       |  ~<\#{3}[ ]> "<h3>" line "</h3>"
+       |  ~<\#{2}[ ]> "<h2>" line "</h2>"
+       |  ~<\#[ ]>    "<h1>" line "</h1>"
+
+fancyHeader := "<h1>" line "</h1>" ~<\n> ~<={3,}>
+            |  "<h2>" line "</h2>" ~<\n> ~<[\-]{3,}>
+
+list := "<ul>" unorderedList "</ul>"
+      | "<ol>" orderedList "</ol>"
+
+unorderedList := unorderedListLine <\n> unorderedList
+              |  unorderedListLine
+
+unorderedListLine := ~<[*+-][ ]> "<li>" continuedLine "</li>"
+
+orderedList := orderedListLine <\n> orderedList
+            |  orderedListLine
+
+orderedListLine := ~<[0-9]+\.[ ]> "<li>" continuedLine "</li>"
+
+blockquote := "<blockquote>" blockquoteBlock "</blockquote>"
+
+blockquoteBlock := blockquoteLine <\n> blockquoteBlock
+                |  blockquoteLine
+
+blockquoteLine := ~<\>[ ]> line
+               |  ~<\>>
+
+horizontalRule := ~<[\-][ ]*[\-][ ]*[\-][ \-]*> "<hr/>"
+               |  ~<\*[ ]*\*[ ]*\*[ *]*> "<hr/>"
+
+catchall := line
+
+continuedLine := line ~<\n[ ][ ]+> " " continuedLine
+              |  line
+
+line := code line
+     |  format line
+     |  <[^\n]> line
+     |  <[^\n]?>
+
+/* XXX: Denne kode giver syntax fejl:
+
+line := code line
+     |  format line
+//     |  image line
+     |  <[^\n]> line
+     |  <[^\n]?>
+
+*/
+
+code := /* ~<``> "<pre>" <([^\n`]|`[^\n`])*> "</pre>" ~<``>
+     |  */ ~<`>  "<pre>" <[^\n`]*> "</pre>" ~<`>
+
+image := "<img alt=\"" ~<\!\[> <([^]]|\\])*> ~<]> "\" src=\"" ~<\(> <([^)]|\\\))*> ~<\)> "\"/>"
+
+// XXX: Um. Why doesn't format work right?
+format := ~<\*\*> "<strong>" line "</strong>" ~<\*\*>
+       |  ~<__>   "<strong>" line "</strong>" ~<__>
+       |  ~<\*>   "<em>"     line "</em>"     ~<\*>
+       |  ~<_>    "<em>"     line "</em>"     ~<_>
+       |  ~<~~>   "<strike>" line "</strike>" ~<~~>

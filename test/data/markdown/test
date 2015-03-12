@@ -1,0 +1,29 @@
+# Overskrift 1
+## Overskrift 2
+### Overskrift 3
+#### Overskrift 4
+##### Overskrift 5
+###### Overskrift 6
+
+Overskrift 1-Alt
+================
+
+Overskrift 2-Alt
+----------------
+
+1. Dette er en list item
+2. Og en til.
+42. Craaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-
+   -aaaaaaaaaazy lang linje.
+
+* Hey med dig
+* Og dig
+- Ups! Forkert symbol.
++ Just kidding!
+
+> Dette er en quote.
+> Og mere.
+>
+> Jaaaa
+
+Lad os få lidt **bold** og *italic*. Og __bold__. Og _italic_. Og ~~strikethrough~~ mel og pizza. Og __bold og *italic og ~~strikethrough~~*__.
