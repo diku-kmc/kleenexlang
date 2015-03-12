@@ -162,8 +162,8 @@ skipComments = ignore $ spaces >> skipComment `sepEndBy` spaces
 skipComment :: KleenexParser ()
 skipComment = ignore $ try (char '/' >> (singleLine <|> multiLine))
     where
-      singleLine = char '/' >> manyTill anyChar newline       >> return ()
-      multiLine  = char '*' >> manyTill anyChar (string "*/") >> return ()
+      singleLine = char '/' >> manyTill anyChar newline             >> return ()
+      multiLine  = char '*' >> manyTill anyChar (try $ string "*/") >> return ()
               
 
 kleenex :: KleenexParser Kleenex
