@@ -1,6 +1,6 @@
 #include "../common.hpp"
 
-// RE2 program corresponding to simple_id.has
+// RE2 program corresponding to simple_id
 // It behaves like cat.
 string regex("(.*)");
 

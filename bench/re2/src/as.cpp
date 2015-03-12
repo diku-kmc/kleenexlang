@@ -1,6 +1,6 @@
 #include "../common.hpp"
 
-// RE2 program corresponding to as.has
+// RE2 implementation of as
 // It matches the input string agains a* and outputs it.
 #ifdef USE_FGETS
   string regex("(a*\\n)");

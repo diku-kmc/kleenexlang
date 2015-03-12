@@ -6,9 +6,9 @@ repgc=../dist/build/repg/repg # Location of our compiler
 opt_levels=(3) # (1 2 3)
 compiler_conf_file="${BASH_SOURCE%/*}/compilers.txt"
 reps=1
-src_dir="hased/src"
-bin_dir="hased/bin"
-time_dir="hased/compiletimes"
+src_dir="kleenex/src"
+bin_dir="kleenex/bin"
+time_dir="kleenex/compiletimes"
 compiletime_postfix=".compiletime"
 name=""
 skip="issuu"
@@ -75,8 +75,8 @@ for opt_level in ${opt_levels[@]}; do # for each SST optimization level
     for i in $(seq 0 $(expr ${#ccs[@]} - 1)); do # for each C compiler available
         cc=${ccs[i]}
         cc_name=${ccs_names[i]}
-        for n in $(ls $src_dir); do         # for each hased source file
-            if [[ ${n} != *".has" ]]; then  #
+        for n in $(ls $src_dir); do         # for each Kleenex source file
+            if [[ ${n} != *".kex" ]]; then  #
                 continue
             fi
             if [ "$only_do" != "" ]; then

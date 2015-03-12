@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Time::HiRes qw/ time /;
 
-# Perl variant of csv_project3.{cpp,has,py}
+# Perl variant of csv_project3
 
 my $regex = "([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*)\n";
 

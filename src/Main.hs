@@ -21,8 +21,8 @@ import           System.IO
 
 import           KMC.Bitcoder
 import           KMC.FSTConstruction hiding (Var)
-import           KMC.Hased.Lang (HasedOutTerm, hasedToMuTerm)
-import           KMC.Hased.Parser (parseHased)
+import           KMC.Kleenex.Lang (KleenexOutTerm, kleenexToMuTerm)
+import           KMC.Kleenex.Parser (parseKleenex)
 import           KMC.Program.Backends.C (CType(..), compileProgram)
 import           KMC.RangeSet (RangeSet)
 import           KMC.SSTCompiler (compileAutomaton)
@@ -148,7 +148,7 @@ buildTransducer :: MainOptions -> [String] -> IO (Transducer, String, String, No
 buildTransducer mainOpts args = do
   when (length args /= 1) $ do
     prog <- getProgName
-    putStrLn $ "Usage: " ++ prog ++ " <compile|visualize> [options] <hased_file|re_file|re>"
+    putStrLn $ "Usage: " ++ prog ++ " <compile|visualize> [options] <kleenex_file|re_file|re>"
     exitWith $ ExitFailure 1
   let [arg] = args
   let ext = takeExtension arg
@@ -166,9 +166,9 @@ buildTransducer mainOpts args = do
           hPutStrLn stderr $ e
           exitWith $ ExitFailure 1
         Right (_, re) -> return (Transducer (fromMu $ fromRegex re), reSrcName, reSrc)
-    else if ext == ".has" then do
-           hasedSrc <- readFile arg
-           return (Transducer (fstFromHased hasedSrc), arg, hasedSrc)
+    else if ext == ".kex" then do
+           kleenexSrc <- readFile arg
+           return (Transducer (fstFromKleenex kleenexSrc), arg, kleenexSrc)
          else do
            hPutStrLn stderr $ "Unknown extension: " ++ ext
            exitWith $ ExitFailure 1
@@ -275,8 +275,8 @@ main = runSubcommand
        , subcommand "visualize" visualize
        ]
 
-fstFromHased :: String -> FST Int (RangeSet Word8) HasedOutTerm
-fstFromHased str =
-  case parseHased str of
+fstFromKleenex :: String -> FST Int (RangeSet Word8) KleenexOutTerm
+fstFromKleenex str =
+  case parseKleenex str of
     Left e -> error e
-    Right ih -> fromMu (hasedToMuTerm ih)
+    Right ih -> fromMu (kleenexToMuTerm ih)

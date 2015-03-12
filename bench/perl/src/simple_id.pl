@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Time::HiRes qw/ time /;
 
-# Perl variant of simple_id.{cpp,has,py}
+# Perl variant of simple_id
 
 my $regex = "(.*)";
 

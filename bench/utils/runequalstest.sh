@@ -14,5 +14,3 @@ else
 	echo "Can't find $3.  Skipping."
 fi
 
-# run_test "RE2 == Hased?     " $(*F) $(RE2_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out cmd
-

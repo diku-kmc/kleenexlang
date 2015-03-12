@@ -1,6 +1,6 @@
 #include "../common.hpp"
 
-// RE2 program corresponding - approximately - to patho2.has
+// RE2 program corresponding - approximately - to patho2
 // output the string if it ends with a "b". 
 string regex("(?:([a-z]*a)|([a-z]*b))?\n?");
 

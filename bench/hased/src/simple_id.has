@@ -1,3 +1,0 @@
-/* Implements a very simple identity.  This is a hased version of 'cat'. */
-
-id := <.*>

@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module KMC.Hased.Parser where
+module KMC.Kleenex.Parser where
 
 import Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import Control.Monad.Identity (Identity)
@@ -36,7 +36,7 @@ changeState forward backward = mkPT . transform . runParsecT
     transform p st = fmap3 (mapReply forward) (p (mapState backward st))
 
 
--- name: Hased : HAskell Stream Editor
+-- name: Kleenex : HAskell Stream Editor
 
 -- Grammar:
 -- parser ::= . | (name ":=" expr) parser
@@ -52,36 +52,36 @@ newtype Identifier = Identifier String deriving (Eq, Ord)
 
 mkIdent :: String -> Identifier
 mkIdent str =
-    case runParser hasedIdentifier hpInitState "" str of
+    case runParser kleenexIdentifier hpInitState "" str of
       Left e  -> error (show e)
       Right i -> i
 fromIdent :: Identifier -> String
 fromIdent (Identifier s) = s
 
--- | A Hased program is a list of assignments.
-data Hased            = Hased [HasedAssignment] deriving (Eq, Ord)
+-- | A Kleenex program is a list of assignments.
+data Kleenex            = Kleenex [KleenexAssignment] deriving (Eq, Ord)
 
 -- | Assigns the term to the name.
-data HasedAssignment  = HA (Identifier, HasedTerm) deriving (Eq, Ord)
+data KleenexAssignment  = HA (Identifier, KleenexTerm) deriving (Eq, Ord)
 
 -- | The terms describe how regexps are mapped to strings.
-data HasedTerm = Constant ByteString -- ^ A constant output.
+data KleenexTerm = Constant ByteString -- ^ A constant output.
                | RE Regex
                | Var Identifier
-               | Seq HasedTerm HasedTerm
-               | Sum HasedTerm HasedTerm
-               | Ignore HasedTerm -- ^ Suppress any output from the subterm.
+               | Seq KleenexTerm KleenexTerm
+               | Sum KleenexTerm KleenexTerm
+               | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
                | One
   deriving (Eq, Ord)
 
 -- Some more friendly Show instances.
-instance Show Hased where
-    show (Hased l) = "Hased: {" ++ (concat $ map ("\n  " ++) (map show l)) ++ "\n}"
-instance Show HasedAssignment where
+instance Show Kleenex where
+    show (Kleenex l) = "Kleenex: {" ++ (concat $ map ("\n  " ++) (map show l)) ++ "\n}"
+instance Show KleenexAssignment where
     show (HA (ident, term)) = show ident ++ " ::== " ++ show term
 instance Show Identifier where
     show = fromIdent
-instance Show HasedTerm where
+instance Show KleenexTerm where
     show One = "1"
     show (Sum l r) = "(" ++ show l ++ ") | (" ++ show r ++ ")"
     show (Seq l r) = show l ++ " " ++ show r
@@ -95,31 +95,31 @@ type HPState = ()
 hpInitState :: HPState
 hpInitState = ()
 
-type HasedParser a = Parsec String HPState a
+type KleenexParser a = Parsec String HPState a
 
 
 withHPState :: Parsec s () a -> Parsec s HPState a
 withHPState p = getState >>= \hps -> changeState (const hps) (const ()) p
 
-separator :: HasedParser ()
+separator :: KleenexParser ()
 separator = spaceOrTab <|> ignore (try (lookAhead newline))
   
 -- Parse one space or tab character.
-spaceOrTab :: HasedParser ()
+spaceOrTab :: KleenexParser ()
 spaceOrTab = ignore (char ' ' <|> char '\t')
 
 ignore :: Parsec s u a -> Parsec s u ()
 ignore p = p >> return ()
 
-parens :: HasedParser a -> HasedParser a
+parens :: KleenexParser a -> KleenexParser a
 parens = between (char '(') (char ')')
 
-spaceAround :: HasedParser a -> HasedParser a
+spaceAround :: KleenexParser a -> KleenexParser a
 spaceAround = between (many spaceOrTab) (many spaceOrTab)
 
 -- | Identifiers are only allowed to start with lower-case characters.
-hasedIdentifier :: HasedParser Identifier
-hasedIdentifier = Identifier <$> 
+kleenexIdentifier :: KleenexParser Identifier
+kleenexIdentifier = Identifier <$> 
                   ((:) <$> legalStartChar <*> many legalChar)
                   <?> "identifier"
     where
@@ -137,47 +137,47 @@ escapedChar = satisfy (not . mustBeEscaped)
       cr = [('\\', '\\'), ('"', '"'), ('n', '\n'), ('t', '\t')]
                
 -- | A "constant" is a string enclosed in quotes.
-hasedConstant :: HasedParser String
-hasedConstant = (char '"') *> (many escapedChar) <* (char '"')
+kleenexConstant :: KleenexParser String
+kleenexConstant = (char '"') *> (many escapedChar) <* (char '"')
                 <?> "string constant"
 
-hasedBecomesToken :: HasedParser ()
-hasedBecomesToken = spaceAround (string ":=" >> return ())
+kleenexBecomesToken :: KleenexParser ()
+kleenexBecomesToken = spaceAround (string ":=" >> return ())
 
-hasedAssignment :: HasedParser HasedAssignment
-hasedAssignment = do
+kleenexAssignment :: KleenexParser KleenexAssignment
+kleenexAssignment = do
   skipComments
-  ident <- hasedIdentifier
-  hasedBecomesToken
-  term <- hasedTerm
+  ident <- kleenexIdentifier
+  kleenexBecomesToken
+  term <- kleenexTerm
   return $ HA (ident, term)
 
 foldr1ifEmpty :: (a -> a -> a) -> a -> [a] -> a
 foldr1ifEmpty _ e [] = e
 foldr1ifEmpty f _ l  = foldr1 f l
 
-skipComments :: HasedParser ()
+skipComments :: KleenexParser ()
 skipComments = ignore $ spaces >> skipComment `sepEndBy` spaces
 
-skipComment :: HasedParser ()
+skipComment :: KleenexParser ()
 skipComment = ignore $ try (char '/' >> (singleLine <|> multiLine))
     where
       singleLine = char '/' >> manyTill anyChar newline       >> return ()
       multiLine  = char '*' >> manyTill anyChar (string "*/") >> return ()
               
 
-hased :: HasedParser Hased
-hased = Hased <$> hasedAssignment `sepEndBy` spaces
+kleenex :: KleenexParser Kleenex
+kleenex = Kleenex <$> kleenexAssignment `sepEndBy` spaces
 
-hasedTerm :: HasedParser HasedTerm
-hasedTerm = buildExpressionParser table (spaceAround hasedPrimTerm)
+kleenexTerm :: KleenexParser KleenexTerm
+kleenexTerm = buildExpressionParser table (spaceAround kleenexPrimTerm)
     where
       table = [ [Infix (char '|' >> return Sum) AssocRight] ]
 
-indentedNewline :: HasedParser ()
+indentedNewline :: KleenexParser ()
 indentedNewline = ignore $ (many1 newline) >> (many1 spaceOrTab)
 
-start :: HasedParser ()
+start :: KleenexParser ()
 start = optional (i <|> c) <?> "start"
     where
       i = do
@@ -186,20 +186,20 @@ start = optional (i <|> c) <?> "start"
         return ()
       c = ignore $ skipComment `sepEndBy` (many spaceOrTab)
 
-hasedPrimTerm :: HasedParser HasedTerm
-hasedPrimTerm = start
+kleenexPrimTerm :: KleenexParser KleenexTerm
+kleenexPrimTerm = start
                 >> elms `sepEndBy` sep
                 >>= return . foldr1ifEmpty Seq One
     where
-      elms = choice [re, identifier, constant, ignored, parens hasedTerm]
+      elms = choice [re, identifier, constant, ignored, parens kleenexTerm]
       sep = many $ spaceOrTab 
                    <|> try indentedNewline 
                    <|>  ignore (skipComment >> many spaceOrTab)
-      constant   = Constant . encodeString <$> hasedConstant
+      constant   = Constant . encodeString <$> kleenexConstant
                    <?> "Constant"
       re         = RE  <$> between (char '<') (char '>') regexP
                    <?> "RE"
-      identifier = Var <$> try (hasedIdentifier <* notFollowedBy hasedBecomesToken)
+      identifier = Var <$> try (kleenexIdentifier <* notFollowedBy kleenexBecomesToken)
                    <?> "Var"
       ignored    = Ignore <$> (char '~' *> elms)
                    <?> "Ignore"
@@ -207,23 +207,23 @@ hasedPrimTerm = start
 encodeString :: String -> ByteString
 encodeString = encodeUtf8 . T.pack
 
-regexP :: HasedParser Regex
+regexP :: KleenexParser Regex
 regexP = snd <$> (withHPState $
                   anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!<>" })
 
-firstName :: Hased -> Identifier
-firstName (Hased (HA (i,_):_)) = i
-firstName (Hased []) = error "firstName: no assignments"
+firstName :: Kleenex -> Identifier
+firstName (Kleenex (HA (i,_):_)) = i
+firstName (Kleenex []) = error "firstName: no assignments"
 
-parseHased :: String -- ^ Input string
-           -> Either String (Identifier, Hased) 
-parseHased str =
-    case runParser (hased <* eof) hpInitState "" str of
+parseKleenex :: String -- ^ Input string
+           -> Either String (Identifier, Kleenex) 
+parseKleenex str =
+    case runParser (kleenex <* eof) hpInitState "" str of
       Left err -> Left (show err)
       Right h -> Right (firstName h, h)
 
-parseHasedFile :: FilePath -> IO (Either String (Identifier, Hased))
-parseHasedFile fp = readFile fp >>= return . parseHased
+parseKleenexFile :: FilePath -> IO (Either String (Identifier, Kleenex))
+parseKleenexFile fp = readFile fp >>= return . parseKleenex
 
 -----------------------------------------------------------------
 -----------------------------------------------------------------
@@ -236,11 +236,11 @@ stateParseTest st p input
                        print err
         Right x  -> print x
 
-parseTest :: (Show a) => HasedParser a -> String -> IO ()
+parseTest :: (Show a) => KleenexParser a -> String -> IO ()
 parseTest = stateParseTest hpInitState
 
 parseTest' :: (Stream s Identity t)
-               => Parsec s HPState Hased -> s -> IO Hased
+               => Parsec s HPState Kleenex -> s -> IO Kleenex
 parseTest' p input
     = case runParser p hpInitState "" input of
         Left err -> do putStr "parse error at "
@@ -248,5 +248,5 @@ parseTest' p input
                        fail ""
         Right x  -> return x
 
-pf = parseTest (hased <* eof)
-pf' = parseTest' (hased <* eof)
+pf = parseTest (kleenex <* eof)
+pf' = parseTest' (kleenex <* eof)

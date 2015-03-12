@@ -26,10 +26,10 @@ function set_invocation_names {
     prog=$2
     a=()
     b=()
-    if   [ $1 == "hased"     ]; then
+    if   [ $1 == "kleenex"     ]; then
         # Many different versions!
         i=0
-        for p in $(ls hased/bin/${prog}*); do
+        for p in $(ls kleenex/bin/${prog}*); do
             a[$i]="$p -t"
             b[$i]=$(basename $p)
             i=$(expr $i + 1)

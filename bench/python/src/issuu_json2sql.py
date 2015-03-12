@@ -1,17 +1,17 @@
 #! env python
 
-# Python version the issuu_json2sql hased program.
+# Python version the issuu_json2sql Kleenex program.
 
 # This implementation uses the Python library "json" to convert the .json file
 # to a SQL insertion statement.  This might seem like comparing apples and oranges,
 # as this program does not exercise the Python regex engine at all (at least not
 # directly), but if this program is to be a realistic use of Python it has to
 # be "Pythonic" and use the standard library function exposed by the json module.
-# Thus, comparing the hased version with the Python version is not a comparison
+# Thus, comparing the kleenex version with the Python version is not a comparison
 # of regex engines, but of two different ways of solving the same problem.
 # This all comes with the caveat that this Python implementation is much more
-# expressive than the hased program because it has the full computational
-# expressibility of Python available.  As a consequence, the hased version
+# expressive than the kleenex program because it has the full computational
+# expressibility of Python available.  As a consequence, the kleenex version
 # only works under some assumptions on the input json data, notably that the
 # fields come in a certain order and that they all are present in every object.
 

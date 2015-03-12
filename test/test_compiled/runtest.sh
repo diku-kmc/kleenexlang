@@ -7,7 +7,7 @@ getinput="sed -n 's/\/\/ IN: \(.*\)/\1/p'"
 getoutput="sed -n 's/\/\/ OUT: \(.*\)/\1/p'"
 
 for tst in $(ls $test_dir); do
-    if [[ $tst != *".has" ]]; then  #
+    if [[ $tst != *".kex" ]]; then  #
         continue
     fi
     compile="${repgc} compile --opt 0 --la=false --wa=false --out ${tst}_bin $test_dir/${tst}"

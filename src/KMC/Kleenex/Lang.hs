@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module KMC.Hased.Lang where
+module KMC.Kleenex.Lang where
 
 import qualified Data.Map as M
 import           Data.Word (Word8)
@@ -14,7 +14,7 @@ import           Data.Text.Encoding (encodeUtf8)
 
 import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
 import           KMC.Expression (Mu (..))
-import qualified KMC.Hased.Parser as H
+import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet)
 import           KMC.Syntax.External (Regex (..), unparse)
@@ -48,23 +48,23 @@ instance Show SimpleMu where
     show (SMIgnore s) = "skip:[" ++ show s ++ "]"
     show SMAccept = "1"
 
--- | Mu-terms created from Hased programs either output the identity on
+-- | Mu-terms created from Kleenex programs either output the identity on
 -- the input character, injected into a list, or the output a constant list
 -- of characters.
-type HasedOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
-instance Pretty HasedOutTerm where
+type KleenexOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
+instance Pretty KleenexOutTerm where
     pretty (Inl (InList _)) = "COPY"
     pretty (Inr (Const [])) = "SKIP"
     pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
 
-type HasedMu a = Mu (RangeSet Word8) HasedOutTerm a
+type KleenexMu a = Mu (RangeSet Word8) KleenexOutTerm a
 
 -- | The term that copies the input char to output.
-copyInput :: HasedOutTerm
+copyInput :: KleenexOutTerm
 copyInput = Inl (InList Ident)
 
 -- | The term that outputs a fixed string (list of Word8).
-out :: [Word8] -> HasedOutTerm
+out :: [Word8] -> KleenexOutTerm
 out = Inr . Const
 
 -- | Get the index of an element in a list, or Nothing.
@@ -79,17 +79,17 @@ getStack Z     (e : _)  = Just e
 getStack (S n) (_ : es) = getStack n es
 getStack _ _            = Nothing
 
--- | Converts a Hased AST which consists of a set of terms bound to variables
+-- | Converts a Kleenex AST which consists of a set of terms bound to variables
 -- to one simplified mu term, with the terms inlined appropriately.
 -- The given identifier is treated as the top-level bound variable,
 -- i.e., it becomes the first mu.  
-hasedToSimpleMu :: H.Identifier -> H.Hased -> SimpleMu 
-hasedToSimpleMu initVar (H.Hased ass) = SMLoop $ go [initVar] (fromJust $ M.lookup initVar mp)
+kleenexToSimpleMu :: H.Identifier -> H.Kleenex -> SimpleMu 
+kleenexToSimpleMu initVar (H.Kleenex ass) = SMLoop $ go [initVar] (fromJust $ M.lookup initVar mp)
     where
-      mp :: M.Map H.Identifier H.HasedTerm
+      mp :: M.Map H.Identifier H.KleenexTerm
       mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
       
-      go :: [H.Identifier] -> H.HasedTerm -> SimpleMu
+      go :: [H.Identifier] -> H.KleenexTerm -> SimpleMu
       go _    (H.Constant n) = SMWrite n
       go vars (H.Var name) =
           case name `pos` vars of
@@ -109,7 +109,7 @@ hasedToSimpleMu initVar (H.Hased ass) = SMLoop $ go [initVar] (fromJust $ M.look
 -- abstractions as Haskell functions.  This function therefore converts
 -- a de Bruijn representation to a HOAS representation.  All embedded
 -- regular expressions are also represented as mu-terms.
-simpleMuToMuTerm :: [HasedMu a] -> Bool -> SimpleMu -> HasedMu a
+simpleMuToMuTerm :: [KleenexMu a] -> Bool -> SimpleMu -> KleenexMu a
 simpleMuToMuTerm st ign sm =
     case sm of
       SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
@@ -125,10 +125,10 @@ simpleMuToMuTerm st ign sm =
       SMIgnore sm' -> simpleMuToMuTerm st True sm'
       SMAccept     -> Accept
 
--- | Convert a Hased program to a mu-term that encodes the string transformation
--- expressed in Hased.
-hasedToMuTerm :: (H.Identifier, H.Hased) -> HasedMu a
-hasedToMuTerm (i, h) = simpleMuToMuTerm [] False $ hasedToSimpleMu i h
+-- | Convert a Kleenex program to a mu-term that encodes the string transformation
+-- expressed in Kleenex.
+kleenexToMuTerm :: (H.Identifier, H.Kleenex) -> KleenexMu a
+kleenexToMuTerm (i, h) = simpleMuToMuTerm [] False $ kleenexToSimpleMu i h
 
 encodeChar :: Char -> [Word8]
 encodeChar = unpack . encodeUtf8 . T.singleton
@@ -136,7 +136,7 @@ encodeChar = unpack . encodeUtf8 . T.singleton
 -- | Translates a regular expression into a mu-term that performs the given
 -- action on the matched symbols: It either copies any matched symbols or
 -- ignores them.
-regexToMuTerm :: HasedOutTerm -> Regex -> HasedMu a
+regexToMuTerm :: KleenexOutTerm -> Regex -> KleenexMu a
 regexToMuTerm o re =
     case re of
        One        -> Accept
@@ -172,6 +172,6 @@ regexToMuTerm o re =
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
 
-testHased :: String -> Either String (HasedMu a)
-testHased s = either Left (Right . hasedToMuTerm) (H.parseHased s)
+testKleenex :: String -> Either String (KleenexMu a)
+testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
   

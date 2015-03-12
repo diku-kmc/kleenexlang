@@ -1,6 +1,6 @@
 #! env python
 
-# Python version of as.cpp and as.has
+# Python version of as
 import sys
 import re
 import datetime

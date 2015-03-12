@@ -55,7 +55,7 @@ def get_data(only_prog = None):
     return benchmarks
 
 # data is of the form
-#  data["hased"][version] = {inputfilename: [1,2,3,4]}
+#  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
 def plot_all(benchmarks, skipFun):
     first = lambda m : m[m.keys()[0]]
@@ -102,7 +102,7 @@ def read_benchmark_output(fn):
     return times
 
 # data is of the form
-#  data["hased"][version] = {inputfilename: [1,2,3,4]}
+#  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
 # the skipThis returns True on an impl name if it should be skipped!
 def plot_benchmark(title, data, inputname, outfilename, skipThis):

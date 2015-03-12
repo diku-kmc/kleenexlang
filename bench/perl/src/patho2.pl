@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Time::HiRes qw/ time /;
 
-# Perl variant of patho2.{cpp,has,py}
+# Perl variant of patho2
 
 my $regex = "^(?:([a-z]*a)|([a-z]*b))?(?:\n)?\$";
 

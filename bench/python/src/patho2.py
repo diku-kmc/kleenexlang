@@ -1,6 +1,6 @@
 #! env python
 
-# Python version of patho2.cpp and patho2.has
+# Python version of patho2
 import sys
 import re
 import datetime

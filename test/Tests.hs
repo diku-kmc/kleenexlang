@@ -12,7 +12,7 @@ import           Data.Text.Encoding (encodeUtf8)
 import           KMC.Coding
 import           KMC.Expression
 import           KMC.FSTConstruction
-import qualified KMC.Hased.Lang as H
+import qualified KMC.Kleenex.Lang as H
 import           KMC.OutputTerm
 import           KMC.RangeSet
 import           KMC.SSTConstruction
@@ -93,7 +93,7 @@ encodeChar = BS.unpack . encodeUtf8 . T.singleton
 charclass_accept_dash :: IO TS.Result
 charclass_accept_dash = 
     let prog = [strQ|test := <[a-z-]*>|]
-    in hasedIdTest prog "a-b-c-d---d-f-eerasdfs-"
+    in kleenexIdTest prog "a-b-c-d---d-f-eerasdfs-"
 
 -- This was a bug in the C generation.  Works in the SST world it seems.
 newline_bug :: IO TS.Result
@@ -104,16 +104,16 @@ test := ( keep "\n" | ~drop ) ~<\n> test
 keep := <(a|b)+(a|b)(a|b)+>
 drop := <[^\n]*>
 |]
-    in hasedIdTest prog $ unlines ["aaaba","aabbaa"]
+    in kleenexIdTest prog $ unlines ["aaaba","aabbaa"]
 
 
-hasedIdTest :: String -> String -> IO TS.Result
-hasedIdTest prog str =
+kleenexIdTest :: String -> String -> IO TS.Result
+kleenexIdTest prog str =
     let inp = concatMap encodeChar str in
-    case H.testHased prog of
+    case H.testKleenex prog of
       Left err -> return $ TS.Fail err
       Right m  ->
-          let sst = sstFromFST (fromMu m :: FST Int (RangeSet Word8) H.HasedOutTerm) True
+          let sst = sstFromFST (fromMu m :: FST Int (RangeSet Word8) H.KleenexOutTerm) True
               out = SST.flattenStream $ SST.run sst inp
           in if inp == out
              then return TS.Pass

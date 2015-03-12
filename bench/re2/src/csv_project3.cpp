@@ -1,6 +1,6 @@
 #include "../common.hpp"
 
-// RE2 program corresponding to csv_project3.has
+// RE2 program corresponding to csv_project3
 // Projects away all columns except number 2 and 5.
 // ([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*),([^,\n]*)\n
 

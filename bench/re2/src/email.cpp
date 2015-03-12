@@ -4,7 +4,7 @@
 // Like the others, it matches each line of input and outputs it if it is a "valid"
 // e-mail address or skips it otherwise.
 
-// Differences to the Hased version:
+// Differences to the Kleenex version:
 //    the \. has been turned into \\. because of c++ escaping
 //    added \\n at the end, because the line iteration keeps the newlines
 string regexprime("[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?");

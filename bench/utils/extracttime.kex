@@ -1,4 +1,4 @@
-// Simple hased script to extract the timing information from the test progs.
+// Simple Kleenex script to extract the timing information from the test progs.
 // The number on the line starting with "matching (ms):" is what we are
 // interested in.
 

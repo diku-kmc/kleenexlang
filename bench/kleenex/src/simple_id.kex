@@ -1,0 +1,3 @@
+/* Implements a very simple identity.  This is a Kleenex version of 'cat'. */
+
+id := <.*>

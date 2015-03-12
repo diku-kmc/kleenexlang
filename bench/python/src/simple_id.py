@@ -1,6 +1,6 @@
 #! env python
 
-# Python version of simple_id.cpp and simple_id.has
+# Python version of simple_id
 import sys
 import re
 import datetime

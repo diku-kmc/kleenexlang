@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Time::HiRes qw/ time /;
 
-# Perl variant of as.{cpp,has,py}
+# Perl variant of as
 
 my $regex = "(a*)";
 

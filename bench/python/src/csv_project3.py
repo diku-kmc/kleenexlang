@@ -1,6 +1,6 @@
 #! env python
 
-# Python version of csv_project3.cpp and csv_project3.has
+# Python version of csv_project3
 import sys
 import re
 import datetime
