@@ -1,0 +1,48 @@
+/* Transformation on Jobindex' access log files from Apache2
+
+   Transforms:
+
+    78.68.41.176 - - [03/Mar/2015:00:00:01 +0100] "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 200 67 "-" "Mozilla/5.0 (iPad; CPU OS 8_1_3 like Mac OS X) AppleWebKit/600.1.4 (KHTML, like Gecko) Mobile/12B466" 13265 "www.jobbsafari.se" "webb" "hypnotoad"
+
+   Into:
+
+   [03/Mar/2015:00:00:01 +0100]    "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 13265 
+*/
+
+log := logline nl log
+     | logline nl
+     | logline
+
+logline := ~ip ~ws ~rfc931 ~ws ~authuser ~ws timestamp ws request ws ~code ~ws ~bytes ~ws ~referer ~ws ~useragent ~ws responsetime ~ws ~hostname ~ws ~frontend ~ws ~backend ~ws
+
+ip := integer <\.> integer <\.> integer <\.> integer
+
+rfc931 := <->
+
+authuser := <[^ ]+>
+
+timestamp := <\[[A-Za-z0-9: /+-]+]>
+
+request := quotedString
+
+code := integer
+
+bytes := integer | <->
+
+referer := quotedString
+
+useragent := quotedString
+
+responsetime := integer
+
+hostname := quotedString
+
+frontend := quotedString
+
+backend := quotedString
+
+ws := <[\t ]*>
+nl := <\n>
+
+quotedString := <"([^"]|\\")*">
+integer := <[0-9]+>
