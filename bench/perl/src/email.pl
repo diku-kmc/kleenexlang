@@ -6,11 +6,10 @@ use Time::HiRes qw/ time /;
 # Perl variant of the email validator
 
 # Differences from the Python and Kleenex version:
-#   the $ sign in the first charclass is escaped with a \
+#   the $ sign in the first and second charclass is escaped with a \
 #   the dot in the +-group after the @-sign is escaped with \\, not just \
-my $regexprime = "[a-z0-9!#\$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
+my $regexprime = "[a-z0-9!#\$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#\$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?";
 my $regex = "^(" . $regexprime . ")\$";
-
 
 my $pre_compile = time;
 
@@ -22,7 +21,7 @@ my $start = time;
 while (<STDIN>) {
     if ($_ =~ $pattern) {
         print STDOUT "$1\n";
-    } 
+    }
 }
 
 # End timing
