@@ -129,7 +129,7 @@ ini2json.ko: $(KLEENEXDIR)/ini2json.kex  $(KLEENEXDIR)/ini_stripcomments.kex uti
 		ini2json $(CAT_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
 
 # Do some cleanup!
-	@rm ini2json.out ini2json.sha kex_ini2json tmp_timing
+	@rm ini2json.out ini2json.sha kex_ini2json kex_ini_stripcomments tmp_timing
 
 # Check each program individually
 patho2: patho2.ko
