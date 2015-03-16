@@ -28,6 +28,7 @@ testinput.simple_id      := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.issuu_json2sql := $(DATA_DIR)/issuu/sample.json
 testinput.email          := $(DATA_DIR)/email/emails_from_apache.txt
 testinput.ini2json       := $(DATA_DIR)/ini/php.ini
+testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
 
 all:
 	@echo "Nothing to do.  Run make equality_check to check all programs."
@@ -43,6 +44,8 @@ data_check:
 	@[ -f ${testinput.simple_id} ] || (echo "Missing test data file: ${testinput.simple_id}" && false)
 	@[ -f ${testinput.issuu_json2sql} ] || (echo "Missing test data file: ${testinput.json2sql}" && false)
 	@[ -f ${testinput.email} ] || (echo "Missing test data file: ${testinput.email}" && false)
+	@[ -f ${testinput.ini2json} ] || (echo "Missing test data file: ${testinput.ini2json}" && false)
+	@[ -f ${testinput.iso_datetime_to_json} ] || (echo "Missing test data file: ${testinput.iso_datetime_to_json}" && false)
 	@echo "Test data OK."
 
 # Check that RE2, Python, and Kleenex compute the same output
@@ -139,5 +142,6 @@ simple_id: simple_id.ko
 issuu_json2sql: issuu_json2sql.ko
 email: email.ko
 ini2json: ini2json.ko
+iso_datetime_to_json: iso_datetime_to_json.ko
 
-.PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email
+.PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json

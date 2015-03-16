@@ -36,6 +36,7 @@ email: src/email.o
 patho2: src/patho2.o
 simple_id: src/simple_id.o
 csv_project3: src/csv_project3.o
+iso_datetime_to_json: src/iso_datetime_to_json.o
 
 clean:
 	rm -rf bin
