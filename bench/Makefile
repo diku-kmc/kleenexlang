@@ -27,6 +27,7 @@ testinput.as             := $(DATA_DIR)/strings/as_small.txt
 testinput.simple_id      := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.issuu_json2sql := $(DATA_DIR)/issuu/sample.json
 testinput.email          := $(DATA_DIR)/email/emails_from_apache.txt
+testinput.ini2json       := $(DATA_DIR)/ini/php.ini
 
 all:
 	@echo "Nothing to do.  Run make equality_check to check all programs."
@@ -51,10 +52,10 @@ utils/extracttime:
 	@$(REPG) compile --out utils/extracttime --quiet utils/extracttime.kex
 
 %.ko: $(KLEENEXDIR)/%.kex utils/extracttime
-	@if [[ "${testinput.$(*F)}" == "" ]] ; then \
+	@bash -c "if [[ \"${testinput.$(*F)}\" == \"\" ]] ; then \
 		echo No test data specified for $(*F) ; \
 		false ; \
-	fi
+	fi"
 	@echo "------------------------------------------"
 	@echo "Checking $(*F)..."
 	$(REPG) compile $< --out kex_$(*F) --quiet=true
@@ -87,7 +88,48 @@ utils/extracttime:
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
 
+# So hacky. Special cased because it's two-phase.
+ini2json.ko: $(KLEENEXDIR)/ini2json.kex  $(KLEENEXDIR)/ini_stripcomments.kex utils/extracttime
+	@bash -c "if [[ \"${testinput.ini2json}\" == \"\" ]] ; then \
+		echo No test data specified for ini2json ; \
+		false ; \
+	fi"
+	@echo "------------------------------------------"
+	@echo "Checking ini2json..."
+	$(REPG) compile $(KLEENEXDIR)/ini_stripcomments.kex --out kex_ini_stripcomments --quiet=true
+	$(REPG) compile $< --out kex_ini2json --quiet=true
+	./kex_ini_stripcomments < ${testinput.ini2json} | ./kex_ini2json > ini2json.out 2> /dev/null
+	shasum ini2json.out > ini2json.sha
 
+	@bash utils/runequalstest.sh "RE2-f == Kleenex     " \
+		ini2json $(RE2_BINDIR)/ini2json-f ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "RE2-glns == Kleenex  " \
+		ini2json $(RE2_BINDIR)/ini2json-glns ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "RE2-gls == Kleenex   " \
+		ini2json $(RE2_BINDIR)/ini2json-gls ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "Python == Kleenex    " \
+		ini2json $(PYTHON_BINDIR)/ini2json.py ${testinput.ini2json} ini2json.out python
+	@bash utils/runequalstest.sh "Perl == Kleenex      " \
+		ini2json $(PERL_BINDIR)/ini2json.pl ${testinput.ini2json} ini2json.out perl
+	@bash utils/runequalstest.sh "Tcl == Kleenex       " \
+		ini2json $(TCL_BINDIR)/ini2json.tcl ${testinput.ini2json} ini2json.out tclsh
+	@bash utils/runequalstest.sh "RE2/J == Kleenex     " \
+		ini2json $(RE2J_BINDIR)/ini2json.jar ${testinput.ini2json} ini2json.out "java -jar"
+	@bash utils/runequalstest.sh "Sed == Kleenex       " \
+		ini2json $(SED_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "Awk == Kleenex       " \
+		ini2json $(AWK_BINDIR)/ini2json.awk ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "Grep == Kleenex      " \
+		ini2json $(GREP_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "C++11 == Kleenex     " \
+		ini2json $(CPP11_BINDIR)/ini2json ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "Oniguruma == Kleenex " \
+		ini2json $(ONIGURUMA_BINDIR)/ini2json ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "Cat == Kleenex       " \
+		ini2json $(CAT_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
+
+# Do some cleanup!
+	@rm ini2json.out ini2json.sha kex_ini2json tmp_timing
 
 # Check each program individually
 patho2: patho2.ko
@@ -96,5 +138,6 @@ as: as.ko
 simple_id: simple_id.ko
 issuu_json2sql: issuu_json2sql.ko
 email: email.ko
+ini2json: ini2json.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email
