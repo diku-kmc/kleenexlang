@@ -104,12 +104,8 @@ ini2json.ko: $(KLEENEXDIR)/ini2json.kex  $(KLEENEXDIR)/ini_stripcomments.kex uti
 	./kex_ini_stripcomments < ${testinput.ini2json} | ./kex_ini2json > ini2json.out 2> /dev/null
 	shasum ini2json.out > ini2json.sha
 
-	@bash utils/runequalstest.sh "RE2-f == Kleenex     " \
-		ini2json $(RE2_BINDIR)/ini2json-f ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "RE2-glns == Kleenex  " \
-		ini2json $(RE2_BINDIR)/ini2json-glns ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "RE2-gls == Kleenex   " \
-		ini2json $(RE2_BINDIR)/ini2json-gls ${testinput.ini2json} ini2json.out
+	@bash utils/runequalstest.sh "RE2 == Kleenex     " \
+		ini2json $(RE2_BINDIR)/ini2json ${testinput.ini2json} ini2json.out
 	@bash utils/runequalstest.sh "Python == Kleenex    " \
 		ini2json $(PYTHON_BINDIR)/ini2json.py ${testinput.ini2json} ini2json.out python
 	@bash utils/runequalstest.sh "Perl == Kleenex      " \
