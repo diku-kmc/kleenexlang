@@ -1,4 +1,4 @@
-#! env python
+#!/usr/bin/env python
 
 # Python version of as
 import sys
