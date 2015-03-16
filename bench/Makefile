@@ -9,6 +9,7 @@ GREP_BINDIR=grep/src
 CPP11_BINDIR=cpp11/bin
 ONIGURUMA_BINDIR=oniguruma/bin
 CAT_BINDIR=cat/src
+RAGEL_BINDIR=ragel/bin
 
 KLEENEXSOURCES = $(notdir $(wildcard $(KLEENEXDIR)/*.kex))
 KLEENEXSOURCES_OBJECTS = $(KLEENEXSOURCES:.kex=.ko)
@@ -31,7 +32,7 @@ testinput.ini2json       := $(DATA_DIR)/ini/php.ini
 testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
 
 all:
-	@echo "Nothing to do.  Run make equality_check to check all programs."
+	@echo "Nothing to do.  Run make -k equality_check to check all programs."
 
 benchmark:
 	@echo "TODO..."
@@ -87,6 +88,8 @@ utils/extracttime:
 		$(*F) $(ONIGURUMA_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Cat == Kleenex       " \
 		$(*F) $(CAT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Ragel == Kleenex     " \
+		$(*F) $(RAGEL_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
@@ -126,6 +129,7 @@ ini2json.ko: $(KLEENEXDIR)/ini2json.kex  $(KLEENEXDIR)/ini_stripcomments.kex uti
 		ini2json $(ONIGURUMA_BINDIR)/ini2json ${testinput.ini2json} ini2json.out
 	@bash utils/runequalstest.sh "Cat == Kleenex       " \
 		ini2json $(CAT_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
+
 
 # Do some cleanup!
 	@rm ini2json.out ini2json.sha kex_ini2json kex_ini_stripcomments tmp_timing
