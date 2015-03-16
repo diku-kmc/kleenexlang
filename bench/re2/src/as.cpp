@@ -2,50 +2,29 @@
 
 // RE2 implementation of as
 // It matches the input string agains a* and outputs it.
-#ifdef USE_FGETS
-  string regex("(a*\\n)");
-#else
-  string regex("(a*)");
-#endif
+string regex("(a*\\n)");
 
 #define NCAP 1
 
 int main(int argc, char *argv[]) {
   SETOPTS
-  // Pre-compile pattern
-  uint64_t preCompile = getTimeMs();
-  RE2 pattern(regex, options);
+    
+  PRE_COMPILE
 
-  // Initialize capture arguments
-  RE2::Arg *args[NCAP];
-  string target[NCAP];
-  for (int i = 0; i < NCAP; i++) {
-    args[i] = new RE2::Arg(&target[i]);
-  }
+  INIT_RE2_CAPTURE_ARGS(NCAP)
 
-  // START LINE-BASED TIMING
-  uint64_t start = getTimeMs();
+  START_TIMING
+
   FOR_EACH_LINE(
                 bool match = RE2::FullMatchN(buffer, pattern, args, NCAP);
                 if(!match) {
-                  cerr << "match error on line " << line << endl;
-                  cerr << buffer;
-                  return 1;
+                  MATCH_ERROR
                 } else {
-                  #ifdef USE_FGETS
-                    cout << target[0];
-                  #else
-                    cout << target[0] << endl;
-                  #endif
+                  fputs(target[0].c_str(), stdout);
                 }
                 )
 
-  uint64_t stop = getTimeMs();
-  // END LINE-BASED TIMING
-
-  cerr << "matching was successful." << endl;
-  cerr << "compilation (ms): " << start - preCompile << endl;
-  cerr << "matching (ms):    " << stop - start << endl;
+  PRINT_TIMES
   
   return 0;
 }

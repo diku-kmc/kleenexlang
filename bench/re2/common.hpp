@@ -4,7 +4,6 @@
 #include <iostream>
 #include <string>
 #include <sys/time.h>
-// #include <stdio.h>
 #include <algorithm>
 
 using namespace std;
@@ -15,25 +14,32 @@ using namespace std;
   #define ENCODING_OPTION RE2::Options::EncodingUTF8
 #endif
 
-#ifdef SYNC_STDIO
-  #warning "Using sync_with_stdio(true)"
-  #define SYNC ios_base::sync_with_stdio(true);
-#else
-  #warning "Using sync_with_stdio(false)"
-  #define SYNC ios_base::sync_with_stdio(false);
-#endif
+#define MATCH_ERROR                                             \
+  fprintf(stderr, "match error on line %d\n%s", line, buffer);  \
+  return 1;
 
-#ifdef USE_FGETS
-  #warning "Using fgets()"
-  #define BUFFER_SIZE (200*1024*1024)
-  char buffer[BUFFER_SIZE] = {0};
-  #define READ_LINE fgets(buffer, LINE_LEN, stdin)
-#else
-  #warning "Using getline()"
-  string buffer;
-  #define READ_LINE getline(cin, buffer)
-#endif
+#define PRE_COMPILE                             \
+  uint64_t preCompile = getTimeMs();            \
+  RE2 pattern(regex, options);
 
+#define START_TIMING uint64_t start = getTimeMs();
+
+#define PRINT_TIMES                                                     \
+  uint64_t stop = getTimeMs();                                          \
+  fprintf(stderr, "\ncompilation (ms): %llu\n", start - preCompile);    \
+  fprintf(stderr, "matching (ms):    %llu\n", stop - start);
+
+// Initialize capture arguments
+#define INIT_RE2_CAPTURE_ARGS(N)                \
+  RE2::Arg *args[N];                            \
+  string target[N];                             \
+  for (int i = 0; i < N; i++) {                 \
+    args[i] = new RE2::Arg(&target[i]);         \
+  }
+
+// C-style fgets() is much much faster than C++-style getline(), so always use that.
+#define BUFFER_SIZE (200*1024*1024)
+char buffer[BUFFER_SIZE] = {0};
 
 #define SETOPTS                                 \
   RE2::Options options;                         \
@@ -42,9 +48,8 @@ using namespace std;
 
 
 #define FOR_EACH_LINE(BODY)                     \
-  SYNC                                          \
   int line = 0;                                 \
-  while(READ_LINE) {                            \
+  while(fgets(buffer, LINE_LEN, stdin)) {       \
     line++;                                     \
     BODY                                        \
   }
@@ -69,9 +74,3 @@ uint64_t getTimeMs() {
     return tv.tv_usec / 1000 + tv.tv_sec * 1000;
 }
 
-// /** Trims whitespace from end of a string
-//   * Taken from http://stackoverflow.com/a/217605/79061 */
-// static inline string &rtrim(string &s) {
-//     s.erase(find_if(s.rbegin(), s.rend(), not1(ptr_fun<int, int>(isspace))).base(), s.end());
-//     return s;
-// }

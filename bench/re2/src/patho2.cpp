@@ -9,38 +9,23 @@ string regex("(?:([a-z]*a)|([a-z]*b))?\n?");
 
 int main(int argc, char *argv[]) {
   SETOPTS
-  // Pre-compile pattern
-  uint64_t preCompile = getTimeMs();
-  RE2 pattern(regex, options);
 
-  // Initialize capture arguments
-  RE2::Arg *args[NCAP];
-  string target[NCAP];
-  for (int i = 0; i < NCAP; i++) {
-    args[i] = new RE2::Arg(&target[i]);
-  }
+  PRE_COMPILE
 
-  // START LINE-BASED TIMING
-  uint64_t start = getTimeMs();
-  // from man fgets:
-  // "The newline, if any, is retained."
+  INIT_RE2_CAPTURE_ARGS(NCAP)
+
+  START_TIMING
+
   FOR_EACH_LINE(
                 bool match = RE2::FullMatchN(buffer, pattern, args, NCAP);
                 if(!match) {
-                  cerr << "match error on line " << line << endl;
-                  cerr << buffer;
-                  return 1;
+                  MATCH_ERROR
                 } else {
-                  cout << target[1] << endl;
+                  fputs(target[1].c_str(), stdout);
+                  fputs("\n", stdout);
                 }
                 )
-    
-  uint64_t stop = getTimeMs();
-  // END LINE-BASED TIMING
-
-  cerr << "matching was successful." << endl;
-  cerr << "compilation (ms): " << start - preCompile << endl;
-  cerr << "matching (ms):    " << stop - start << endl;
+  PRINT_TIMES
   
   return 0;
 }

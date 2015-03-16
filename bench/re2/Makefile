@@ -1,5 +1,5 @@
 BINDIR=bin
-SOURCES = $(wildcard src/*.cpp)
+SOURCES = $(filter-out src/raw_io_speed.cpp,$(wildcard src/*.cpp))
 OBJECTS = $(SOURCES:.cpp=.o)
 UTF8_OBJS = $(OBJECTS:.o=.utf8o)
 LIBRE2_DESTDIR = $(HOME)
@@ -15,25 +15,12 @@ latin1: $(OBJECTS)
 utf8: $(UTF8_OBJS)
 
 %.o: %.cpp
-	rm -f $(BINDIR)/$(*F)-*
-# with getline, no sync
-	$(CXX) $(CXXFLAGS) -o $(BINDIR)/BIN-$(*F)-glns $<
-	echo "#!/bin/sh" >> $(BINDIR)/$(*F)-glns
-	echo 'DIR=$$( cd "$$( dirname "$${BASH_SOURCE[0]}" )" && pwd )' >> $(BINDIR)/$(*F)-glns
-	echo "DYLD_LIBRARY_PATH=$(LIBRE2_DESTDIR)/usr/local/lib/ LD_LIBRARY_PATH=\$$DYLD_LIBRARY_PATH \$$DIR/BIN-$(*F)-glns" >> $(BINDIR)/$(*F)-glns
-	chmod +x $(BINDIR)/$(*F)-glns
-# with getline, sync
-	$(CXX) $(CXXFLAGS) -D SYNC_STDIO -o $(BINDIR)/BIN-$(*F)-gls $<
-	echo "#!/bin/sh" >> $(BINDIR)/$(*F)-gls
-	echo 'DIR=$$( cd "$$( dirname "$${BASH_SOURCE[0]}" )" && pwd )' >> $(BINDIR)/$(*F)-gls
-	echo "DYLD_LIBRARY_PATH=$(LIBRE2_DESTDIR)/usr/local/lib/ LD_LIBRARY_PATH=\$$DYLD_LIBRARY_PATH \$$DIR/BIN-$(*F)-gls" >> $(BINDIR)/$(*F)-gls
-	chmod +x $(BINDIR)/$(*F)-gls
-# with fgets
-	$(CXX) $(CXXFLAGS) -D USE_FGETS -o $(BINDIR)/BIN-$(*F)-f $<
-	echo "#!/bin/sh" >> $(BINDIR)/$(*F)-f
-	echo 'DIR=$$( cd "$$( dirname "$${BASH_SOURCE[0]}" )" && pwd )' >> $(BINDIR)/$(*F)-f
-	echo "DYLD_LIBRARY_PATH=$(LIBRE2_DESTDIR)/usr/local/lib/ LD_LIBRARY_PATH=\$$DYLD_LIBRARY_PATH \$$DIR/BIN-$(*F)-f" >> $(BINDIR)/$(*F)-f
-	chmod +x $(BINDIR)/$(*F)-f
+	rm -f $(BINDIR)/$(*F)
+	$(CXX) $(CXXFLAGS) -o $(BINDIR)/BIN-$(*F) $<
+	echo "#!/bin/sh" >> $(BINDIR)/$(*F)
+	echo 'DIR=$$( cd "$$( dirname "$${BASH_SOURCE[0]}" )" && pwd )' >> $(BINDIR)/$(*F)
+	echo "DYLD_LIBRARY_PATH=$(LIBRE2_DESTDIR)/usr/local/lib/ LD_LIBRARY_PATH=\$$DYLD_LIBRARY_PATH \$$DIR/BIN-$(*F)" >> $(BINDIR)/$(*F)
+	chmod +x $(BINDIR)/$(*F)
 
 %.utf8o: %.cpp
 	$(CXX) $(CXXFLAGS) -D USE_UTF8 -o $(BINDIR)/$(*F)_utf8 $<
@@ -43,7 +30,11 @@ patho2 : src/patho2.o
 csv_project3 : src/csv_project3.o
 simple_id : src/simple_id.o
 email : src/email.o
-re2_readlinespeed : src/re2_readlinespeed.o
+
+# This is a special case
+raw_io_speed: 
+	$(CXX) -O3 -o $(BINDIR)/raw_io_speed-fputs src/raw_io_speed.cpp
+	$(CXX) -O3 -D USE_PRINTF -o $(BINDIR)/raw_io_speed-fprintf src/raw_io_speed.cpp
 
 .PHONY: clean
 
