@@ -4,6 +4,7 @@ patho2          	kleenex,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
 as              	kleenex,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
 csv_project3    	kleenex,re2,re2j,gawk,cpp11,oniguruma,perl,python,sed,tcl
 email           	kleenex,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
+iso_datetime_to_json    kleenex,re2,re2j,gawk,cpp11,oniguruma,perl,python,sed,tcl
 issuu_json2sql  	kleenex,python
 id_ints         	kleenex
 patho1          	kleenex
