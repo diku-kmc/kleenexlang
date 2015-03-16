@@ -61,12 +61,8 @@ utils/extracttime:
 	./kex_$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum $(*F).out > $(*F).sha
 
-	@bash utils/runequalstest.sh "RE2-f == Kleenex     " \
-		$(*F) $(RE2_BINDIR)/$(*F)-f ${testinput.$(*F)} $(*F).out
-	@bash utils/runequalstest.sh "RE2-glns == Kleenex  " \
-		$(*F) $(RE2_BINDIR)/$(*F)-glns ${testinput.$(*F)} $(*F).out
-	@bash utils/runequalstest.sh "RE2-gls == Kleenex   " \
-		$(*F) $(RE2_BINDIR)/$(*F)-gls ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "RE2 == Kleenex       " \
+		$(*F) $(RE2_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Python == Kleenex    " \
 		$(*F) $(PYTHON_BINDIR)/$(*F).py ${testinput.$(*F)} $(*F).out python
 	@bash utils/runequalstest.sh "Perl == Kleenex      " \

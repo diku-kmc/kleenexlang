@@ -13,4 +13,4 @@ issuu_nofallback    kleenex
 csv2json            kleenex
 csv2json_nows       kleenex
 json2csv            kleenex
-re2_readlinespeed   re2
+raw_io_speed        re2

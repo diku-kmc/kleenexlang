@@ -11,4 +11,11 @@ json2csv            csv/csv_format1.csv.ws.json;csv/csv_format1.csv.nows.json
 as                  strings/as_small.txt
 csv_project3        csv/csv_format1.csv
 email               email/emails_from_apache.txt
-re2_readlinespeed   strings/ab_lines.txt
+
+# Measure the speed of reading and writing lines in C/C++.
+# The test reads lines with fgets() and prints it using either
+# /two/ calls to fputs(), adding a newline with the second call,
+# or /one/ call to fprintf(), using the formatting to add the extra
+# newline.  It is, maybe unsurprisingly, faster to do two fputs() than
+# to do one fprintf().
+raw_io_speed        issuu/medium.json

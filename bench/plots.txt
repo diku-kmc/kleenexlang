@@ -1,0 +1,13 @@
+# Relation between test programs and their plots.
+# A test program is tied to a list of implementations that should be
+# /skipped/ when plotting it. For each line of configuration, an output
+# file name is specified. The paths are relative to plots/.
+# Any programs not found in this relation will be processed normally, i.e.,
+# they will be plotted, written to a .pdf file, and no implementations will be
+# skipped.
+# Lists are delimited by comma, and the empty list is the single comma.
+
+# Program name        Skip impls.  Input data name   Plot transform     Output file name
+##########################################################################################
+simple_id             cat,cpp11    DEFAULT           Mbit/s                simple_id.pdf
+simple_id             ,            DEFAULT           Gbit/s                simple_id-ALL.pdf

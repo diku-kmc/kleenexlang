@@ -35,7 +35,6 @@ function set_invocation_names {
             i=$(expr $i + 1)
         done
     elif [ $1 == "re2"       ]; then
-#        a=("re2/bin/$prog")
         # Many different versions!
         i=0
         for p in $(ls re2/bin/${prog}*); do

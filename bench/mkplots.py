@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
+import argparse
 import glob
 import re
 import locale
@@ -20,19 +21,19 @@ def trans_Mbit_per_s(inputsize_bytes):
              "yaxis_label" : "MBit/s",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
              (prog, inputname, inputsize_bytes / 2.0**20)
-    }
+         }
 def trans_ms(inputsize_bytes):
     return { "median_format_string" : "%d",
              "trans_fun" : lambda ps : ps,
              "yaxis_label" : "Time (ms)",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
              (prog, inputname, inputsize_bytes / 2.0**20)
-    }
+         }
 
 transformations = {
     "Gbit/s" : trans_Gbit_per_s,
     "Mbit/s" : trans_Mbit_per_s,
-    "ms" : trans_ms
+    "ms"     : trans_ms
 }
 
 def default_version_name():
@@ -42,29 +43,34 @@ def get_plot_full_name(n):
     return os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots", n)
 
 def g(): # For testing purposes.
-    go("simple_id", ["cpp11"])
+    go(["simple_id"], ["cpp11"])
 
-def go(prog = None, skip = None, transform = "ms"):
-    skipFun = lambda p, i : False
-    try:
-        transFun = transformations[transform]
-    except KeyError:
-        raise Exception("Could not find transformation \"%s\"" % transform)
-
-    if skip != None:
+def go(progs = [], skip = None, default_transformation = "ms"):
+    conf, inputs, skips = get_benchmark_configuration()
+    if skip != None: # Override whatever is read from plots.txt
         if type(skip) == list:
-            skipFun = lambda p, i : i in skip
+            skipFun = lambda p, i, n : i in skip
         elif type(skip) == dict:
-            skipFun = lambda p, i : i in skip[p]
+            skipFun = lambda p, i, n : i in skip[p]
         else:
             raise Exception("If set, skip must be a list or a dictionary!")
-    conf, inputs = get_benchmark_configuration()
-    plot_all(get_data(conf, prog), inputs, skipFun, transFun)
+    else: # Then we do not override the skip map from plots.txt
+        def f(p, i, n): # program name, implementation name, output name
+            try: return i in skips[p][n]['skip']
+            except KeyError: return False
+        skipFun = f
+    
+    def getTransFun(p, n):
+        try: return transformations[skips[p][n]['transformation']]
+        except KeyError:
+            return transformations[default_transformation]
 
-def get_data(conf, only_prog = None):
+    plot_all(get_data(conf, progs), inputs, skips, skipFun, getTransFun)
+
+def get_data(conf, only_progs = []):
     benchmarks = {}
     for prog, impls in conf.iteritems():
-        if only_prog != None and only_prog != prog:
+        if only_progs != [] and not prog in only_progs:
             continue
         benchmarks[prog] = {}
         for impl in impls:
@@ -87,42 +93,63 @@ def get_data(conf, only_prog = None):
 # data is of the form
 #  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
-def plot_all(benchmarks, inputNames, skipFun, transFun):
-    first = lambda m : m[m.keys()[0]]
+def plot_all(benchmarks, inputNames, plotConfMap, skipFun, getTransformation):
     for prog, benchs in benchmarks.iteritems():
-        filename = get_plot_full_name(prog + ".pdf")
-        try:
-            # TODO We just pick the first input file...
-            # inputname = (first(first(benchs)).keys()[0])[:-len(input_suffix)]
-            inputfile = inputNames[prog][0]
+        try: output_names = plotConfMap[prog].keys()
+        except KeyError: output_names = [prog + ".pdf"]
+        for output_name in output_names:
+            inputfile = ""
+            try: inputfile = plotConfMap[prog][output_name]['indata']
+            except KeyError: pass
+            try:
+                if inputfile == "" or inputfile == "DEFAULT":
+                    inputfile = inputNames[prog][0]
+            except KeyError:
+                print "Skipping %s; no input data specified!" % prog
+                continue
             inputname = os.path.basename(inputfile)
             inputsize = get_input_file_size(inputfile)
-            def sf(i): # Specialise the skip function to this program.
-                try: return skipFun(prog, i)
+            def sf(i, n): # Specialise the skip function to this program.
+                try: return skipFun(prog, i, n)
                 except KeyError: return False
-            fig = plot_benchmark(prog, benchs, inputname, filename, sf, transFun(inputsize))
-        except KeyError: # No file name
-            pass
+            transFun = getTransformation(prog, output_name)
+            fig = plot_benchmark(prog, benchs, inputname, output_name, sf, transFun(inputsize))
 
 def strip_input_file_suffix(s):
     input_suffix = ".runningtime"
     return s[:-len(input_suffix)]
 
-def get_benchmark_configuration(conf_file = "benchmarks.txt", inputs_file = "inputs.txt"):
+def get_benchmark_configuration(conf_file = "benchmarks.txt",
+                                inputs_file = "inputs.txt",
+                                plots_file = "plots.txt"):
     def read_conf(fp, sep):
         m = {}
         with open(fp, 'r') as f:
             for line in f:
-                if line[0] == '#': continue
+                if line[0] == '#' or line.strip() == "": continue
                 ps = filter(lambda x : len(x) > 0, line.split(" "))
                 prog = ps[0].strip()
                 vector = map(lambda x : x.strip(), ps[1].split(sep))
                 m[prog] = vector
         return m
-                
     conf = read_conf(conf_file, ',')
     inputs = read_conf(inputs_file, ';')
-    return (conf, inputs)
+    plots = {}
+    with open(plots_file, 'r') as f:
+        for line in f:
+            if line[0] == '#' or line.strip() == "": continue
+            ps = filter(lambda x : len(x) > 0, line.split(" "))
+            prog = ps[0].strip()
+            skip_list = map(lambda x : x.strip(), ps[1].split(','))
+            inputdata_file_name = ps[2].strip()
+            plot_transform = ps[3].strip()
+            output_file_name = ps[4].strip()
+            if not plots.has_key(prog):
+                plots[prog] = {}
+            plots[prog][output_file_name] = {'skip': skip_list,
+                                             'indata' : inputdata_file_name,
+                                             'transformation' : plot_transform}
+    return (conf, inputs, plots)
 
 def get_input_file_size(inpf):
     try:
@@ -152,11 +179,14 @@ def read_benchmark_output(fn):
                 times.append(l)
     return times
 
+# TODO:  Make histogram plots of data sets to see distribution.
+
 # data is of the form
 #  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
 # the skipThis returns True on an impl name if it should be skipped!
-def plot_benchmark(prog, data, inputname, outfilename, skipThis, data_trans):
+def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
+#    data_trans = getDataTransformation(prog, output_name)
     trans_fun = data_trans["trans_fun"]
     median_format_string = data_trans["median_format_string"]
     yaxis_label = data_trans["yaxis_label"]
@@ -167,7 +197,7 @@ def plot_benchmark(prog, data, inputname, outfilename, skipThis, data_trans):
     # Add the bars
     for impl, versions in data.iteritems():
         color_idx = 0
-        if skipThis(impl):
+        if skipThis(impl, output_name):
             continue
         for version, inputfiles in versions.iteritems():
             for inputfile, times in inputfiles.iteritems():
@@ -220,26 +250,28 @@ def plot_benchmark(prog, data, inputname, outfilename, skipThis, data_trans):
 
     # Set properties of plot and make it look nice.
     ax.xaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
+    ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
     ax.set_axisbelow(True)
     ax.set_xlim(0, numBoxes + 0.5)
     ax.spines["right"].set_visible(False)
     ax.spines["top"].set_visible(False)
-    ax.spines["left"].set_color('grey')
-    ax.spines["bottom"].set_color('grey')
+    ax.spines["left"].set_color('lightgrey')
+    ax.spines["bottom"].set_color('lightgrey')
     ax.yaxis.set_ticks_position('left')
     ax.set_ylabel(yaxis_label)
     ax.set_title(title)
     ax.set_xticks(np.arange(numBoxes) + 1)
     ax.tick_params(axis = 'x', length = 0)
     ax.tick_params(axis = 'y', colors = "grey")
-    # TODO make y tick labels formatted
     locale.setlocale(locale.LC_ALL, 'en_US')
     def locale_formatter(x, p):
         return locale.format("%d", x, grouping=True)
     ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(locale_formatter))
     ax.set_ylim(bottom=0)
-    ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls), rotation = 90)
-    plt.tight_layout()
+    ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls), rotation = 45, horizontalalignment="right")
+    try: plt.tight_layout()
+    except UserWarning: pass
+    outfilename = get_plot_full_name(output_name)
     fig.savefig(outfilename)
     print "Wrote file %s" % outfilename
     plt.close()
@@ -283,7 +315,29 @@ def format_version(vstring):
 
 # Start main program; do everything!
 if __name__ == "__main__":
-    skipMap = {
-        "simple_id" : ["cpp11", "cat"] 
-    }
-    go(skip = skipMap, transform = "Mbit/s")
+    parser = argparse.ArgumentParser(
+        description="""
+Make some plots!  
+If no arguments are given, all programs are plotted.
+        """)
+    parser.add_argument('-p', nargs='+',
+                        help='Name of the program to plot')
+    parser.add_argument('-t',
+                        help = "Data transform (mbs=Mbit/s [DEFAULT], gbs=Gbit/s, ms=Milliseconds)")
+    parser.add_argument('-c', 
+                        help = "Alternate config file")
+    parser.add_argument('-s', nargs='+', help = "Skip implementation")
+    args = parser.parse_args()
+
+    if args.p == None: progs = []
+    else:              progs = args.p
+
+    if args.t == None:    transform = "Mbit/s"
+    elif args.t == "mbs": transform = "Mbit/s"
+    elif args.t == "gbs": transform = "Gbit/s"
+    elif args.t == "ms":  transform = "ms"
+    else:
+        print "Unknown transformation: %s!\nDefaulting to Mbit/s." % args.t
+        transform = "Mbit/s"
+
+    go(progs, skip = args.s, default_transformation = transform)
