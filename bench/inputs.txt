@@ -12,6 +12,7 @@ as                  strings/as_small.txt
 csv_project3        csv/csv_format1.csv
 email               email/emails_from_apache.txt
 iso_datetime_to_json datetime/datetime_sample.txt
+ini2json            ini/medium.ini
 
 # Measure the speed of reading and writing lines in C/C++.
 # The test reads lines with fgets() and prints it using either
