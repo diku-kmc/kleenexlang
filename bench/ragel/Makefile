@@ -18,15 +18,9 @@ email: src/email.o
 flip_ab: src/flip_ab.o
 aaa: src/aaa.o
 
-install-ragel: $(RAGEL)
-	(cd $(RAGEL) && ./configure)
-	(cd $(RAGEL) && make)
-	rm -f ragel
-	ln -s $(RAGEL)/ragel/ragel ragel
+install-ragel:
+	./getragel.sh $(RAGEL)
 
 .phony: clean
 clean:
 	rm -rf $(RAGEL)
-
-$(RAGEL):
-	wget http://www.colm.net/files/ragel/$(RAGEL).tar.gz -O - | tar zx
