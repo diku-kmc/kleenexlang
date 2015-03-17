@@ -9,7 +9,7 @@ pre_compile = datetime.datetime.now()
 parser = ConfigParser.RawConfigParser()
 parser.optionxform = str
 
-bslash = re.compile('\\\\')
+bslash = re.compile(r'\\')
 quote  = re.compile('"')
 
 # Start timing
@@ -38,7 +38,7 @@ for section in parser.sections():
         if value.startswith('"') and value.endswith('"'):
             value = value[1:-1]
         else:
-            value = bslash.sub('\\\\', value)
+            value = bslash.sub(r'\\\\', value)
             value = quote.sub(r'\"', value)
 
         sys.stdout.write("        \"%s\": \"%s\"" % (key, value))
