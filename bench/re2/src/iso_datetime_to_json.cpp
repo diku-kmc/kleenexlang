@@ -4,7 +4,7 @@ string regexprime("((?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[0-1]|0[1-9]|[1-
 
 string regex(regexprime + "\\n");
 
-#define NCAP 8
+#define NCAP 7
 #define OUT(S) fputs(S, stdout)
 
 int main(int argc, char *argv[]) {
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
                   OUT("', 'hours'='"); OUT(target[3].c_str());
                   OUT("', 'minutes'='"); OUT(target[4].c_str());
                   OUT("', 'seconds'='"); OUT(target[5].c_str());
-                  OUT("', 'tz'='"); OUT(target[7].c_str()); 
+                  OUT("', 'tz'='"); OUT(target[6].c_str()); 
                   OUT("'}\n");
                 }
                 )
