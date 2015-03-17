@@ -188,3 +188,24 @@ build-benchmark-programs:
 	@echo "Nothing to do for sed"
 	@echo "Nothing to do for tcl..."
 	@echo "DONE"
+
+clean-benchmark-programs:
+	@echo "Cleaning benchmark programs (not Kleenex programs)..."
+	@echo "Nothing to do for cat"
+	@echo "Cleaning cpp11 programs..."
+	(cd cpp11 && make clean)
+	@echo "Nothing to do for gawk"
+	@echo "Nothing to do for grep"
+	@echo "Cleaning oniguruma programs..."
+	(cd oniguruma && make clean)
+	@echo "Nothing to do for Perl"
+	@echo "Nothing to do for Python"
+	@echo "Cleaning Ragel programs..."
+	(cd ragel && make clean)
+	@echo "Cleaning RE2 programs..."
+	(cd re2 && make clean)
+	@echo "Cleaning RE2J programs..."
+	(cd re2j && ./ant clean)
+	@echo "Nothing to do for sed"
+	@echo "Nothing to do for tcl..."
+	@echo "DONE"
