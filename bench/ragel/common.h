@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #define BUFFER_SIZE (200*1024*1024)
 char buffer[BUFFER_SIZE] = {0};
@@ -13,7 +14,7 @@ char buffer[BUFFER_SIZE] = {0};
 
 #define POST                                                \
   uint64_t stop = getTimeMs();                              \
-  fprintf(stderr, "\nmatching (ms): %llu\n", stop - start);
+  fprintf(stderr, "\nmatching (ms): %" PRIu64 "\n", stop - start);
 
 
 uint64_t getTimeMs() {
