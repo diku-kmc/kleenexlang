@@ -167,3 +167,24 @@ install-benchmark-dependencies:
 	@echo "Installing tcl..."
 	(cd tcl && make install-tcl)
 	@echo "DONE"
+
+build-benchmark-programs:
+	@echo "Building benchmark programs (not Kleenex programs)..."
+	@echo "Nothing to do for cat"
+	@echo "Building cpp11 programs..."
+	(cd cpp11 && make)
+	@echo "Nothing to do for gawk"
+	@echo "Nothing to do for grep"
+	@echo "Building oniguruma programs..."
+	(cd oniguruma && make)
+	@echo "Nothing to do for Perl"
+	@echo "Nothing to do for Python"
+	@echo "Building Ragel programs..."
+	(cd ragel && make)
+	@echo "Building RE2 programs..."
+	(cd re2 && make)
+	@echo "Building RE2J programs..."
+	(cd re2j && ./ant jar)
+	@echo "Nothing to do for sed"
+	@echo "Nothing to do for tcl..."
+	@echo "DONE"
