@@ -12,7 +12,7 @@
 char *mark;
 
 
-#line 34 "src/email.rl"
+#line 33 "src/email.rl"
 
 /*
 Call "mark" upon entry to the sub-machine "email".
@@ -84,7 +84,7 @@ static const int email_fst_error = 0;
 static const int email_fst_en_main = 10;
 
 
-#line 40 "src/email.rl"
+#line 39 "src/email.rl"
 
 
 
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
 	cs = email_fst_start;
 	}
 
-#line 51 "src/email.rl"
+#line 50 "src/email.rl"
     
 #line 107 "src/email.c"
 	{
@@ -202,7 +202,7 @@ _again:
 	_out: {}
 	}
 
-#line 52 "src/email.rl"
+#line 51 "src/email.rl"
   }
 
   POST
