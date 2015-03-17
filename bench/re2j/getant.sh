@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+echo "Checking if 'ant' is installed on system..."
+if hash ant 2>/dev/null; then
+    echo "'ant' is already installed."
+    exit 0
+fi
+echo "'ant' is not installed; installing it locally."
+
 antball="apache-ant-1.9.4-bin.tar.gz"
 anturl="http://mirrors.dotsrc.org/apache//ant/binaries/apache-ant-1.9.4-bin.tar.gz"
 antdir="apache-ant-1.9.4"

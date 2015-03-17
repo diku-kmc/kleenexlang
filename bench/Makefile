@@ -145,3 +145,25 @@ ini2json: ini2json.ko
 iso_datetime_to_json: iso_datetime_to_json.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
+
+
+install-benchmark-dependencies:
+	@echo "Installing benchmark deps..."
+	@echo "Nothing to do for cat"
+	@echo "Nothing to do for cpp11"
+	@echo "Nothing to do for gawk"
+	@echo "Nothing to do for grep"
+	@echo "Installing oniguruma library..."
+	(cd oniguruma && make install-oniguruma)
+	@echo "Nothing to do for Perl"
+	@echo "Nothing to do for Python"
+	@echo "Installing Ragel..."
+	(cd ragel && make install-ragel)
+	@echo "Installing RE2..."
+	(cd re2 && make install-libre2)
+	@echo "Checking 'ant' for RE2J..."
+	(cd re2j && ./getant.sh)
+	@echo "Nothing to do for sed"
+	@echo "Installing tcl..."
+	(cd tcl && make install-tcl)
+	@echo "DONE"

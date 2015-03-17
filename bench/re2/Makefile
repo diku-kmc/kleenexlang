@@ -44,13 +44,7 @@ clean:
 
 # Fetch re2 and compile it!
 install-libre2:
-	git clone https://github.com/google/re2.git $(LIBRE2_SRCDIR)
-	(cd libre2 && make)
-	(cd libre2 && make test LDFLAGS=-pthread)
-	(cd libre2 && make install DESTDIR=$(LIBRE2_DESTDIR))
-# Does not work -- do not care!
-# cd libre2 ; make testinstall DESTDIR=$(LIBRE2_DESTDIR)
-
+	./getlibre2.sh $(LIBRE2_SRCDIR) $(LIBRE2_DESTDIR)
 
 uninstall-libre2:
 	rm -rf $(LIBRE2_DESTDIR)/usr/local/include/re2

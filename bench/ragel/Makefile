@@ -21,6 +21,7 @@ aaa: src/aaa.o
 install-ragel: $(RAGEL)
 	(cd $(RAGEL) && ./configure)
 	(cd $(RAGEL) && make)
+	rm -f ragel
 	ln -s $(RAGEL)/ragel/ragel ragel
 
 .phony: clean

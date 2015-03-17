@@ -1,5 +1,6 @@
 
 TCL_DESTDIR=$(HOME)
+TCL_SRCDIR=tcl8.6.3
 
 UNAME := $(shell uname)
 
@@ -13,14 +14,8 @@ endif
 # Download and compile Tcl and install it in $TCL_DESTDIR
 install-tcl: build mkscript
 
-tcl8.6.3-src.tar.gz:
-	wget --output-document=tcl8.6.3-src.tar.gz http://prdownloads.sourceforge.net/tcl/tcl8.6.3-src.tar.gz
-	tar xvf tcl8.6.3-src.tar.gz
-
-build: tcl8.6.3-src.tar.gz
-	(cd tcl8.6.3 && $(CONFDIR)/configure)
-	(cd tcl8.6.3 && make)
-	(cd tcl8.6.3 && make install DESTDIR=$(TCL_DESTDIR))
+build:
+	./gettcl.sh $(TCL_SRCDIR) $(TCL_DESTDIR) $(CONFDIR)
 
 mkscript:
 	rm -f tclsh
