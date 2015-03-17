@@ -2,33 +2,13 @@
 
 #include "../common.h"
 
-#define RE "^(([a-z]*a)|([a-z]*b))?$"
+#define REGEX "^(([a-z]*a)|([a-z]*b))?$"
 
 int main(int argc, char* argv[]) {
-  int r;
-  char *start, *end;
-  regex_t* reg;
-  OnigErrorInfo einfo;
-  OnigRegion *region;
 
-  uint64_t time_pre_compile = getTimeMs();
+  PRE
   
-  r = onig_new(&reg, RE, RE + strlen((char* )RE),
-               ONIG_OPTION_DEFAULT,
-               ONIG_ENCODING_UTF8,
-               ONIG_SYNTAX_POSIX_EXTENDED,
-               &einfo);
-  if (r != ONIG_NORMAL) {
-    char s[ONIG_MAX_ERROR_MESSAGE_LEN];
-    onig_error_code_to_str(s, r, &einfo);
-    fprintf(stderr, "ERROR: %s\n", s);
-    return -1;
-  }
-  int lno = 0;
-  uint64_t time_start = getTimeMs();
-  
-  region = onig_region_new();
-  while(fgets(buffer, LINE_LEN, stdin)) {
+  while(fgets(buffer, sizeof(buffer), stdin)) {
     lno++;
     end   = buffer + strlen((char* )buffer);
     start = buffer;
@@ -43,14 +23,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  onig_region_free(region, 1 /* 1:free self, 0:free contents only */);
-  onig_free(reg);
-  onig_end();
+  PRINT_TIMES
 
-  uint64_t time_end = getTimeMs();
-
-  fprintf(stderr, "\ncompilation (ms): %llu\n", time_start - time_pre_compile);
-  fprintf(stderr, "matching (ms):    %llu\n", time_end - time_start);
-  
   return 0;
 }
