@@ -1,5 +1,6 @@
 // common re2 things
 
+#include <stdio.h>
 #include <re2/re2.h>
 #include <iostream>
 #include <string>
