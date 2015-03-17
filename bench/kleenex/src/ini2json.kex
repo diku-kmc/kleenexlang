@@ -24,7 +24,8 @@ value := skipWs <"[^\n]*"> skipWs
 escapedValue := escapedChar escapedValue
               | ""
 
-escapedChar := ~<"> "\\\""
+escapedChar := ~<\\> "\\\\"
+             | ~<"> "\\\""
              | <[^\n]>
 
 skipWs := ~<[ \t]*>

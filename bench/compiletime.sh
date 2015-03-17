@@ -13,8 +13,12 @@ compiletime_postfix=".compiletime"
 name=""
 skip="issuu"
 timeoutseconds=30
-timeoutcmd="gtimeout"
 
+if [ "$(uname)" = "Linux" ]; then
+    timeoutcmd="timeout"
+else
+    timeoutcmd="gtimeout"
+fi
 
 ccs=()
 ccs_names=()
