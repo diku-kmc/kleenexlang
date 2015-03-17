@@ -30,6 +30,7 @@ testinput.issuu_json2sql := $(DATA_DIR)/issuu/sample.json
 testinput.email          := $(DATA_DIR)/email/emails_from_apache.txt
 testinput.ini2json       := $(DATA_DIR)/ini/php.ini
 testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
+testinput.url            := $(DATA_DIR)/url/test_urls.txt
 
 all:
 	@echo "Nothing to do.  Run make -k equality_check to check all programs."

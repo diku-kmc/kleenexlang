@@ -1,0 +1,63 @@
+/* Parses a list of RFC1738 generic URLs into their consituent parts
+   https://www.ietf.org/rfc/rfc1738.txt
+*/
+
+prog := genericurl <\n> prog
+     |  ""
+
+genericurl := scheme ~<:> schemepart
+
+scheme := "Scheme: " <[a-z0-9.+-]+> "\n"
+
+schemepart := ip_schemepart
+            | "Scheme-part: " xchars "\n"
+
+ip_schemepart := ~<//> login (~</> urlpath | "")
+
+login := (user (~<:> password | "") ~<@> | "") hostport
+
+hostport := host (~<:> port | "")
+
+host := "Host: " (hostname | hostnumber) "\n"
+
+hostname := domainlabels toplabel
+
+domainlabels := domainlabel <\.> domainlabels
+              | ""
+
+domainlabel := alphadigit (alphadashdigits alphadigit | "")
+
+toplabel := alpha (alphadashdigits alphadigit | "")
+
+alphadashdigits := (alphadigit | <->) alphadashdigits
+                |  ""
+
+alphadigit := alpha | digit
+
+hostnumber := digits <.> digits <.> digits <.> digits
+
+port := "Port: " digits "\n"
+
+user := "User: " userstr "\n"
+
+password := "Password: " userstr "\n"
+
+userstr := (uchar | <[;?&=]>) userstr
+        |  ""
+
+urlpath := "Path: " xchars "\n"
+
+xchars := xchar xchars | ""
+
+alpha    := <[a-zA-Z]>
+digit    := <[0-9]>
+digits   := <[0-9]+>
+safe     := <[$_.+-]>
+extra    := <[!*'(),]>
+reserved := <[;/?:@&=]>
+escape   := <%[0-9A-Fa-f]{2}>
+
+unreserved := alpha | digit | safe | extra
+
+uchar := unreserved | escape
+xchar := unreserved | reserved | escape
