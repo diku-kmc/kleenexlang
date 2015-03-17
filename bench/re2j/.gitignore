@@ -1,2 +1,4 @@
 # Ignore build stuff
 build/
+ant
+apache-ant*

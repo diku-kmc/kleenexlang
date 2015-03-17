@@ -1,3 +1,4 @@
 # Ignore tcl src
 tcl8.6.3/
 tcl8.6.3-src.tar.gz
+tclsh
