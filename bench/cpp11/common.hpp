@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <algorithm>
 #include <regex> // The C++11 default regex library
+#include <inttypes.h>
 
 using namespace std;
 
@@ -26,8 +27,8 @@ char buffer[BUFFER_SIZE] = {0};
 
 #define PRINT_TIMES                                                     \
   uint64_t stop = getTimeMs();                                          \
-  fprintf(stderr, "\ncompilation (ms): %llu\n", start - preCompile);    \
-  fprintf(stderr, "matching (ms):    %llu\n", stop - start);
+  fprintf(stderr, "\ncompilation (ms): %" PRIu64 "\n", start - preCompile);  \
+  fprintf(stderr, "matching (ms):    %" PRIu64 "\n", stop - start);
 
 #define MATCH_ERROR                                             \
   fprintf(stderr, "match error on line %d\n%s", line, buffer);  \

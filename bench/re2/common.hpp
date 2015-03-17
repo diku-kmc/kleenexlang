@@ -6,6 +6,7 @@
 #include <string>
 #include <sys/time.h>
 #include <algorithm>
+#include <inttypes.h>
 
 using namespace std;
 
@@ -27,8 +28,8 @@ using namespace std;
 
 #define PRINT_TIMES                                                     \
   uint64_t stop = getTimeMs();                                          \
-  fprintf(stderr, "\ncompilation (ms): %llu\n", start - preCompile);    \
-  fprintf(stderr, "matching (ms):    %llu\n", stop - start);
+  fprintf(stderr, "\ncompilation (ms): %" PRIu64 "\n", start - preCompile);  \
+  fprintf(stderr, "matching (ms):    %" PRIu64 "\n", stop - start);
 
 // Initialize capture arguments
 #define INIT_RE2_CAPTURE_ARGS(N)                \
