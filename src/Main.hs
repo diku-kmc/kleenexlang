@@ -49,7 +49,6 @@ data CompileOptions =
     , optCFile           :: Maybe FilePath
     , optWordSize        :: CType
     , optAltCompiler     :: FilePath
-    , optWordAlignment   :: Bool
     }
 
 data VisualizeOptions =
@@ -108,7 +107,6 @@ instance Options CompileOptions where
                        , optionDescription = "Buffer word size"
                        })
       <*> simpleOption "cc" "gcc" "C compiler"
-      <*> simpleOption "wa" True "Enable word alignment in C"
 
 instance Options VisualizeOptions where
     defineOptions =
@@ -144,17 +142,23 @@ data DetTransducer where
 transducerSize :: Transducer -> Int
 transducerSize (Transducer fst') = S.size $ fstS fst'
 
+data Flavor = CompilingKleenex | CompilingRegex deriving (Show, Eq)
+
+getCompileFlavor :: [String] -> Flavor
+getCompileFlavor args =
+    let [arg] = args in case takeExtension arg of
+                          ".kex" -> CompilingKleenex
+                          ".re"  -> CompilingRegex
+                          ".rx"  -> CompilingRegex
+                          f      -> error $ "Unknown extension: " ++ f
+                                   
 buildTransducer :: MainOptions -> [String] -> IO (Transducer, String, String, NominalDiffTime)
 buildTransducer mainOpts args = do
-  when (length args /= 1) $ do
-    prog <- getProgName
-    putStrLn $ "Usage: " ++ prog ++ " <compile|visualize> [options] <kleenex_file|re_file|re>"
-    exitWith $ ExitFailure 1
   let [arg] = args
-  let ext = takeExtension arg
+  let flav = getCompileFlavor args
   timeFSTgen <- getCurrentTime
   (fst', srcName, src) <-
-    if optExpressionArg mainOpts || ext == ".re" then do
+    if optExpressionArg mainOpts || flav == CompilingRegex then do
       (reSrcName, reSrc) <-
         if optExpressionArg mainOpts then
             return ("<CLI>", arg)
@@ -166,11 +170,11 @@ buildTransducer mainOpts args = do
           hPutStrLn stderr $ e
           exitWith $ ExitFailure 1
         Right (_, re) -> return (Transducer (fromMu $ fromRegex re), reSrcName, reSrc)
-    else if ext == ".kex" then do
+    else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
            return (Transducer (fstFromKleenex kleenexSrc), arg, kleenexSrc)
          else do
-           hPutStrLn stderr $ "Unknown extension: " ++ ext
+           hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
            exitWith $ ExitFailure 1
   when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (transducerSize fst')
   timeFSTgen' <- getCurrentTime
@@ -193,11 +197,12 @@ compileTransducer mainOpts (Transducer fst') = do
 
 transducerToProgram :: MainOptions
                     -> CompileOptions
+                    -> Bool
                     -> String
                     -> String
                     -> DetTransducer
                     -> IO (ExitCode, NominalDiffTime)
-transducerToProgram mainOpts compileOpts srcFile srcMd5 (DetTransducer sst) = do
+transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5 (DetTransducer sst) = do
   timeCompile <- getCurrentTime
   let prog = compileAutomaton sst
   let envInfo = intercalate "\\n" [ "Options:"
@@ -216,15 +221,28 @@ transducerToProgram mainOpts compileOpts srcFile srcMd5 (DetTransducer sst) = do
                         (optAltCompiler compileOpts)
                         (optOutFile compileOpts)
                         (optCFile compileOpts)
-                        (optWordAlignment compileOpts)
+                        useWordAlignment
   timeCompile' <- getCurrentTime
   return (ret, diffUTCTime timeCompile' timeCompile)
 
+
+checkArgs :: [String] -> IO ()
+checkArgs args = do
+  when (length args /= 1) $ do
+    prog <- getProgName
+    putStrLn $ "Usage: " ++ prog ++ " <compile|visualize> [options] <kleenex_file|re_file|re>"
+    exitWith $ ExitFailure 1
+  
+
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
 compile mainOpts compileOpts args = do
+  checkArgs args
   (transducer, srcName, srcMd5, fstGenDuration) <- buildTransducer mainOpts args
   (detTransducer, sstGenDuration, sstOptDuration) <- compileTransducer mainOpts transducer
-  (ret, compileDuration) <- transducerToProgram mainOpts compileOpts srcName srcMd5 detTransducer
+  let useWordAlignment = getCompileFlavor args == CompilingKleenex
+  (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
+                                                useWordAlignment srcName
+                                                srcMd5 detTransducer
   when (not $ optQuiet mainOpts) $ do
     let fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
                 in replicate (8 - length s) ' ' ++ s
@@ -240,6 +258,7 @@ compile mainOpts compileOpts args = do
 
 visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
 visualize mainOpts visOpts args = do
+  checkArgs args
   (Transducer fst', _, _, _) <- buildTransducer mainOpts args
   dg <- case optVisStage visOpts of
           VisFST -> return $ fstToDot fst'
