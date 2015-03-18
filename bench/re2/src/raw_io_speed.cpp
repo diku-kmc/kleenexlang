@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <inttypes.h>
 #include <iostream>
 #include <sys/time.h>
 
@@ -36,7 +38,7 @@ int main(int argc, char *argv[]) {
   uint64_t stop = getTimeMs();
 
   // Write "matching" for compatibility with other tests.
-  fprintf(stderr, "\nmatching (ms): %llu\n", stop - start);
+  fprintf(stderr, "\nmatching (ms): %" PRIu64 "\n", stop - start);
   
   return 0;
 }
