@@ -3,7 +3,7 @@
 
 repgc=../dist/build/repg/repg # Location of our compiler
 
-opt_levels=(3) # (1 2 3)
+opt_levels=(0 3)
 compiler_conf_file="${BASH_SOURCE%/*}/compilers.txt"
 reps=1
 src_dir="kleenex/src"
@@ -11,7 +11,6 @@ bin_dir="kleenex/bin"
 time_dir="kleenex/compiletimes"
 compiletime_postfix=".compiletime"
 name=""
-skip="issuu"
 timeoutseconds=30
 
 if [ "$(uname)" = "Linux" ]; then
@@ -35,29 +34,28 @@ function setname {
     name="${1}__${2}__${3}"
 }
 
-function areyousure {
-    while true; do
-        read -p "$1" yn
-        case $yn in
-            [Yy]* ) break;;
-            [Nn]* ) exit;;
-            * ) echo "Please answer yes or no.";;
-        esac
-    done
-}
-
-cleardata=false
 dryrun=true
 only_do=""
-while getopts ":fco:" opt; do
+
+while getopts ":fo:t:" opt; do
   case $opt in
-  c)
-      cleardata=true
-      areyousure "This will clear old data in $out_dir.  Proceed? "
-      ;;
   o)
       echo "# Only doing $OPTARG"
       only_do=$OPTARG
+      ;;
+  t)
+      if [[ $OPTARG =~ ^[0-9]+$ ]] && (( $OPTARG >= 0 )); then
+          echo "# Setting timeout value to $OPTARG seconds"
+          timeoutseconds=$OPTARG
+          if [ $timeoutseconds == 0 ]; then
+              echo "# Timeout set to 0; disabling timeout."
+              timeoutcmd=""
+              timeoutseconds=""
+          fi
+      else
+          echo "# Illegal argument: '$OPTARG'.  Must be an integer."
+          exit 1
+      fi
       ;;
   f)
       dryrun=false
@@ -65,7 +63,7 @@ while getopts ":fco:" opt; do
       ;;
   \?)
       echo "Invalid option: -$OPTARG" >&2
-      exit
+      exit 1
       ;;
   esac
 done
