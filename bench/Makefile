@@ -155,19 +155,17 @@ iso_datetime_to_json: iso_datetime_to_json.ko
 generate-test-data:
 	@echo "Generating/fetching test data..."
 	@echo "Generating 250 MB a/b lines with average line length of 1000..."
-	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -b 250000000 > ab_lines_len1000_250mb.txt)
-	@echo "Generating 100 MB a/b lines with average line length of 50..."
-	(cd ../test/data/strings && ./gen_ab_lines.pl -l 50 -b 100000000 > ab_lines_len50_100mb.txt)
-	@echo "Generaring 100 MB \"a\"s..."
-	(cd ../test/data/strings && ./gen_as.pl -b 100000000 > as_100mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 250000000 > ab_lines_len1000_250mb.txt)
+	@echo "Generating 100 MB \"a\"s on one line..."
+	(cd ../test/data/strings && ./gen_ab_lines.pl -n 1 -a -s 100000000 > as_100mb.txt)
 	@echo "Generating 250 MB email addresses..."
-	(cd ../test/data/email && ./gen_emails.pl -b 250000000 > emails_250mb.txt)
+	(cd ../test/data/email && ./gen_emails.pl -s 250000000 > emails_250mb.txt)
 	@echo "Generating 250 MB \"format 1\" csv data..."
-	(cd ../test/data/csv && ./gen_csv.pl -f 1 -b 250000000 > csv_format1_250mb.txt)
+	(cd ../test/data/csv && ./gen_csv.pl -f 1 -s 250000000 > csv_format1_250mb.txt)
 	@echo "Generating 250 MB ISO datetime stamps..."
-	(cd ../test/data/datetime && ./gen_datetime.pl -b 250000000 > datetimes_250mb.txt)
+	(cd ../test/data/datetime && ./gen_datetime.pl -s 250000000 > datetimes_250mb.txt)
 	@echo "Generating a 250 MB .ini file..."
-	(cd ../test/data/init && ./gen_ini.pl -b 250000000 > inifile_250mb.ini)
+	(cd ../test/data/init && ./gen_ini.pl -s 250000000 > inifile_250mb.ini)
 
 install-benchmark-dependencies:
 	@echo "Installing benchmark deps..."
