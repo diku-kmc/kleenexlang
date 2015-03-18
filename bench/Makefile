@@ -152,7 +152,7 @@ iso_datetime_to_json: iso_datetime_to_json.ko
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
-generate-test-data: generate-strings generate-emails generate-csv generate-datetime generate-inifile
+generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile
 
 generate-strings:
 	@echo "Generating 250 MB a/b lines with average line length of 1000..."
@@ -173,12 +173,16 @@ generate-datetime:
 	(cd ../test/data/datetime && ./gen_datetime.pl -s 250000000 > datetimes_250mb.txt)
 
 generate-inifile:
-	@echo "Generating a 250 MB .ini file..."
-	(cd ../test/data/init && ./gen_ini.pl -s 250000000 > inifile_250mb.ini)
+	@echo "Generating a 25 MB .ini file..."
+	(cd ../test/data/ini && ./gen_ini.pl -s 25000000 > inifile_25mb.ini)
 
 generate-urls:
 	@echo "Generating 100 MB URLs..."
 	(cd ../test/data/url && ./gen_url.pl -s 100000000 > urls_100mb.txt)
+
+download-issuu:
+	@echo "Downloading 1,000,000 json objects from a random part of the Issuu dataset..."
+	(cd ../test/data/issuu && ./download.sh -f -n 1000000 > issuu_1000000objs.json)
 
 
 install-benchmark-dependencies:

@@ -3,9 +3,9 @@ simple_id           strings/ab_lines_len1000_250mb.txt
 patho1              strings/ab_lines_len1000_250mb.txt
 patho2	            strings/ab_lines_len1000_250mb.txt
 flip_ab             strings/ab_lines_len1000_250mb.txt
-issuu_fallback	    issuu/medium.json
-issuu_nofallback    issuu/medium.json
-issuu_json2sql      issuu/medium.json
+issuu_fallback	    issuu/issuu_1000000objs.json
+issuu_nofallback    issuu/issuu_1000000objs.json
+issuu_json2sql      issuu/issuu_1000000objs.json
 csv2json            csv/csv_format1_250mb.csv
 csv2json_nows	    csv/csv_format1_250mb.csv
 # json2csv            csv/csv_format1_250mb.csv.csv.ws.json
@@ -13,7 +13,7 @@ as                  strings/as_100mb.txt
 csv_project3        csv/csv_format1_250mb.csv
 email               email/emails_100mb.txt
 iso_datetime_to_json datetime/datetimes_250mb.txt
-ini2json            ini/inifile_250mb.ini
+ini2json            ini/inifile_25mb.ini
 
 # Measure the speed of reading and writing lines in C/C++.
 # The test reads lines with fgets() and prints it using either
