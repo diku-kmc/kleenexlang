@@ -18,7 +18,6 @@ KLEENEXDIR = kleenex/src
 REPG = ../dist/build/repg/repg
 DATA_DIR = ../test/data
 
-
 # Through unimaginable hackery, we can get a hashmap-like thing in make.
 # Attach test input file to the programs, to check that the RE2 C++
 # programs called <NAME> are equivalent to the Kleenex programs <NAME>.kex
@@ -33,7 +32,12 @@ testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
 testinput.url            := $(DATA_DIR)/url/test_urls.txt
 
 all:
-	@echo "Nothing to do.  Run make -k equality_check to check all programs."
+	@echo "Nothing to do."
+	@echo "make -k equality_check: run a sanity check on the benchmark programs."
+	@echo "make install-benchmark-dependencies: install needed stuff to run benchmark."
+	@echo "make build-benchmark-programs: build the benchmark programs (not Kleenex)."
+	@echo "make clean-benchmark-programs: delete the built benchmark programs."
+	@echo "make generate-test-data: generate needed test data."
 
 benchmark:
 	@echo "TODO..."
@@ -147,6 +151,23 @@ iso_datetime_to_json: iso_datetime_to_json.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
+
+generate-test-data:
+	@echo "Generating/fetching test data..."
+	@echo "Generating 250 MB a/b lines with average line length of 1000..."
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -b 250000000 > ab_lines_len1000_250mb.txt)
+	@echo "Generating 100 MB a/b lines with average line length of 50..."
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 50 -b 100000000 > ab_lines_len50_100mb.txt)
+	@echo "Generaring 100 MB \"a\"s..."
+	(cd ../test/data/strings && ./gen_as.pl -b 100000000 > as_100mb.txt)
+	@echo "Generating 250 MB email addresses..."
+	(cd ../test/data/email && ./gen_emails.pl -b 250000000 > emails_250mb.txt)
+	@echo "Generating 250 MB \"format 1\" csv data..."
+	(cd ../test/data/csv && ./gen_csv.pl -f 1 -b 250000000 > csv_format1_250mb.txt)
+	@echo "Generating 250 MB ISO datetime stamps..."
+	(cd ../test/data/datetime && ./gen_datetime.pl -b 250000000 > datetimes_250mb.txt)
+	@echo "Generating a 250 MB .ini file..."
+	(cd ../test/data/init && ./gen_ini.pl -b 250000000 > inifile_250mb.ini)
 
 install-benchmark-dependencies:
 	@echo "Installing benchmark deps..."
