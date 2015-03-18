@@ -54,4 +54,4 @@ rot13 := ~<A> "N" rot13
       |  ~<y> "l" rot13
       |  ~<z> "m" rot13
       |   <.>     rot13
-      |   <.> /* ideally epsilon */
+      |   ""

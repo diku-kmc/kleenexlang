@@ -30,6 +30,7 @@ testinput.email          := $(DATA_DIR)/email/emails_from_apache.txt
 testinput.ini2json       := $(DATA_DIR)/ini/php.ini
 testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
 testinput.url            := $(DATA_DIR)/url/test_urls.txt
+testinput.rot13			 := $(DATA_DIR)/strings/random_bytes.txt
 
 all:
 	@echo "Nothing to do."
@@ -52,6 +53,7 @@ data_check:
 	@[ -f ${testinput.email} ] || (echo "Missing test data file: ${testinput.email}" && false)
 	@[ -f ${testinput.ini2json} ] || (echo "Missing test data file: ${testinput.ini2json}" && false)
 	@[ -f ${testinput.iso_datetime_to_json} ] || (echo "Missing test data file: ${testinput.iso_datetime_to_json}" && false)
+	@[ -f ${testinput.rot13} ] || (echo "Missing test data file: ${testinput.rot13}" && false)
 	@echo "Test data OK."
 
 # Check that RE2, Python, and Kleenex compute the same output
@@ -148,17 +150,21 @@ issuu_json2sql: issuu_json2sql.ko
 email: email.ko
 ini2json: ini2json.ko
 iso_datetime_to_json: iso_datetime_to_json.ko
+rot13: rot13.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
 generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile
 
-generate-strings:
+generate-strings: generate-ab-strings generate-a-strings
+
+generate-ab-strings:
 	@echo "Generating 250 MB a/b lines with average line length of 1000..."
 	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 250000000 > ab_lines_len1000_250mb.txt)
+generate-a-strings:
 	@echo "Generating 100 MB \"a\"s on one line..."
-	(cd ../test/data/strings && ./gen_ab_lines.pl -n 1 -a -s 100000000 > as_100mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 100000000 > as_100mb.txt)
 
 generate-emails:
 	@echo "Generating 100 MB email addresses..."
@@ -181,8 +187,8 @@ generate-urls:
 	(cd ../test/data/url && ./gen_url.pl -s 100000000 > urls_100mb.txt)
 
 download-issuu:
-	@echo "Downloading 1,000,000 json objects from a random part of the Issuu dataset..."
-	(cd ../test/data/issuu && ./download.sh -f -n 1000000 > issuu_1000000objs.json)
+	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
+	(cd ../test/data/issuu && ./download.sh -f -c 0 -n 1000000 > issuu_1000000objs.json)
 
 
 install-benchmark-dependencies:

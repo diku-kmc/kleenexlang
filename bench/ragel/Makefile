@@ -18,6 +18,8 @@ email: src/email.o
 flip_ab: src/flip_ab.o
 aaa: src/aaa.o
 issuu_json2sql: src/issuu_json2sql.o
+rot13: src/rot13.o
+
 
 install-ragel:
 	./getragel.sh $(RAGEL)
