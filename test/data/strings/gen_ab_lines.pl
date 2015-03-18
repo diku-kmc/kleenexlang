@@ -33,7 +33,7 @@ my $b = undef;
 GetOptions("length=i" => \$avglen,
            "num=i"    => \$n,
            "bytes=i"  => \$b);
-
+my $lastnl = 0;
 while (1) {
     last if ((defined $n && $n <= 0) || (defined $b && $b <= 0));
 
@@ -43,12 +43,18 @@ while (1) {
 
     if ($i < $avglen) {
         print "a";
+        $lastnl = 0;
     } elsif ($i < 2*$avglen) {
         print "b";
+        $lastnl = 0;
     } else {
         print "\n";
+        $lastnl = 1;
         $n -= 1 if defined $n;
 
         last if ((defined $n && $n <= 0) || (defined $b && $b <= 0));
     }
 }
+
+# Always add a newline at the end.
+print "\n" if (!$lastnl);
