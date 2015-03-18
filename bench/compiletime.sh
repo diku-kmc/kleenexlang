@@ -47,7 +47,7 @@ while getopts ":fo:t:" opt; do
       if [[ $OPTARG =~ ^[0-9]+$ ]] && (( $OPTARG >= 0 )); then
           echo "# Setting timeout value to $OPTARG seconds"
           timeoutseconds=$OPTARG
-          if [ $timeoutseconds == 0 ]; then
+          if [ "$timeoutseconds" == 0 ]; then
               echo "# Timeout set to 0; disabling timeout."
               timeoutcmd=""
               timeoutseconds=""
@@ -94,11 +94,18 @@ for opt_level in ${opt_levels[@]}; do # for each SST optimization level
             for i in `seq 1 $reps`; do
                 binary="${bin_dir}/${name}"
                 precmd="$repgc compile ${src_dir}/$n --out $binary --opt $opt_level --cc $cc >> $timingdata"
-                cmd="$timeoutcmd $timeoutseconds $precmd"
+                if [ "$timeoutcmd" == "" ]; then
+                    cmd=$precmd
+                else
+                    cmd="$timeoutcmd $timeoutseconds $precmd"
+                fi
                 echo "#$i"
                 echo $cmd
                 if [ "$dryrun" = false ]; then
                     eval "$cmd"
+                    if [ $? == 124 ]; then
+                        echo "# TIMED OUT!"
+                    fi
                 fi
                 echo ""
             done
