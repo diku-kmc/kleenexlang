@@ -46,32 +46,34 @@ GetOptions("length=i" => \$avglen,
            "as_only"  => \$only_a,
            "bs_only"  => \$only_b);
 my $lastnl = 0;
+
+# Ignore line count if set to only one char.
+$n = undef if (defined $only_a || defined $only_b);
+# a takes precedence
+$only_b = undef if (defined $only_a && defined $only_b);
+
 while (1) {
     last if ((defined $n && $n <= 0) || (defined $b && $b <= 0));
 
-    my $i = int(rand() * (2 * $avglen + 2));
-
     $b -= 1 if defined $b;
     $lastnl = 0;
-    if ($i < $avglen) {
-        if(defined $only_b) {
-            print "b";
-        } else {
-            print "a";
-        }
-    } elsif ($i < 2*$avglen) {
-        if(defined $only_a) {
-            print "a";
-        } else {
-            print "b";
-        }
+    
+    if (defined $only_a || defined $only_b) {
+        print "a" if (defined $only_a);
+        print "b" if (defined $only_b);
     } else {
-        print "\n";
-        $lastnl = 1;
-        $n -= 1 if defined $n;
-
-        last if ((defined $n && $n <= 0) || (defined $b && $b <= 0));
+        my $i = int(rand() * (2 * $avglen + 2));
+        if ($i < $avglen) {
+            print "a";
+        } elsif ($i < 2*$avglen) {
+            print "b";
+        } else {
+            print "\n";
+            $lastnl = 1;
+            $n -= 1 if defined $n;
+        }
     }
+    last if ((defined $n && $n <= 0) || (defined $b && $b <= 0));    
 }
 
 # Always add a newline at the end.
