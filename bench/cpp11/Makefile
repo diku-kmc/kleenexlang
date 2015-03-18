@@ -7,7 +7,8 @@ BINDIR=bin
 SOURCES = $(wildcard src/*.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 
-CXX=c++
+# Use clang instead of GCC because of the above.
+CXX=clang++
 CXXFLAGS=-O3 -std=c++11
 
 all: $(OBJECTS)
