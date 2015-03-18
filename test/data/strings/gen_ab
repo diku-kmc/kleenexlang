@@ -1,4 +1,0 @@
-#! /bin/bash
-
-export LC_CTYPE=C
-cat /dev/urandom | tr -c "" "$(perl -e 'print "a"x128 . "b"x128;')"

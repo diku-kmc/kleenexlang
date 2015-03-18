@@ -1,7 +1,0 @@
-#! /bin/bash
-
-# Always add a newline at end of file
-trap 'echo ""' SIGHUP SIGINT SIGTERM
-
-export LC_CTYPE=C
-cat /dev/zero | tr '\0' 'a'
