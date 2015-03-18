@@ -90,13 +90,22 @@ function run {
                 for i in $(seq 1 $warmup_reps); do
                     echo "# WARMUP #$i: "
                     echo $warmup_cmd
-                    if [ "$dryrun" = false ]; then eval $warmup_cmd ; fi
+                    if [ "$dryrun" = false ]; then
+                        eval $warmup_cmd
+                    fi
                 done
             fi
             for i in $(seq 1 $reps); do
                 echo "# Run #$i: "
                 echo $cmd
-                if [ "$dryrun" = false ]; then eval $cmd ; fi
+                if [ "$dryrun" = false ]; then
+                    eval $cmd
+                    if [ $? != 0 ]; then
+                        echo "# Hm, some sort of error occurred!"
+                        echo "# Here are the last five lines of stderr output:"
+                        tail -n 5 $outfile | while read el; do echo "#    $el"; done
+                    fi
+                fi
             done
         done
     done
