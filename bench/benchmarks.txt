@@ -6,10 +6,9 @@ csv_project3    	kleenex,re2,re2j,gawk,cpp11,oniguruma,perl,python,sed,tcl
 email           	kleenex,re2,re2j,gawk,grep,cpp11,oniguruma,perl,python,sed,tcl
 iso_datetime_to_json    kleenex,re2,re2j,gawk,cpp11,oniguruma,perl,python,sed,tcl
 ini2json            kleenex,gawk,perl,python,tcl
-issuu_json2sql  	kleenex,python
-id_ints         	kleenex
+issuu_json2sql  	kleenex,python,ragel
 patho1          	kleenex
-flip_ab             kleenex
+flip_ab             kleenex,ragel
 issuu_fallback  	kleenex
 issuu_nofallback    kleenex
 csv2json            kleenex

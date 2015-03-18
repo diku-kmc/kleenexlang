@@ -33,13 +33,20 @@ function set_compiler_names {
 function setname {
     name="${1}__${2}__${3}"
 }
+function usage {
+    echo "usage: $0 [-fh] [-p P] [-t N]"
+    echo " -f: force, perform compilation instead of just printing what to do."
+    echo " -h: print this usage and exit."
+    echo " -p P: only compile program P."
+    echo " -t N: set timeout to N seconds.  If N==0 there is no timeout."
+}
 
 dryrun=true
 only_do=""
 
-while getopts ":fo:t:" opt; do
+while getopts ":fhp:t:" opt; do
   case $opt in
-  o)
+  p)
       echo "# Only doing $OPTARG"
       only_do=$OPTARG
       ;;
@@ -61,8 +68,13 @@ while getopts ":fo:t:" opt; do
       dryrun=false
       echo "# NOT making a dry-run..."
       ;;
+  h)
+      usage
+      exit 2
+      ;;
   \?)
       echo "Invalid option: -$OPTARG" >&2
+      usage
       exit 1
       ;;
   esac
