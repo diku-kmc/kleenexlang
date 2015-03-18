@@ -36,11 +36,25 @@ transformations = {
     "ms"     : trans_ms
 }
 
+# Default base_dir is the directory of this script.
+base_dir = os.path.realpath("__file__")
+# Global var determining verbosity.
+is_verbose = False
+
 def default_version_name():
     return "DEFAULT"
 
 def get_plot_full_name(n):
     return os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots", n)
+
+def data_dir(impl, prog):
+    dd = os.path.join(os.path.dirname(base_dir), impl, "times", prog)
+    if is_verbose:
+        print "Reading from %s" % dd
+    return dd
+
+def test_data_dir():
+    return os.path.join(os.path.dirname(base_dir), "..", "test", "data")
 
 def g(): # For testing purposes.
     go(["simple_id"], ["cpp11"])
@@ -157,14 +171,6 @@ def get_input_file_size(inpf):
     except OSError: # File not found...
         return 0
 
-def data_dir(impl, prog):
-    return os.path.join(os.path.dirname(
-        os.path.realpath("__file__")),
-        impl, "times", prog)
-
-def test_data_dir():
-    return os.path.join(os.path.dirname(os.path.realpath("__file__")), "..", "test", "data")
-
 def read_benchmark_output(fn):
     times = []
     magic_word = "matching (ms):"   # ouch!
@@ -202,9 +208,17 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
         for version, inputfiles in versions.iteritems():
             for inputfile, times in inputfiles.iteritems():
                 if strip_input_file_suffix(inputfile) != inputname:
+                    if is_verbose:
+                        print "Skipping %s because the file name is wrong: %s" % (inputname, inputfile)
                     continue
                 if times == []:
+                    if is_verbose:
+                        print "Skipping %s because there are no time data." % inputfile
                     continue
+                if is_verbose:
+                    if version == default_version_name(): v = impl
+                    else: v = version
+                    print "Adding data from '%s', file \"%s\", to plot." % (v, inputfile)
                 plot_data.append(trans_fun(times))
                 if version == default_version_name():
                     v = None # I.e., there is only one version of the implementation
@@ -328,6 +342,9 @@ If no arguments are given, all programs are plotted.
     parser.add_argument('-c', 
                         help = "Alternate config file")
     parser.add_argument('-s', nargs='+', help = "Skip implementation")
+    parser.add_argument('-b', nargs=1,
+                        help = "Alternate base bench/ directory than current dir.")
+    parser.add_argument('-v', action='count', help = "Be more verbose.")
     args = parser.parse_args()
 
     if args.p == None: progs = []
@@ -340,5 +357,18 @@ If no arguments are given, all programs are plotted.
     else:
         print "Unknown transformation: %s!\nDefaulting to Mbit/s." % args.t
         transform = "Mbit/s"
+
+    if args.b != None:
+        old = base_dir
+        new = os.path.dirname(args.b[0])
+        if new == "":
+            print "Could not use %s as a base directory.  Using default." % args.b[0]
+        else:
+            base_dir = "%s/" % new
+            print "Using %s as base directory instead of %s." % (base_dir, old)
+
+    if args.v != None:
+        is_verbose = True
+        print "Entering verbose mode."
 
     go(progs, skip = args.s, default_transformation = transform)
