@@ -17,6 +17,7 @@ all: $(OBJ)
 email: src/email.o
 flip_ab: src/flip_ab.o
 aaa: src/aaa.o
+issuu_json2sql: src/issuu_json2sql.o
 
 install-ragel:
 	./getragel.sh $(RAGEL)
