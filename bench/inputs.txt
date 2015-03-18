@@ -11,7 +11,7 @@ csv2json_nows	    csv/csv_format1_250mb.csv
 # json2csv            csv/csv_format1_250mb.csv.csv.ws.json
 as                  strings/as_100mb.txt
 csv_project3        csv/csv_format1_250mb.csv
-email               email/emails_250mb.txt
+email               email/emails_100mb.txt
 iso_datetime_to_json datetime/datetimes_250mb.txt
 ini2json            ini/inifile_250mb.ini
 

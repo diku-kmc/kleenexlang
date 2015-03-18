@@ -176,6 +176,9 @@ generate-inifile:
 	@echo "Generating a 250 MB .ini file..."
 	(cd ../test/data/init && ./gen_ini.pl -s 250000000 > inifile_250mb.ini)
 
+generate-urls:
+	@echo "Generating 100 MB URLs..."
+	(cd ../test/data/url && ./gen_url.pl -s 100000000 > urls_100mb.txt)
 
 
 install-benchmark-dependencies:

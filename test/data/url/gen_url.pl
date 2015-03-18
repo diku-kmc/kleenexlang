@@ -15,7 +15,7 @@ Generate 1000 urls
 
 Generate 250000000 bytes worth of URLs
 
-    gen_url.pl -b 250000000
+    gen_url.pl -s 250000000
 
 Generate an endless stream of URLs 
 
@@ -29,7 +29,7 @@ my $n = undef;
 my $b = undef;
 
 GetOptions("num=i"    => \$n,
-           "bytes=i"  => \$b);
+           "size_bytes=i"  => \$b);
 
 sub gen_string {
     my ($chars, $min_length, $max_length) = @_;

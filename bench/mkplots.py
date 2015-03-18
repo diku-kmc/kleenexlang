@@ -212,8 +212,10 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
                     v = version
                 lbls.append((impl, v))
     numBoxes = len(plot_data)
+    outfilename = get_plot_full_name(output_name)
     if numBoxes == 0:
         plt.close()
+        print "Not writing %s - nothing on the plot." % outfilename
         return False
     returnCode = False
     # Make the actual boxplot
@@ -271,7 +273,6 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
     ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls), rotation = 45, horizontalalignment="right")
     try: plt.tight_layout()
     except UserWarning: pass
-    outfilename = get_plot_full_name(output_name)
     fig.savefig(outfilename)
     print "Wrote file %s" % outfilename
     plt.close()
