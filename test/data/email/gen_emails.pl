@@ -1,10 +1,21 @@
 #!/usr/bin/env perl
 use 5.012;
 use warnings;
+use Getopt::Long;
 
 =head1 NAME
 
 C<gen_emails.pl> - Generates emails; some valid, some not valid.
+
+=head1 USAGE
+
+Generate a 250mb file with email addresses.
+
+    gen_emails.pl -s 250000000
+
+Generate an endless stream of email addresses.
+    
+    gen_emails.pl
 
 =cut
 
@@ -65,6 +76,14 @@ sub mutate {
     return $mail;
 }
 
+# Approx. number of bytes to generate.
+my $b = undef;
+
+GetOptions("size_bytes=i"  => \$b);
+
 while (1) {
-    printf("%s\n", mutate(gen_email));
+    my $m = mutate(gen_email);
+    $b -= length($m) if defined $b;
+    printf("%s\n", $m);
+    last if (defined $b && $b <= 0);
 }

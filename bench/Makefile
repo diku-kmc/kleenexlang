@@ -152,20 +152,31 @@ iso_datetime_to_json: iso_datetime_to_json.ko
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
-generate-test-data:
-	@echo "Generating/fetching test data..."
+generate-test-data: generate-strings generate-emails generate-csv generate-datetime generate-inifile
+
+generate-strings:
 	@echo "Generating 250 MB a/b lines with average line length of 1000..."
 	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 250000000 > ab_lines_len1000_250mb.txt)
 	@echo "Generating 100 MB \"a\"s on one line..."
 	(cd ../test/data/strings && ./gen_ab_lines.pl -n 1 -a -s 100000000 > as_100mb.txt)
-	@echo "Generating 250 MB email addresses..."
-	(cd ../test/data/email && ./gen_emails.pl -s 250000000 > emails_250mb.txt)
+
+generate-emails:
+	@echo "Generating 100 MB email addresses..."
+	(cd ../test/data/email && ./gen_emails.pl -s 100000000 > emails_100mb.txt)
+
+generate-csv:
 	@echo "Generating 250 MB \"format 1\" csv data..."
 	(cd ../test/data/csv && ./gen_csv.pl -f 1 -s 250000000 > csv_format1_250mb.txt)
+
+generate-datetime:
 	@echo "Generating 250 MB ISO datetime stamps..."
 	(cd ../test/data/datetime && ./gen_datetime.pl -s 250000000 > datetimes_250mb.txt)
+
+generate-inifile:
 	@echo "Generating a 250 MB .ini file..."
 	(cd ../test/data/init && ./gen_ini.pl -s 250000000 > inifile_250mb.ini)
+
+
 
 install-benchmark-dependencies:
 	@echo "Installing benchmark deps..."
