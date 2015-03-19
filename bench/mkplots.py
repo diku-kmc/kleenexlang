@@ -7,6 +7,22 @@ import glob
 import re
 import locale
 import os
+import errno
+import warnings
+import csv
+
+def colored(msg, color):
+    color_code = { 'green'   : "\033[32m",
+                   'yellow'  : '\033[33m',
+                   'red'     : '\033[31m',
+                   'cyan'    : '\033[36m'
+    }
+    try:
+        beg = color_code[color]
+        end = '\033[0m'
+        return beg + msg + end
+    except KeyError:
+        return msg
 
 def trans_Gbit_per_s(inputsize_bytes):
     return { "median_format_string" : "%.3f",
@@ -22,6 +38,13 @@ def trans_Mbit_per_s(inputsize_bytes):
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
              (prog, inputname, inputsize_bytes / 2.0**20)
          }
+def trans_s(inputsize_bytes):
+    return { "median_format_string" : "%d",
+             "trans_fun" : lambda ps : map(lambda p : p / 1000, ps),
+             "yaxis_label" : "Time (s)",
+             "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
+             (prog, inputname, inputsize_bytes / 2.0**20)
+         }
 def trans_ms(inputsize_bytes):
     return { "median_format_string" : "%d",
              "trans_fun" : lambda ps : ps,
@@ -33,25 +56,34 @@ def trans_ms(inputsize_bytes):
 transformations = {
     "Gbit/s" : trans_Gbit_per_s,
     "Mbit/s" : trans_Mbit_per_s,
+    "s"      : trans_s,
     "ms"     : trans_ms
 }
 
 # Default base_dir is the directory of this script.
-base_dir = os.path.realpath("__file__")
-# Global var determining verbosity.
+base_dir = os.path.dirname(os.path.realpath("__file__"))
+# Default plot_dir is plots/
+plot_dir = os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots")
+# Don't override plots if they already exist.
+force_override = False
+# Don't print so much gunk.
 is_verbose = False
+
+def verbose_print(msg):
+    if is_verbose:
+        print colored(msg, 'yellow')
+
+def warning_print(msg):
+    print colored(msg, 'red')
+
+def notice_print(msg):
+    print colored(msg, 'cyan')
 
 def default_version_name():
     return "DEFAULT"
 
-def get_plot_full_name(n):
-    return os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots", n)
-
 def data_dir(impl, prog):
-    dd = os.path.join(os.path.dirname(base_dir), impl, "times", prog)
-    if is_verbose:
-        print "Reading from %s" % dd
-    return dd
+    return os.path.join(os.path.dirname(base_dir), impl, "times", prog)
 
 def test_data_dir():
     return os.path.join(os.path.dirname(base_dir), "..", "test", "data")
@@ -176,6 +208,7 @@ def read_benchmark_output(fn):
     magic_word = "matching (ms):"   # ouch!
     other_magic_word = "time (ms):" #
     with open(fn, 'r') as f:
+        verbose_print("Looking in file %s" % fn)
         for line in f:
             if line.startswith(magic_word):
                 l = int(line[len(magic_word):].strip())
@@ -192,7 +225,6 @@ def read_benchmark_output(fn):
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
 # the skipThis returns True on an impl name if it should be skipped!
 def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
-#    data_trans = getDataTransformation(prog, output_name)
     trans_fun = data_trans["trans_fun"]
     median_format_string = data_trans["median_format_string"]
     yaxis_label = data_trans["yaxis_label"]
@@ -208,30 +240,30 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
         for version, inputfiles in versions.iteritems():
             for inputfile, times in inputfiles.iteritems():
                 if strip_input_file_suffix(inputfile) != inputname:
-                    if is_verbose:
-                        print "Skipping %s because the file name is wrong: %s" % (inputname, inputfile)
+                    verbose_print("Skipping %s because the file name is wrong: %s" % (inputname, inputfile))
                     continue
                 if times == []:
-                    if is_verbose:
-                        print "Skipping %s because there are no time data." % inputfile
+                    verbose_print("Skipping %s because there are no time data." % inputfile)
                     continue
-                if is_verbose:
-                    if version == default_version_name(): v = impl
-                    else: v = version
-                    print "Adding data from '%s', file \"%s\", to plot." % (v, inputfile)
-                plot_data.append(trans_fun(times))
+                if version == default_version_name(): v = impl
+                else: v = version
+                verbose_print("Adding data from '%s', file \"%s\", to plot." % (v, inputfile))
+                try:
+                    d = trans_fun(times)
+                except ZeroDivisionError:
+                    warning_print("Zero division for the data from %s in '%s'!" % (v, prog))
+                    continue
+                plot_data.append(d)
                 if version == default_version_name():
                     v = None # I.e., there is only one version of the implementation
                 else:
                     v = version
                 lbls.append((impl, v))
     numBoxes = len(plot_data)
-    outfilename = get_plot_full_name(output_name)
     if numBoxes == 0:
         plt.close()
-        print "Not writing %s - nothing on the plot." % outfilename
+        notice_print("Not writing %s - nothing on the plot." % output_name)
         return False
-    returnCode = False
     # Make the actual boxplot
     bp = ax.boxplot(x=plot_data, sym='+', vert=1)
     plt.setp(bp['boxes'], color='black')
@@ -285,12 +317,47 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
     ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(locale_formatter))
     ax.set_ylim(bottom=0)
     ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls), rotation = 45, horizontalalignment="right")
-    try: plt.tight_layout()
-    except UserWarning: pass
-    fig.savefig(outfilename)
-    print "Wrote file %s" % outfilename
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.tight_layout() # Throws an annoying warnings about renderers.
+    save_plot(fig, lbls, plot_data, plot_dir, output_name)
     plt.close()
     return True
+
+
+def save_plot(fig, labels, plot_data, directory, name):
+    make_sure_path_exists(directory)
+    fn = os.path.join(directory, name)
+    csv_fn = (lambda (n, _) : n + ".csv")(os.path.splitext(fn))
+    if not force_override and os.path.exists(fn):
+        warning_print("File %s already exists, skipping.  Use -f to override." % fn)
+    else:
+        fig.savefig(fn)
+        col_count = len(plot_data)
+        row_count = max(map(lambda l : len(l), plot_data))
+        with open(csv_fn, 'w') as csvfile:
+            csvwriter = csv.writer(csvfile)
+            row = []
+            for i in xrange(0, col_count):
+                nm,vs=labels[i]
+                row.append(format_label(nm, vs))
+            csvwriter.writerow(row)
+            for i in xrange(0, row_count):
+                row = []
+                for j in xrange(0, col_count):
+                    try: row.append(plot_data[j][i])
+                    except IndexError:
+                        row.append(None)
+                csvwriter.writerow(row)
+        print colored("Wrote file %s in dir %s" % (name, directory), 'green')
+
+        
+def make_sure_path_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError as exception:
+        if exception.errno != errno.EEXIST:
+            raise
 
 def get_box_coords(box):
     boxX = []
@@ -338,13 +405,16 @@ If no arguments are given, all programs are plotted.
     parser.add_argument('-p', nargs='+',
                         help='Name of the program to plot')
     parser.add_argument('-t',
-                        help = "Data transform (mbs=Mbit/s [DEFAULT], gbs=Gbit/s, ms=Milliseconds)")
+                        help = "Data transform (mbs=Mbit/s [DEFAULT], gbs=Gbit/s, s=Seconds, ms=Milliseconds)")
     parser.add_argument('-c', 
                         help = "Alternate config file")
     parser.add_argument('-s', nargs='+', help = "Skip implementation")
     parser.add_argument('-b', nargs=1,
                         help = "Alternate base bench/ directory than current dir.")
     parser.add_argument('-v', action='count', help = "Be more verbose.")
+    parser.add_argument('-d', nargs=1,
+                        help = "Destination directory for plots.  Default plots/")
+    parser.add_argument('-f', action='count', help = "Force overwrite of existing plots.")
     args = parser.parse_args()
 
     if args.p == None: progs = []
@@ -354,21 +424,34 @@ If no arguments are given, all programs are plotted.
     elif args.t == "mbs": transform = "Mbit/s"
     elif args.t == "gbs": transform = "Gbit/s"
     elif args.t == "ms":  transform = "ms"
+    elif args.t == "s":   transform = "s"
     else:
         print "Unknown transformation: %s!\nDefaulting to Mbit/s." % args.t
         transform = "Mbit/s"
 
     if args.b != None:
-        old = base_dir
         new = os.path.dirname(args.b[0])
         if new == "":
             print "Could not use %s as a base directory.  Using default." % args.b[0]
         else:
+            old = base_dir
             base_dir = "%s/" % new
             print "Using %s as base directory instead of %s." % (base_dir, old)
 
     if args.v != None:
         is_verbose = True
         print "Entering verbose mode."
+
+    if args.d != None:
+        new = os.path.dirname(args.d[0])
+        if new == "":
+            print "Could not use %s as a plots directory.  Using default." % args.d[0]
+        else:
+            old = plot_dir
+            plot_dir = "%s/" % new
+            print "Using %s as a plot directory instead of %s." % (plot_dir, old)
+
+    if args.f != None:
+        force_override = True
 
     go(progs, skip = args.s, default_transformation = transform)
