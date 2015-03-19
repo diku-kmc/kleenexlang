@@ -61,8 +61,9 @@ keyVal := ~<"ts":> "Timestamp=" someNumber sep
         | "Unknown key/Val: " someString ~<:> "/" (someString | someNumber) sep
 
 hash16 := <[a-f0-9]{16}>
-someString := ~<"> <[^"]*> ~<">
-someNumber := <[0-9]+>
+someString := ~<"> <([^"])*> ~<">
+//someString := ~<"> <(\\"|[^"])*> ~<">
+someNumber := <-?[0-9]+>
 
 eventType  := <impression|click|read|download|share|pageread|pagereadtime|continuation_load>
 causeType  := <impression|page|ad|related|archive>
