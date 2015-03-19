@@ -1,10 +1,21 @@
 #!/usr/bin/env perl
 use 5.012;
 use warnings;
+use Getopt::Long;
 
 =head1 NAME
 
 C<gen_datetime.pl> - Generates timestamps
+
+=head1 USAGE
+
+Generate a 250mb file.
+
+    gen_datetime.pl -s 250000000
+
+Generate an endless stream of datetime lines
+
+    gen_datetime.pl
 
 =cut
 
@@ -33,6 +44,13 @@ sub gen_date {
                    gen_timezone);
 }
 
+# Number of bytes emitted (approximately)
+my $b = undef;
+GetOptions("size_bytes=i"  => \$b);
+
 while (1) {
+    my $d = gen_date;
+    $b -= length($d) if defined $b;
     printf ("%s\n", gen_date);
+    last if (defined $b && $b <= 0);
 }
