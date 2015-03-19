@@ -61,7 +61,7 @@ transformations = {
 }
 
 # Default base_dir is the directory of this script.
-base_dir = os.path.dirname(os.path.realpath("__file__"))
+base_dir = os.path.realpath("__file__")
 # Default plot_dir is plots/
 plot_dir = os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots")
 # Don't override plots if they already exist.
@@ -123,6 +123,7 @@ def get_data(conf, only_progs = []):
             benchmarks[prog][impl] = {}
             # Get timing info from impl/time/prog/*
             timing_dirs = filter(os.path.isdir, glob.glob(data_dir(impl, prog) + "*"))
+            verbose_print("Getting data for %s with %s from %s" % (str(prog), impl, timing_dirs))
             for time_dir in timing_dirs:
                 if len(timing_dirs) > 1:
                     version = time_dir.split(os.path.sep)[-1]
@@ -233,12 +234,12 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
     lbls = []
     plot_data = []
     # Add the bars
-    for impl, versions in data.iteritems():
+    for impl, versions in iter(sorted(data.iteritems())):
         color_idx = 0
         if skipThis(impl, output_name):
             continue
-        for version, inputfiles in versions.iteritems():
-            for inputfile, times in inputfiles.iteritems():
+        for version, inputfiles in iter(sorted(versions.iteritems())):
+            for inputfile, times in iter(sorted(inputfiles.iteritems())):
                 if strip_input_file_suffix(inputfile) != inputname:
                     verbose_print("Skipping %s because the file name is wrong: %s" % (inputname, inputfile))
                     continue
@@ -349,7 +350,7 @@ def save_plot(fig, labels, plot_data, directory, name):
                     except IndexError:
                         row.append(None)
                 csvwriter.writerow(row)
-        print colored("Wrote file %s in dir %s" % (name, directory), 'green')
+        print colored("Case '%s' -- wrote files:\n  %s\n  %s" % (name, fn, csv_fn), 'green')
 
         
 def make_sure_path_exists(path):
@@ -370,7 +371,7 @@ def get_box_coords(box):
 def format_label(name, version):
     if version != None:
         v = format_version(version)
-        n = "\n"
+        n = " "
     else:
         v = ""
         n = ""
@@ -426,17 +427,17 @@ If no arguments are given, all programs are plotted.
     elif args.t == "ms":  transform = "ms"
     elif args.t == "s":   transform = "s"
     else:
-        print "Unknown transformation: %s!\nDefaulting to Mbit/s." % args.t
+        warning_print("Unknown transformation: %s!\nDefaulting to Mbit/s." % args.t)
         transform = "Mbit/s"
 
     if args.b != None:
         new = os.path.dirname(args.b[0])
         if new == "":
-            print "Could not use %s as a base directory.  Using default." % args.b[0]
+            warning_print("Could not use %s as a base directory.  Using default." % args.b[0])
         else:
             old = base_dir
             base_dir = "%s/" % new
-            print "Using %s as base directory instead of %s." % (base_dir, old)
+            notice_print("Using %s as base directory instead of %s." % (base_dir, old))
 
     if args.v != None:
         is_verbose = True
@@ -445,11 +446,11 @@ If no arguments are given, all programs are plotted.
     if args.d != None:
         new = os.path.dirname(args.d[0])
         if new == "":
-            print "Could not use %s as a plots directory.  Using default." % args.d[0]
+            warning_print("Could not use %s as a plots directory.  Using default." % args.d[0])
         else:
             old = plot_dir
             plot_dir = "%s/" % new
-            print "Using %s as a plot directory instead of %s." % (plot_dir, old)
+            notice_print("Using %s as a plot directory instead of %s." % (plot_dir, old))
 
     if args.f != None:
         force_override = True
