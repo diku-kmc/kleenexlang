@@ -1,7 +1,8 @@
 # Ignore everything in this directory
 *
-# Except this file, description files, and sample files
+# Except this file, description files, sample files and generator scripts.
 !.gitignore
 !desc_*.txt
 !*.sample.csv
 !*.sh
+!gen_*.pl
