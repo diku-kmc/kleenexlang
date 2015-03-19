@@ -72,17 +72,15 @@ function run {
             inv=${invocation_cmds[i]}
             inv_name=${invocation_cmds_names[i]}
             # Stitch together the actual command to run
-            # pf=$(echo $input | sed 's/\//_/g')
             pf=$(basename $input)
             out_dir="${flavor}/${time_dir}/${inv_name}"
-            mkdir -p "$out_dir"
             outfile="${out_dir}/${pf}${time_suffix}"
             _cmd="${inv} < ${data_dir}/${input} > /dev/null"
             warmup_cmd="$_cmd 2> /dev/null"
             cmd="$_cmd 2>> ${outfile}"
             if [ $warmup_reps -gt 0 ]; then
                 for i in $(seq 1 $warmup_reps); do
-                    echo "# WARMUP #$i: "
+                    echo "# WARMUP $i of $warmup_reps: "
                     echo $warmup_cmd
                     if [ "$dryrun" = false ]; then
                         eval $warmup_cmd
@@ -90,9 +88,10 @@ function run {
                 done
             fi
             for i in $(seq 1 $reps); do
-                echo "# Run #$i: "
+                echo "# Run $i of $reps: "
                 echo $cmd
                 if [ "$dryrun" = false ]; then
+                    mkdir -p "$out_dir"
                     eval $cmd
                     if [ $? != 0 ]; then
                         echo "# Hm, some sort of error occurred!"
