@@ -39,7 +39,7 @@ function set_invocation_names {
     elif [ $1 == "gawk"      ]; then a=("gawk/src/$prog.awk")
     elif [ $1 == "python"    ]; then a=("python python/src/$prog.py")
     elif [ $1 == "perl"      ]; then a=("perl perl/src/$prog.pl")
-    elif [ $1 == "tcl"       ]; then a=("tcl/src/$prog.tcl")
+    elif [ $1 == "tcl"       ]; then a=("tcl/tclsh tcl/src/$prog.tcl")
     elif [ $1 == "sed"       ]; then a=("sed/src/$prog.sh")
     elif [ $1 == "grep"      ]; then a=("grep/src/$prog.sh")
     elif [ $1 == "cpp11"     ]; then a=("cpp11/bin/$prog")
