@@ -45,7 +45,13 @@ function set_invocation_names {
     elif [ $1 == "cpp11"     ]; then a=("cpp11/bin/$prog")
     elif [ $1 == "oniguruma" ]; then a=("oniguruma/bin/$prog")
     elif [ $1 == "cat"       ]; then a=("cat/src/$prog.sh")
-    elif [ $1 == "ragel"     ]; then a=("ragel/bin/$prog")
+    elif [ $1 == "ragel"     ]; then
+        i=0
+        for p in $(ls ragel/bin/${prog}*); do
+            a[$i]=$p
+            b[$i]=$(basename $p)
+            i=$(expr $i + 1)
+        done
     else
         echo "Could not find invocation for $1"
         exit 1

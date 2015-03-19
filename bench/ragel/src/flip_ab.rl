@@ -1,8 +1,5 @@
-#include <string.h>
-#include <stdio.h>
-
-#define BUFFER_SIZE (200*1024*1024)
-#define LINE_LEN 100000000
+#include "../common.h"
+// Ragel implementation of the flip_ab
 
 %%{
   machine flip_ab;
@@ -14,15 +11,18 @@
 
 %% write data;
 
-char buffer[BUFFER_SIZE] = {0};
 int main(int argc, char **argv) {
-  int cs; // Current state
+
+  PRE;
   
-  while(fgets(buffer, LINE_LEN, stdin)) {
+  while(fgets(buffer, sizeof(buffer), stdin)) {
     char *p = &buffer[0];
     char *pe = p + strlen(buffer) + 1;
     %% write init;
     %% write exec;
   }
+
+  POST;
+  
   return 0;
 }

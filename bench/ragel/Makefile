@@ -11,8 +11,20 @@ all: $(OBJ)
 
 %.o: %.rl
 	@mkdir -p $(BIN_DIR)
-	./ragel $< -o src/$(*F).c
-	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F) src/$(*F).c
+	./ragel -T0 $< -o src/$(*F)-T0.c
+	./ragel -T1 $< -o src/$(*F)-T1.c
+	./ragel -F0 $< -o src/$(*F)-F0.c
+	./ragel -F1 $< -o src/$(*F)-F1.c
+	./ragel -G0 $< -o src/$(*F)-G0.c
+	./ragel -G1 $< -o src/$(*F)-G1.c
+	./ragel -G2 $< -o src/$(*F)-G2.c
+	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F)-T0 src/$(*F)-T0.c
+	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F)-T1 src/$(*F)-T1.c
+	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F)-F0 src/$(*F)-F0.c
+	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F)-F1 src/$(*F)-F1.c
+	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F)-G0 src/$(*F)-G0.c
+	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F)-G1 src/$(*F)-G1.c
+	$(CC) $(CCFLAGS) -o $(BIN_DIR)/$(*F)-G2 src/$(*F)-G2.c
 
 email: src/email.o
 flip_ab: src/flip_ab.o
@@ -25,5 +37,10 @@ install-ragel:
 	./getragel.sh $(RAGEL)
 
 .phony: clean
+
 clean:
+	rm -rf bin/
+
+uninstall-ragel:
 	rm -rf $(RAGEL)
+	rm -rf ragel
