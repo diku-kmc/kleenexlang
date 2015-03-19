@@ -81,5 +81,5 @@ while (1) {
 
     my $line = join(",", map { $_->() } @fields) . "\n";
     print $line;
-    $b -= length $line;
+    $b -= length $line if defined($b);
 }
