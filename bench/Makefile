@@ -95,8 +95,8 @@ utils/extracttime:
 		$(*F) $(ONIGURUMA_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Cat == Kleenex       " \
 		$(*F) $(CAT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
-	@bash utils/runequalstest.sh "Ragel == Kleenex     " \
-		$(*F) $(RAGEL_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Ragel-T0 == Kleenex     " \
+		$(*F) $(RAGEL_BINDIR)/$(*F)-T0 ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
