@@ -67,12 +67,17 @@ function set_invocation_names {
 
 
 function run {
+    tmp_file="output.tmp"
     testname=$1
     flavor=$2
     # Get names of input files.
     IFS=';' read -a inputs <<< $(cat ${input_table} | awk "\$1 ~ /${testname}/ { print \$2 }")
     # Set prog names and invocation commands.
     set_invocation_names $flavor $testname
+    if [ ${#invocation_cmds[@]} == 0 ]; then
+        printf "# No %s binaries for %s!  Skipping.\n" $flavor $testname
+        return
+    fi
     for input in ${inputs[@]}; do
         for i in $(seq 0 $(expr ${#invocation_cmds[@]} - 1)); do
             inv=${invocation_cmds[i]}
@@ -82,7 +87,7 @@ function run {
             out_dir="${flavor}/${time_dir}/${inv_name}"
             outfile="${out_dir}/${pf}${time_suffix}"
             _cmd="${inv} < ${data_dir}/${input} > /dev/null"
-            warmup_cmd="$_cmd 2> /dev/null"
+            warmup_cmd="$_cmd 2>> $tmp_file"
             cmd="$_cmd 2>> ${outfile}"
             if [ $warmup_reps -gt 0 ]; then
                 for i in $(seq 1 $warmup_reps); do
@@ -90,6 +95,12 @@ function run {
                     echo $warmup_cmd
                     if [ "$dryrun" = false ]; then
                         eval $warmup_cmd
+                        if [ $? != 0 ]; then
+                            echo "# Hm, some sort of error occurred!"
+                            echo "# Here are the last five lines of stderr output:"
+                            tail -n 5 $tmp_file | while read el; do echo "#    $el"; done
+                            break
+                        fi
                     fi
                 done
             fi
@@ -109,6 +120,7 @@ function run {
             done
         done
     done
+    rm -f $tmp_file
 }
 
 function usage {

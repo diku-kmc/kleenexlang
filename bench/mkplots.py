@@ -427,13 +427,14 @@ If no arguments are given, all programs are plotted.
     elif args.t == "ms":  transform = "ms"
     elif args.t == "s":   transform = "s"
     else:
-        warning_print("Unknown transformation: %s!\nDefaulting to Mbit/s." % args.t)
-        transform = "Mbit/s"
+        warning_print("Unknown transformation: '%s'!." % args.t)
+        exit(2)
 
     if args.b != None:
         new = os.path.dirname(args.b[0])
         if new == "":
-            warning_print("Could not use %s as a base directory.  Using default." % args.b[0])
+            warning_print("Could not use %s as a base directory." % args.b[0])
+            exit(2)
         else:
             old = base_dir
             base_dir = "%s/" % new
@@ -446,7 +447,8 @@ If no arguments are given, all programs are plotted.
     if args.d != None:
         new = os.path.dirname(args.d[0])
         if new == "":
-            warning_print("Could not use %s as a plots directory.  Using default." % args.d[0])
+            warning_print("Could not use %s as a plots directory." % args.d[0])
+            exit(2)
         else:
             old = plot_dir
             plot_dir = "%s/" % new
