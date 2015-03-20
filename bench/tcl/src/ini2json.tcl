@@ -5,7 +5,7 @@
 # Regular expression definitions
 set comment    {^\s*;|^\s*$}
 set headingRx  {^\s*\[([^\n\]]*)\]\s*$}
-set keyValueRx {^\s*([^;\s=\[]*)\s*=\s*([^\n]*)\s*$}
+set keyValueRx {^\s*([^;\s=\[]*)\s*=\s*([^\n]*?)\s*$}
 set quotedRx   {^".*"$}
 set bslashRx   {\\}
 set quoteRx    {\"}
@@ -14,6 +14,13 @@ set matched 0
 set key 0
 set value 0
 
+
+# Pre-compilation
+#set dummy [regexp $headingRx "" NULL]
+#set dummy [regexp $comment "" NULL]
+#set dummy [regexp $keyValueRx "" NULL]
+#set dummy [regexp $quotedRx "" NULL]
+#set dummy [regexp $quoteRx "" NULL]
 
 # Start timing
 set start [clock clicks -milliseconds]

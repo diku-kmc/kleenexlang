@@ -21,8 +21,8 @@ key := skipWs "\"" <[^; \t=\[\n]*> "\"" skipWs
 value := skipWs <"[^\n]*"> skipWs
        | skipWs "\"" escapedValue "\"" skipWs
 
-escapedValue := escapedChar escapedValue
-              | ""
+escapedValue := ""
+              | escapedChar escapedValue
 
 escapedChar := ~<\\> "\\\\"
              | ~<"> "\\\""
