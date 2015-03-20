@@ -30,7 +30,7 @@ testinput.email          := $(DATA_DIR)/email/emails_from_apache.txt
 testinput.ini2json       := $(DATA_DIR)/ini/php.ini
 testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
 testinput.url            := $(DATA_DIR)/url/test_urls.txt
-testinput.rot13			 := $(DATA_DIR)/strings/random_bytes.txt
+testinput.rot13			 := $(DATA_DIR)/strings/random_small.txt
 
 all:
 	@echo "Nothing to do."
@@ -157,7 +157,7 @@ rot13: rot13.ko
 
 generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile
 
-generate-strings: generate-ab-strings generate-a-strings
+generate-strings: generate-ab-strings generate-a-strings generate-random-string
 
 generate-ab-strings:
 	@echo "Generating 250 MB a/b lines with average line length of 1000..."
@@ -165,6 +165,9 @@ generate-ab-strings:
 generate-a-strings:
 	@echo "Generating 100 MB \"a\"s on one line..."
 	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 100000000 > as_100mb.txt)
+generate-random-string:
+	@echo "Generating 250 MB random characters..."
+	(cd ../test/data/strings && ./gen_random_chars.sh 250000000 > random_250mb.txt)
 
 generate-emails:
 	@echo "Generating 100 MB email addresses..."

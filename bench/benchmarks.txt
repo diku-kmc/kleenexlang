@@ -15,3 +15,4 @@ csv2json            kleenex
 csv2json_nows       kleenex
 json2csv            kleenex
 raw_io_speed        re2
+rot13               kleenex,ragel
