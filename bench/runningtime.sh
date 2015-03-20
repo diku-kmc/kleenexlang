@@ -140,11 +140,10 @@ while getopts ":fhi:p:w:r:" opt; do
         p)
             IFS=',' read -a only_cases <<< $OPTARG
             echo "# Only doing programs $only_cases"
-#            only_case=$OPTARG
             ;;
         i)
-            echo "# Only doing implementation $OPTARG"
-            only_prog=$OPTARG
+            IFS=',' read -a only_progs <<< $OPTARG
+            echo "# Only doing implementations $only_progs"
             ;;
         f)
             dryrun=false
@@ -187,8 +186,9 @@ for test_case in $all_test_cases; do
     if [ "$only_cases" != "" ] && [ "$c" == "y" ] ||
            [ "$only_cases" == "" ]; then
         for prog in $progs; do
-            if [ "$only_prog" != "" ] && [ "$only_prog" == $prog ] ||
-                   [ "$only_prog" == "" ] ; then
+            d=$(contains "${only_progs[@]}" $prog)
+            if [ "$only_progs" != "" ] && [ "$d" == "y" ] ||
+                   [ "$only_progs" == "" ] ; then
                 run $test_case $prog
             fi
         done
