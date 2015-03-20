@@ -431,9 +431,11 @@ If no arguments are given, all programs are plotted.
         exit(2)
 
     if args.b != None:
-        new = os.path.dirname(args.b[0])
+        a = args.b[0]
+        if not a.endswith(os.path.sep): a = a + os.path.sep
+        new = os.path.dirname(a)
         if new == "":
-            warning_print("Could not use %s as a base directory." % args.b[0])
+            warning_print("Could not use %s as a base directory." % a)
             exit(2)
         else:
             old = base_dir
@@ -445,9 +447,11 @@ If no arguments are given, all programs are plotted.
         print "Entering verbose mode."
 
     if args.d != None:
-        new = os.path.dirname(args.d[0])
+        a = args.d[0]
+        if not a.endswith(os.path.sep): a = a + os.path.sep
+        new = os.path.dirname(a)
         if new == "":
-            warning_print("Could not use %s as a plots directory." % args.d[0])
+            warning_print("Could not use %s as a plots directory." % a)
             exit(2)
         else:
             old = plot_dir
