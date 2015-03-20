@@ -175,7 +175,7 @@ generate-emails:
 
 generate-csv:
 	@echo "Generating 250 MB \"format 1\" csv data..."
-	(cd ../test/data/csv && ./gen_csv.pl -f 1 -s 250000000 > csv_format1_250mb.txt)
+	(cd ../test/data/csv && ./gen_csv.pl -f 1 -s 250000000 > csv_format1_250mb.csv)
 
 generate-datetime:
 	@echo "Generating 250 MB ISO datetime stamps..."
