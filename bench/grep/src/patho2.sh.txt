@@ -1,5 +1,4 @@
 #!/bin/bash
-source "${BASH_SOURCE%/*}"/../setup.sh
 
 # GNU grep version of the "patho2" program.
 
@@ -10,7 +9,8 @@ source "${BASH_SOURCE%/*}"/../setup.sh
 # anymore.  Furhermore, the "patho2" program is supposed to emit blank lines
 # for all lines ending in an "a", but grep skips those lines.
 
-echo "fail"
+printf "not implemented\n" >> /dev/stderr
+exit 1
 
 # regex="([a-z]*a)|([a-z]*b)"
 
