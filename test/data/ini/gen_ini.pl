@@ -17,13 +17,13 @@ Generate an endless stream of ini file.
 
 my @comm_chars = ( 'a' .. 'z', 'A' .. 'Z', '0' .. '9', '=', ' ' );
 my @sect_chars = ( 'a' .. 'z', 'A' .. 'Z', '0' .. '9', '=', '_', "-" );
-my @key_chars = ( 'a' .. 'z', 'a' .. 'z', '0' .. '9', '=', '_', "-" );
-my @value_chars = ( 'a' .. 'z', 'a' .. 'z', '0' .. '9', '=', '_', "-", ' ' );
+my @key_chars = ( 'a' .. 'z', 'a' .. 'z', '0' .. '9', '_', "-" );
+my @value_chars = ( 'a' .. 'z', 'a' .. 'z', '0' .. '9', '_', "-", ' ' );
 my @value_chars_quot = ( 'a' .. 'z', 'a' .. 'z', '0' .. '9', '=', '_', "-", ' ');
 
 sub comment {
     my $r = "";
-    if (rand() < 0.9) {
+    if (rand() < 0.8) {
         $r = $r . ";";
         for my $i (1 .. rand(200)) {
             $r = $r . $comm_chars[rand @comm_chars];
@@ -46,7 +46,7 @@ sub comments {
 sub section {
     my $r = "";
     $r = $r . "[";
-    for my $i (1 .. rand(50)) {
+    for my $i (1 .. 10+rand(50)) {
         $r = $r . $sect_chars[rand @sect_chars];
     }
     $r = $r . "]\n";
@@ -55,7 +55,7 @@ sub section {
 
 sub keyvalue {
     my $r = "";
-    for my $i (1 .. rand(30)) {
+    for my $i (1 .. 10+rand(30)) {
         $r = $r . $key_chars[rand @key_chars];
     }
     $r = $r . " "x(rand(3)) . "=" . " "x(rand(3));
@@ -80,16 +80,15 @@ GetOptions("size_bytes=i" => \$b);
 
 while (1) {
     my $r = comments;
-    $r = $r . section;
-    print $r;
-
-    $b -= length($r) if (defined $b);
+    $r .= section;
 
     for my $i (1 .. rand(20)) {
-        $r = comment if (rand() < 0.3);
-        $r = $r . keyvalue;
-        print $r;
-        $b -= length($r) if (defined $b);
+        $r .= comment if (rand() < 0.3);
+        $r .= keyvalue;
     }
+
+    $b -= length($r) if (defined $b);
+    print $r;
+
     last if (defined $b && $b <= 0);
 }

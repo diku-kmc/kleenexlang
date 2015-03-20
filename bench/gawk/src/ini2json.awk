@@ -33,7 +33,7 @@ match($0, /^\s*\[([^\n\]]*)\]\s*$/, m) {
 }
 
 # Key-value pairs
-match($0, /^\s*([^; =\[]*)\s*=\s*([^\n]*)\s*$/, m) {
+match($0, /^\s*([^; =\[]*)\s*=\s*([^\n]*\S|)\s*$/, m) {
     key   = m[1]
     value = m[2]
     if (! match (value, /^".*"$/)) {

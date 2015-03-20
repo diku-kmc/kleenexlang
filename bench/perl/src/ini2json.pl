@@ -10,7 +10,7 @@ my $pre_compile = time;
 
 my $commentRx  = qr/^\s*;|^\s*$/;
 my $headingRx  = qr/^\s*\[([^\n\]]*)\]\s*$/;
-my $keyValueRx = qr/^\s*([^;\s=\[]*)\s*=\s*([^\n]*)\s*$/;
+my $keyValueRx = qr/^\s*([^;\s=\[]*)\s*=\s*([^\n]*?)\s*$/;
 my $quotedRx   = qr/^".*"$/;
 my $bslashRx   = qr/\\/;
 my $quoteRx    = qr/"/;

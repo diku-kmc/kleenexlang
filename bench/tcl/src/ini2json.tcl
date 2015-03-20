@@ -5,7 +5,7 @@
 # Regular expression definitions
 set comment    {^\s*;|^\s*$}
 set headingRx  {^\s*\[([^\n\]]*)\]\s*$}
-set keyValueRx {^\s*([^;\s=\[]*)\s*=\s*([^\n]*)\s*$}
+set keyValueRx {^\s*([^;\s=\[]*)\s*=\s*([^\n]*?)\s*$}
 set quotedRx   {^".*"$}
 set bslashRx   {\\}
 set quoteRx    {\"}
