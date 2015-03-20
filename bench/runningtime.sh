@@ -138,8 +138,9 @@ function usage {
 while getopts ":fhi:p:w:r:" opt; do
     case $opt in
         p)
-            echo "# Only doing program $OPTARG"
-            only_case=$OPTARG
+            IFS=',' read -a only_cases <<< $OPTARG
+            echo "# Only doing programs $only_cases"
+#            only_case=$OPTARG
             ;;
         i)
             echo "# Only doing implementation $OPTARG"
@@ -167,11 +168,24 @@ while getopts ":fhi:p:w:r:" opt; do
     esac
 done
 
+function contains() {
+    arr=$1
+    value=$2
+    case "${arr}" in
+        *$value*) echo "y"
+                  return 0
+                  ;;
+    esac
+    echo "n"
+    return 1
+}
+
 # Run!
 for test_case in $all_test_cases; do
     IFS=',' read -a progs <<< $(cat ${test_case_table} | awk "\$1 ~ /${test_case}/ { print \$2 }")
-    if [ "$only_case" != "" ] && [ "$only_case" == "$test_case" ] ||
-           [ "$only_case" == "" ]; then
+    c=$(contains "${only_cases[@]}" $test_case)
+    if [ "$only_cases" != "" ] && [ "$c" == "y" ] ||
+           [ "$only_cases" == "" ]; then
         for prog in $progs; do
             if [ "$only_prog" != "" ] && [ "$only_prog" == $prog ] ||
                    [ "$only_prog" == "" ] ; then

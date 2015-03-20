@@ -383,7 +383,7 @@ def format_version(vstring):
     ret_string = ""
     
     try:
-        m = re.match(".*__([0-9]+)__(.*)", vstring)
+        m = re.match(".*__(.+)__(.*)", vstring)
         opt_level = m.group(1)
         compiler = m.group(2)
         ret_string = "%s, %s" % (opt_level, compiler)
