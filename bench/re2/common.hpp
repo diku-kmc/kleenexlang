@@ -17,7 +17,7 @@ using namespace std;
 #endif
 
 #define MATCH_ERROR                                             \
-  fprintf(stderr, "match error on line %d\n%s", line, buffer);  \
+  fprintf(stderr, "match error on line %d\n", line);            \
   return 1;
 
 #define PRE_COMPILE                             \
