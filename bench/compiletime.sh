@@ -3,7 +3,8 @@
 
 repgc=../dist/build/repg/repg # Location of our compiler
 
-opt_levels=(0 3)
+# 'nola' is "no lookahead" and 'la' is "lookahead"
+opt_levels=(0-nola 3-nola 3-la)
 compiler_conf_file="${BASH_SOURCE%/*}/compilers.txt"
 reps=1
 src_dir="kleenex/src"
@@ -85,7 +86,9 @@ set_compiler_names
 mkdir -p $time_dir
 mkdir -p $bin_dir
 
-for opt_level in ${opt_levels[@]}; do # for each SST optimization level
+for opt_la_level in ${opt_levels[@]}; do # for each SST optimization level
+    opt_level=${opt_la_level%-*}
+    lookahead=${opt_la_level#*-}
     for i in $(seq 0 $(expr ${#ccs[@]} - 1)); do # for each C compiler available
         cc=${ccs[i]}
         cc_name=${ccs_names[i]}
@@ -98,14 +101,19 @@ for opt_level in ${opt_levels[@]}; do # for each SST optimization level
                     continue;
                 fi
             fi
-            setname $n $opt_level $cc_name
+            setname $n $opt_la_level $cc_name
             timingdata="${time_dir}/${name}${compiletime_postfix}"
             if [ "$cleardata" = true ]; then
                 cat /dev/null > $timingdata
             fi
             for i in `seq 1 $reps`; do
                 binary="${bin_dir}/${name}"
-                precmd="$repgc compile ${src_dir}/$n --out $binary --opt $opt_level --cc $cc >> $timingdata"
+                if [ "$lookahead" == "la" ]; then
+                    la_on_off="--la=true"
+                else
+                    la_on_off="--la=false"
+                fi
+                precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off --opt $opt_level --cc $cc >> $timingdata"
                 if [ "$timeoutcmd" == "" ]; then
                     cmd=$precmd
                 else
