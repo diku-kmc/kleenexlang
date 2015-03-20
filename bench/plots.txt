@@ -13,3 +13,6 @@ simple_id             cat,cpp11    DEFAULT           Mbit/s                simpl
 simple_id             ,            DEFAULT           Gbit/s                simple_id-ALL.pdf
 simple_id             ,            DEFAULT           ms                    simple_id-ms.pdf
 as                    ,            DEFAULT           ms                    as-ms.pdf
+as                    ,            DEFAULT           Mbit/s                as-mbs.pdf
+email                 ,            DEFAULT           Mbit/s                email-all.pdf
+email                 grep         DEFAULT           Mbit/s                email-nogrep.pdf
