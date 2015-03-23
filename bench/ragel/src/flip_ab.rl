@@ -1,12 +1,17 @@
 #include "../common.h"
 // Ragel implementation of the flip_ab
 
+char outchar;
 %%{
   machine flip_ab;
-  action mk_a { fputs("a", stdout); }
-  action mk_b { fputs("b", stdout); }
+  action out {
+    fputs(&outchar, stdout);
+  }
 
-  main := ( 'a' $mk_b | 'b' $mk_a )* @{  };
+  a = 'a' > { outchar = 'b'; };
+  b = 'b' > { outchar = 'a'; };
+  
+  main := (a | b)* $ out;
 }%%
 
 %% write data;
@@ -16,10 +21,13 @@ int main(int argc, char **argv) {
   PRE;
   
   while(fgets(buffer, sizeof(buffer), stdin)) {
-    char *p = &buffer[0];
-    char *pe = p + strlen(buffer) + 1;
+    INIT_LINE;
     %% write init;
     %% write exec;
+
+    if(p+1 != pe) {
+      FAIL;
+    }
   }
 
   POST;

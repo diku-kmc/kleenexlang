@@ -44,8 +44,7 @@ int main(int argc, char **argv) {
   PRE
 
   while(fgets(buffer, sizeof(buffer), stdin)) {
-    char *p = &buffer[0];
-    char *pe = p + strlen(buffer) + 1;
+    INIT_LINE;
     %% write init;
     %% write exec;
   }

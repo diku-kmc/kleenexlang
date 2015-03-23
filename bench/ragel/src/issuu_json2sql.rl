@@ -21,7 +21,7 @@ int echo = 0;
   sep = ws ':' ws;
   keepComma = ws ',' %{ fputs(",", stdout); };
   dropComma = ws ',';
-  someInt = /-?[0-9]*/; 
+  someInt = '-'? [0-9]*;
   someString = /[^"\n]*/;
   qt = '\"' > { fputs("'", stdout); };
   stringReplaceQuotes = qt (someString > echo_on % echo_off) qt;
@@ -39,7 +39,7 @@ int echo = 0;
   object = curl_start (ws keyVal)* ws curl_end;
 
 
-  json2sql = (object ws)*;
+  json2sql = (object ws)* '\n';
   
   main := json2sql $ print;
 }%%
@@ -55,14 +55,17 @@ int main(int argc, char **argv) {
   int first = 1;
 
   while(fgets(buffer, sizeof(buffer), stdin)) {
-    char *p  = &buffer[0];
-    char *pe = p + strlen(buffer) + 1;
+    INIT_LINE;
     if(!first) {
       fputs(",\n", stdout);
     }
     first = 0;
     %% write init;
     %% write exec;
+
+    if (p != pe) {
+       FAIL;
+    }
   }
   fputs(";\n", stdout);
   

@@ -16,6 +16,14 @@ char buffer[BUFFER_SIZE] = {0};
   uint64_t stop = getTimeMs();                              \
   fprintf(stderr, "\nmatching (ms): %" PRIu64 "\n", stop - start);
 
+#define FAIL                                            \
+  fprintf(stderr, "matching failed (%p %p)!\n", p, pe); \
+  return 1;                                                            
+
+#define INIT_LINE                               \
+  char *p = &buffer[0];                         \
+  char *pe = p + strlen(buffer);
+
 
 uint64_t getTimeMs() {
     struct timeval tv;
