@@ -27,7 +27,7 @@ stringReplaceQuotes := qt someString qt
 qt := "'" ~<"> // replace double with single quote
 sep := ws ~<:> ws
 someString := <[^"\n]*>
-someInt := <[0-9]*>
+someInt := <-?[0-9]*>
 someNumber := someInt <\.> someInt
 contryCode := <[A-Z]{2}>
 
