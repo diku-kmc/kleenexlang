@@ -29,7 +29,7 @@ char *mark;
 
   fb = /[^\n]*/;
   
-  main := ((email > 10 >mark %print | (fb > 5)) '\n')* ;
+  main := ((email >mark %print | (fb - email)) '\n')* ;
 }%%
 /*
 Call "mark" upon entry to the sub-machine "email".
@@ -47,6 +47,10 @@ int main(int argc, char **argv) {
     INIT_LINE;
     %% write init;
     %% write exec;
+
+    if (p != pe) {
+      FAIL;
+    }
   }
 
   POST
