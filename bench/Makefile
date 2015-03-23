@@ -96,7 +96,7 @@ utils/extracttime:
 	@bash utils/runequalstest.sh "Cat == Kleenex       " \
 		$(*F) $(CAT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Ragel-T1 == Kleenex     " \
-		$(*F) $(RAGEL_BINDIR)/$(*F)-T0 ${testinput.$(*F)} $(*F).out
+		$(*F) $(RAGEL_BINDIR)/$(*F)-T1 ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
