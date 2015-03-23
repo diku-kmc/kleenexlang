@@ -121,8 +121,14 @@ def get_data(conf, only_progs = []):
         benchmarks[prog] = {}
         for impl in impls:
             benchmarks[prog][impl] = {}
+            # Really ugly hack!  Because of csv2json and csv2json_nows, which only
+            # overlap for Kleenex as they are only implemented there...
+            if impl == "kleenex": 
+                sp = "%s.kex" % prog
+            else:
+                sp = prog
             # Get timing info from impl/time/prog/*
-            timing_dirs = filter(os.path.isdir, glob.glob(data_dir(impl, prog) + "*"))
+            timing_dirs = filter(os.path.isdir, glob.glob(data_dir(impl, sp) + "*"))
             verbose_print("Getting data for %s with %s from %s" % (str(prog), impl, timing_dirs))
             for time_dir in timing_dirs:
                 if len(timing_dirs) > 1:

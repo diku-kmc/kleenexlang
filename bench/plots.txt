@@ -16,3 +16,5 @@ as                    ,            DEFAULT           ms                    as-ms
 as                    ,            DEFAULT           Mbit/s                as-mbs.pdf
 email                 ,            DEFAULT           Mbit/s                email-all.pdf
 email                 grep         DEFAULT           Mbit/s                email-nogrep.pdf
+issuu_json2sql        ,            DEFAULT           Mbit/s                issuu_json2sql-mbs.pdf
+issuu_json2sql        ,            DEFAULT           ms                    issuu_json2sql-ms.pdf
