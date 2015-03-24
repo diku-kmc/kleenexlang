@@ -171,6 +171,9 @@ generate-strings: generate-ab-strings generate-a-strings generate-random-string
 generate-ab-strings:
 	@echo "Generating 250 MB a/b lines with average line length of 1000..."
 	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 250000000 > ab_lines_len1000_250mb.txt)
+	@echo "Generating 250 MB a/b lines with average line length of 80..."
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 80 -s 250000000 > ab_lines_len80_250mb.txt)
+
 generate-a-strings:
 	@echo "Generating 100 MB \"a\"s on one line..."
 	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 100000000 > as_100mb.txt)

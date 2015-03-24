@@ -32,7 +32,7 @@ def trans_Gbit_per_s(inputsize_bytes):
              (prog, inputname, inputsize_bytes / 2.0**20)
          }
 def trans_Mbit_per_s(inputsize_bytes):
-    return { "median_format_string" : "%.2f",
+    return { "median_format_string" : "%.1f",
              "trans_fun" : lambda ps : map(lambda p : ((inputsize_bytes * 8) / 1e6) / (p / 1000.0), ps),
              "yaxis_label" : "MBit/s",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %

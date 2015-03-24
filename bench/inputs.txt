@@ -1,5 +1,5 @@
 # Benchmark name    Semicolon-separated input data 
-simple_id           strings/ab_lines_len1000_250mb.txt
+simple_id           strings/ab_lines_len1000_250mb.txt;strings/ab_lines_len80_250mb.txt
 patho1              strings/ab_lines_len1000_250mb.txt
 patho2	            strings/ab_lines_len1000_250mb.txt
 flip_ab             strings/ab_lines_len1000_250mb.txt
