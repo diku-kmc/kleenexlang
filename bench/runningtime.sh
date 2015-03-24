@@ -15,8 +15,6 @@ time_dir="times"
 warmup_reps=0   # Number of warm-up runs
 reps=1          # Number of measured runs
 dryrun=true     # Do a dry-run (i.e., only show what to do)
-only_case=""    # If set, do /only/ this test case
-only_prog=""    # If set, do /only/ this program
 
 
 invocation_cmds=()
@@ -79,6 +77,10 @@ function run {
         return
     fi
     for input in ${inputs[@]}; do
+        c=$(contains "${only_inputdata[@]}" $input)
+        if [ "$only_inputdata" != "" ] && [ "$c" != "y" ]; then
+            continue;
+        fi
         for i in $(seq 0 $(expr ${#invocation_cmds[@]} - 1)); do
             inv=${invocation_cmds[i]}
             inv_name=${invocation_cmds_names[i]}
@@ -135,7 +137,7 @@ function usage {
 }
 
 # Parse command-line parameters.
-while getopts ":fhi:p:w:r:" opt; do
+while getopts ":fhi:p:w:r:d:" opt; do
     case $opt in
         p)
             IFS=',' read -a only_cases <<< $OPTARG
@@ -144,6 +146,10 @@ while getopts ":fhi:p:w:r:" opt; do
         i)
             IFS=',' read -a only_progs <<< $OPTARG
             echo "# Only doing implementations $only_progs"
+            ;;
+        d)
+            IFS=',' read -a only_inputdata <<< $OPTARG
+            echo "# Only doing programs that read input files $only_inputdata"
             ;;
         f)
             dryrun=false
