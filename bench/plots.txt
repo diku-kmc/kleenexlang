@@ -11,7 +11,7 @@
 ##########################################################################################
 simple_id             cat,cpp11    DEFAULT           Mbit/s                simple_id.pdf
 simple_id             ,            DEFAULT           Gbit/s                simple_id-ALL.pdf
-simple_id             cat          ab_lines_len80_250mb.txt  Mbit/s        simple_id-l80.pdf
+simple_id             cat          strings/ab_lines_len80_250mb.txt  Mbit/s        simple_id-l80.pdf
 simple_id             ,            DEFAULT           ms                    simple_id-ms.pdf
 as                    ,            DEFAULT           ms                    as-ms.pdf
 as                    ,            DEFAULT           Mbit/s                as-mbs.pdf
