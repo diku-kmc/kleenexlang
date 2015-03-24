@@ -25,6 +25,7 @@ issuu_json2sql: src/issuu_json2sql.o
 rot13: src/rot13.o
 iso_datetime_to_json: src/iso_datetime_to_json.o
 csv_project3: src/csv_project3.o
+csv2json: src/csv2json.o
 
 install-ragel:
 	./getragel.sh $(RAGEL)

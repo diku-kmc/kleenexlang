@@ -31,6 +31,7 @@ testinput.ini2json       := $(DATA_DIR)/ini/php.ini
 testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
 testinput.url            := $(DATA_DIR)/url/test_urls.txt
 testinput.rot13			 := $(DATA_DIR)/strings/random_small.txt
+testinput.csv2json       := $(DATA_DIR)/csv/csv_format1.sample.csv
 
 all:
 	@echo "Nothing to do."
@@ -54,6 +55,7 @@ data_check:
 	@[ -f ${testinput.ini2json} ] || (echo "Missing test data file: ${testinput.ini2json}" && false)
 	@[ -f ${testinput.iso_datetime_to_json} ] || (echo "Missing test data file: ${testinput.iso_datetime_to_json}" && false)
 	@[ -f ${testinput.rot13} ] || (echo "Missing test data file: ${testinput.rot13}" && false)
+	@[ -f ${testinput.csv2json} ] || (echo "Missing test data file: ${testinput.csv2json}" && false)
 	@echo "Test data OK."
 
 # Check that RE2, Python, and Kleenex compute the same output
@@ -151,6 +153,7 @@ email: email.ko
 ini2json: ini2json.ko
 iso_datetime_to_json: iso_datetime_to_json.ko
 rot13: rot13.ko
+csv2json: csv2json.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
