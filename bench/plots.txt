@@ -15,6 +15,7 @@ simple_id             ,            DEFAULT           ms                    simpl
 as                    ,            DEFAULT           ms                    as-ms.pdf
 as                    ,            DEFAULT           Mbit/s                as-mbs.pdf
 email                 ,            DEFAULT           Mbit/s                email-all.pdf
+email                 ,            DEFAULT           ms                    email-all-ms.pdf
 email                 grep         DEFAULT           Mbit/s                email-nogrep.pdf
 issuu_json2sql        ,            DEFAULT           Mbit/s                issuu_json2sql-mbs.pdf
 issuu_json2sql        ,            DEFAULT           ms                    issuu_json2sql-ms.pdf
