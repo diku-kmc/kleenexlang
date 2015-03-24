@@ -29,6 +29,7 @@
     <mkjar prog="Patho2"      jarname="patho2.jar"       />
     <mkjar prog="Email"       jarname="email.jar"        />
     <mkjar prog="IsoDatetimeToJson" jarname="iso_datetime_to_json.jar" />
+    <mkjar prog="RawSpeed"  jarname="rawspeed.jar" />
   </target>
 
 
