@@ -88,9 +88,6 @@ def data_dir(impl, prog):
 def test_data_dir():
     return os.path.join(os.path.dirname(base_dir), "..", "test", "data")
 
-def g(): # For testing purposes.
-    go(["simple_id"], ["cpp11"])
-
 def go(progs = [], skip = None, default_transformation = "ms"):
     conf, inputs, skips = get_benchmark_configuration()
     if skip != None: # Override whatever is read from plots.txt
@@ -162,6 +159,7 @@ def plot_all(benchmarks, inputNames, plotConfMap, skipFun, getTransformation):
                 continue
             inputname = os.path.basename(inputfile)
             inputsize = get_input_file_size(inputfile)
+            verbose_print("Size: %s" % str(inputsize))
             def sf(i, n): # Specialise the skip function to this program.
                 try: return skipFun(prog, i, n)
                 except KeyError: return False
@@ -205,9 +203,11 @@ def get_benchmark_configuration(conf_file = "benchmarks.txt",
     return (conf, inputs, plots)
 
 def get_input_file_size(inpf):
+    f = os.path.join(test_data_dir(), inpf)
     try:
-        return os.lstat(os.path.join(test_data_dir(), inpf)).st_size
+        return os.lstat(f).st_size
     except OSError: # File not found...
+        warning_print("Could not get size of \"%s\", file not found!" % f)
         return 0
 
 def read_benchmark_output(fn):
