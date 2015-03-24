@@ -100,6 +100,10 @@ utils/extracttime:
 		$(*F) $(CAT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Ragel-T1 == Kleenex     " \
 		$(*F) $(RAGEL_BINDIR)/$(*F)-T1 ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Ragel-F1 == Kleenex     " \
+		$(*F) $(RAGEL_BINDIR)/$(*F)-F1 ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Ragel-G2 == Kleenex     " \
+		$(*F) $(RAGEL_BINDIR)/$(*F)-G2 ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
