@@ -102,23 +102,20 @@ for opt_la_level in ${opt_levels[@]}; do # for each SST optimization level
                 fi
             fi
             setname $n $opt_la_level $cc_name
+            if [ "$lookahead" == "la" ]; then
+                la_on_off="--la=true"
+            else
+                la_on_off="--la=false"
+            fi
             timingdata="${time_dir}/${name}${compiletime_postfix}"
-            if [ "$cleardata" = true ]; then
-                cat /dev/null > $timingdata
+            binary="${bin_dir}/${name}"
+            precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off --opt $opt_level --cc $cc >> $timingdata"
+            if [ "$timeoutcmd" == "" ]; then
+                cmd=$precmd
+            else
+                cmd="$timeoutcmd $timeoutseconds $precmd"
             fi
             for i in `seq 1 $reps`; do
-                binary="${bin_dir}/${name}"
-                if [ "$lookahead" == "la" ]; then
-                    la_on_off="--la=true"
-                else
-                    la_on_off="--la=false"
-                fi
-                precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off --opt $opt_level --cc $cc >> $timingdata"
-                if [ "$timeoutcmd" == "" ]; then
-                    cmd=$precmd
-                else
-                    cmd="$timeoutcmd $timeoutseconds $precmd"
-                fi
                 echo "#$i"
                 echo $cmd
                 if [ "$dryrun" = false ]; then
