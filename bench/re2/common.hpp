@@ -51,7 +51,7 @@ char buffer[BUFFER_SIZE] = {0};
 
 #define FOR_EACH_LINE(BODY)                     \
   int line = 0;                                 \
-  while(fgets(buffer, LINE_LEN, stdin)) {       \
+  while(fgets(buffer, sizeof(buffer), stdin)) { \
     line++;                                     \
     BODY                                        \
   }
@@ -60,8 +60,6 @@ char buffer[BUFFER_SIZE] = {0};
 // Size of the chunks we read in at a time
 #define INPUT_BLOCK_SIZE (1024*1024)
 
-// Maximum line length
-#define LINE_LEN 100000000
 // Number of capturing parentheses
 #ifndef NO_CAPTURE
     #define CAPTURE true
