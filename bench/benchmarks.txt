@@ -11,7 +11,7 @@ patho1          	kleenex
 flip_ab             kleenex,ragel
 issuu_fallback  	kleenex
 issuu_nofallback    kleenex
-csv2json            kleenex
+csv2json            kleenex,ragel
 csv2json_nows       kleenex
 json2csv            kleenex
 raw_io_speed        re2
