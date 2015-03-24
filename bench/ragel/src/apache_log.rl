@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "../common.h"
 
 #define MAX_LINE_LENGTH 4096
 
@@ -65,6 +66,8 @@ static inline void emit(char *type) {
 }
 
 int main() {
+  PRE
+
   int lines = 0;
 
   fputc('[', stdout); // We're printing out a list objects. Here's the start.
@@ -95,5 +98,8 @@ int main() {
     lines ++;
   }
   fprintf(stdout, "]\n");
+
+  POST
+
   return 0;
 }
