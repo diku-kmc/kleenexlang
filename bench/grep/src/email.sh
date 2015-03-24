@@ -7,7 +7,7 @@ regex="[a-z0-9!#$%&'*+/=?^_\`{|}~-]+(\.[a-z0-9!#$%&'*+/=?^_\`{|}~-]+)*@([a-z0-9]
 
 start=$(get_millisecond_time)
 
-$grep -E "^${regex}$" $@
+$grep --text -E "^${regex}$" $@
 
 end=$(get_millisecond_time)
 elaps=$(expr $end - $start)
