@@ -90,6 +90,8 @@ utils/extracttime:
 		$(*F) $(SED_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Awk == Kleenex       " \
 		$(*F) $(AWK_BINDIR)/$(*F).awk ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Awk-noregex == Kleenex       " \
+		$(*F) $(AWK_BINDIR)/$(*F)-native.awk ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Grep == Kleenex      " \
 		$(*F) $(GREP_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "C++11 == Kleenex     " \

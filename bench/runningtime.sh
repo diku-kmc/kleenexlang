@@ -34,7 +34,13 @@ function set_invocation_names {
         done
     elif [ $1 == "re2"       ]; then a=("re2/bin/$prog")
     elif [ $1 == "re2j"      ]; then a=("java -jar re2j/build/jar/$prog.jar")
-    elif [ $1 == "gawk"      ]; then a=("gawk/src/$prog.awk")
+    elif [ $1 == "gawk"      ]; then
+        i=0
+        for p in $(ls gawk/src/${prog}*.awk); do
+            a[$i]=$p
+            b[$i]=$(basename $p)
+            i=$(expr $i + 1)
+        done
     elif [ $1 == "python"    ]; then a=("python python/src/$prog.py")
     elif [ $1 == "perl"      ]; then a=("perl perl/src/$prog.pl")
     elif [ $1 == "tcl"       ]; then a=("tcl/tclsh tcl/src/$prog.tcl")
