@@ -34,7 +34,7 @@ alphadashdigits := (alphadigit | <->) alphadashdigits
 
 alphadigit := alpha | digit
 
-hostnumber := digits <.> digits <.> digits <.> digits
+hostnumber := digits <\.> digits <\.> digits <\.> digits
 
 port := "Port: " digits "\n"
 
