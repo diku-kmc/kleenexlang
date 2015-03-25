@@ -20,3 +20,5 @@ email                 ,            DEFAULT           ms                    email
 email                 grep         DEFAULT           Mbit/s                email-nogrep.pdf
 issuu_json2sql        ,            DEFAULT           Mbit/s                issuu_json2sql-mbs.pdf
 issuu_json2sql        ,            DEFAULT           ms                    issuu_json2sql-ms.pdf
+flip_ab               ,            DEFAULT           Mbit/s                flip_ab.pdf
+flip_ab               ,            strings/ab_lines_len80_250mb.txt   Mbit/s    flip_ab-l80.pdf
