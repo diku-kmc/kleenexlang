@@ -50,6 +50,7 @@ function set_invocation_names {
     elif [ $1 == "oniguruma" ]; then a=("oniguruma/bin/$prog")
     elif [ $1 == "cat"       ]; then a=("cat/src/$prog.sh")
     elif [ $1 == "cut"       ]; then a=("cut/src/$prog.sh")
+    elif [ $1 == "tr"        ]; then a=("tr/src/$prog.sh")
     elif [ $1 == "ragel"     ]; then
         i=0
         for p in $(ls ragel/bin/${prog}*); do
