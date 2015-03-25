@@ -120,7 +120,7 @@ def get_data(conf, only_progs = []):
             benchmarks[prog][impl] = {}
             # Really ugly hack!  Because of csv2json and csv2json_nows, which only
             # overlap for Kleenex as they are only implemented there...
-            if impl == "kleenex": 
+            if impl == "kleenex" and prog == "csv2json":
                 sp = "%s.kex" % prog
             else:
                 sp = prog
@@ -387,7 +387,7 @@ def format_version(vstring):
     if vstring == None:
         return ""
     ret_string = ""
-    
+    # This is really quite ugly.
     try:
         m = re.match(".*__(.+)__(.*)", vstring)
         opt_level = m.group(1)
@@ -395,11 +395,16 @@ def format_version(vstring):
         ret_string = "%s, %s" % (opt_level, compiler)
     except AttributeError:
         try:
-            m = re.match(".*-(.*)", vstring)
+            m = re.match(".*-(.*).awk", vstring)
             vname = m.group(1)
             ret_string = "%s" % (vname)
         except AttributeError:
-            ret_string = "" 
+            try:
+                m = re.match(".*-(.*)", vstring)
+                vname = m.group(1)
+                ret_string = "%s" % (vname)
+            except AttributeError:
+                ret_string = "" 
     return ret_string
 
 # Start main program; do everything!
