@@ -16,6 +16,7 @@ iso_datetime_to_json datetime/datetimes_250mb.txt
 ini2json            ini/inifile_25mb.ini
 rot13               strings/random_250mb.txt
 apache_log          apache_log/example_big.log
+dfamail             email/emails_100mb.txt
 
 # Measure the speed of reading and writing lines in C/C++.
 # The test reads lines with fgets() and prints it using either

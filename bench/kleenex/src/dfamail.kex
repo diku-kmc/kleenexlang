@@ -1,0 +1,8 @@
+del := ~emailLines
+
+emailLines := ( simpleEmail <\n> | ~fb ~<\n> ) emailLines
+            | ( simpleEmail <\n> | ~fb ~<\n>)
+
+fb := <[^\n]*>
+
+simpleEmail := <[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?>
