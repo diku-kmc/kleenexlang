@@ -10,6 +10,7 @@ CPP11_BINDIR=cpp11/bin
 ONIGURUMA_BINDIR=oniguruma/bin
 CAT_BINDIR=cat/src
 RAGEL_BINDIR=ragel/bin
+CUT_BINDIR=cut/src
 
 KLEENEXSOURCES = $(notdir $(wildcard $(KLEENEXDIR)/*.kex))
 KLEENEXSOURCES_OBJECTS = $(KLEENEXSOURCES:.kex=.ko)
@@ -106,6 +107,9 @@ utils/extracttime:
 		$(*F) $(RAGEL_BINDIR)/$(*F)-F1 ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Ragel-G2 == Kleenex     " \
 		$(*F) $(RAGEL_BINDIR)/$(*F)-G2 ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Cut == Kleenex       " \
+		$(*F) $(CUT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
+
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing

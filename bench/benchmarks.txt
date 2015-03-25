@@ -2,7 +2,7 @@
 simple_id       	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl,cat
 patho2          	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl
 as              	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl
-csv_project3    	kleenex,re2,re2j,gawk,oniguruma,perl,python,sed,tcl,ragel
+csv_project3    	kleenex,re2,re2j,gawk,oniguruma,perl,python,sed,tcl,ragel,cut
 email           	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl,ragel
 iso_datetime_to_json    kleenex,re2,re2j,gawk,oniguruma,perl,python,sed,tcl,ragel
 ini2json            kleenex,gawk,perl,python,tcl
