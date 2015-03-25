@@ -8,13 +8,13 @@ iso_datetime_to_json    kleenex,re2,re2j,gawk,oniguruma,perl,python,sed,tcl,rage
 ini2json            kleenex,gawk,perl,python,tcl
 issuu_json2sql  	kleenex,python,ragel
 patho1          	kleenex
-flip_ab             kleenex,ragel
+flip_ab             kleenex,ragel,tr
 issuu_fallback  	kleenex
 issuu_nofallback    kleenex
 csv2json            kleenex,ragel
 csv2json_nows       kleenex
 json2csv            kleenex
 raw_io_speed        re2
-rot13               kleenex,ragel
+rot13               kleenex,ragel,tr
 apache_log          kleenex,perl,ragel
 dfamail             kleenex

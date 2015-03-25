@@ -11,6 +11,7 @@ ONIGURUMA_BINDIR=oniguruma/bin
 CAT_BINDIR=cat/src
 RAGEL_BINDIR=ragel/bin
 CUT_BINDIR=cut/src
+TR_BINDIR=tr/src
 
 KLEENEXSOURCES = $(notdir $(wildcard $(KLEENEXDIR)/*.kex))
 KLEENEXSOURCES_OBJECTS = $(KLEENEXSOURCES:.kex=.ko)
@@ -34,6 +35,7 @@ testinput.url            := $(DATA_DIR)/url/test_urls.txt
 testinput.rot13			 := $(DATA_DIR)/strings/random_small.txt
 testinput.csv2json       := $(DATA_DIR)/csv/csv_format1.sample.csv
 testinput.apache_log     := $(DATA_DIR)/apache_log/example.log
+testinput.flip_ab        := $(DATA_DIR)/strings/ab_lines_small.txt
 
 all:
 	@echo "Nothing to do."
@@ -109,6 +111,8 @@ utils/extracttime:
 		$(*F) $(RAGEL_BINDIR)/$(*F)-G2 ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Cut == Kleenex       " \
 		$(*F) $(CUT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
+	@bash utils/runequalstest.sh "Tr == Kleenex       " \
+		$(*F) $(TR_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
 
 
 # Do some cleanup!
@@ -166,6 +170,7 @@ iso_datetime_to_json: iso_datetime_to_json.ko
 rot13: rot13.ko
 csv2json: csv2json.ko
 apache_log: apache_log.ko
+flip_ab: flip_ab.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 

@@ -25,6 +25,8 @@ int main(int argc, char **argv) {
     %% write init;
     %% write exec;
 
+    fputc('\n', stdout);
+
     if(p+1 != pe) {
       FAIL;
     }
