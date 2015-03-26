@@ -2,7 +2,9 @@ RAGEL=ragel-6.9
 SOURCES = $(wildcard src/*.rl)
 ODIR=obj
 OBJ = $(SOURCES:.rl=.o)
+GOBJ = $(SOURCES:.rl=.go)
 BIN_DIR = bin
+GRAPH_DIR = graphs
 CC = gcc
 CCFLAGS = -O3
 
@@ -27,6 +29,15 @@ iso_datetime_to_json: src/iso_datetime_to_json.o
 csv_project3: src/csv_project3.o
 csv2json: src/csv2json.o
 apache_log: src/apache_log.o
+
+
+%.go: %.rl
+	@mkdir -p $(GRAPH_DIR)
+	./ragel -p -V $< -o $(GRAPH_DIR)/$(*F).dot
+	dot -Tpdf $(GRAPH_DIR)/$(*F).dot -o $(GRAPH_DIR)/$(*F).pdf
+
+draw-graphs: $(GOBJ)
+
 
 install-ragel:
 	./getragel.sh $(RAGEL)
