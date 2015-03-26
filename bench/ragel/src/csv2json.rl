@@ -12,7 +12,7 @@ int echo = 0;
 
   action dump {
     if(echo) {
-      fprintf(stdout, "%.*s", 1, &fc);
+      fprintf(stdout, "%c", fc);
     }
   }
 
