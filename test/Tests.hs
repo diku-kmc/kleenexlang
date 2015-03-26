@@ -13,12 +13,14 @@ import           KMC.Coding
 import           KMC.Expression
 import           KMC.FSTConstruction
 import qualified KMC.Kleenex.Lang as H
+import qualified KMC.Kleenex.Parser as HP
 import           KMC.OutputTerm
 import           KMC.RangeSet
 import           KMC.SSTConstruction
 import           KMC.SymbolicFST as FST
 import           KMC.SymbolicSST as SST
 import           KMC.Util.Heredoc
+
 
 simpleTest :: String -> IO TS.Result -> TS.Test
 simpleTest name' action = TS.Test inst
@@ -51,6 +53,7 @@ quickTest prop = do
 tests :: IO [TS.Test]
 tests = return [ simpleGroup True "Coding" codingTests
                , simpleGroup True "Regression" regressionTests
+               , simpleGroup True "Kleenex parsing" kleenexParserTests
                ]
 
 prop_coding_bijective :: Property
@@ -118,3 +121,119 @@ kleenexIdTest prog str =
           in if inp == out
              then return TS.Pass
              else return $ TS.Fail "Identity failed"
+
+
+{--------------------------------------------------------------------}
+{- Kleenex parser tests                                             -}
+{--------------------------------------------------------------------}
+
+kleenexParserTests :: [TS.Test]
+kleenexParserTests =
+    [ simpleGroup True "Comment behaviour"
+                      [ uncurry simpleTest kp_test1
+                      , uncurry simpleTest kp_test2
+                      , uncurry simpleTest kp_test3
+                      , uncurry simpleTest kp_test4
+                      , uncurry simpleTest kp_test5
+                      , uncurry simpleTest kp_test6
+                      , uncurry simpleTest kp_test8
+                      ]
+    , simpleGroup True "Newline behaviour"
+                      [ uncurry simpleTest kp_test7
+                      ]
+    ]
+
+(<@>) :: String -> IO TS.Result -> (String, IO TS.Result)
+(<@>) n t = (n, t)
+infix 0 <@>
+
+kp_compare :: String -> String -> IO TS.Result
+kp_compare progA progB =
+    case (HP.parseKleenex progA, HP.parseKleenex progB) of
+      (Right sa, Right sb) -> if sa == sb
+                            then return TS.Pass
+                            else return $ TS.Fail $ "[ " ++ show sa ++
+                                     "] != [ " ++ show sb ++ "]"
+      (Left e, _)         -> return $ TS.Fail e
+      (_, Left e)         -> return $ TS.Fail e
+
+kp_test1 :: (String, IO TS.Result)
+kp_test1 = "Mid-of-line //" <@>
+    let pa = [strQ|p := "a" <b> // | "b" <a>
+|]
+        pb = [strQ|p := "a" <b>
+|]
+    in kp_compare pa pb
+
+kp_test2 :: (String, IO TS.Result)
+kp_test2 = "First-on-line // in def." <@>
+    let pa = [strQ|
+p := "a" <b>
+//  | "c" <d>
+    | "e" <f>
+|]
+        pb = [strQ|
+p := "a" <b>
+   | "e" <f>
+|]
+    in kp_compare pa pb
+
+kp_test3 :: (String, IO TS.Result)
+kp_test3 = "Last-line //" <@>
+    let pa = [strQ|
+p := "a" e
+e := "b" c
+c := "c" <a>
+// c := "d" <b>
+|]
+        pb = [strQ|
+p := "a" e
+e := "b" c
+c := "c" <a>
+|]
+    in kp_compare pa pb
+
+kp_test4 :: (String, IO TS.Result)
+kp_test4 = "C and C++ style equal" <@>
+    let pa = [strQ|
+//p := "a" <b>
+p := "a" <b>
+|]
+        pb = [strQ|
+/*p := "a" <b>*/
+p := "a" <b>
+|]
+   in kp_compare pa pb
+
+kp_test5 :: (String, IO TS.Result)
+kp_test5 = "C comment in term" <@>
+    let pa = [strQ|
+p := "a" /*"b"*/ <b>
+|]
+        pb = [strQ|
+p := "a" <b>
+|]
+    in kp_compare pa pb
+
+kp_test6 :: (String, IO TS.Result)
+kp_test6 = "C comment remove choice" <@>
+    let pa = [strQ|
+p := "a" <b> /* | */ <c>
+|]
+        pb = [strQ|
+p := "a" <b> <c>
+|]
+    in kp_compare pa pb
+
+kp_test8 :: (String, IO TS.Result)
+kp_test8 = "Comment out last part of file" <@>
+    let pa = [strQ|p := "a" <b> //|]
+        pb = [strQ|p := "a" <b>|]
+    in kp_compare pa pb
+
+kp_test7 :: (String, IO TS.Result)
+kp_test7 = "No newline at end of file" <@>
+    let pa = [strQ|p := "a" <b>|]
+        pb = [strQ|p := "a" <b>
+|]
+    in kp_compare pa pb

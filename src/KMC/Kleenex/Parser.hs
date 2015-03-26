@@ -48,7 +48,7 @@ changeState forward backward = mkPT . transform . runParsecT
 --          | expr "|" expr
 
 -- | An Identifier is a String that always starts with a lower-case char.
-newtype Identifier = Identifier String deriving (Eq, Ord)
+newtype Identifier = Identifier String deriving (Eq, Ord, Show)
 
 mkIdent :: String -> Identifier
 mkIdent str =
@@ -59,10 +59,10 @@ fromIdent :: Identifier -> String
 fromIdent (Identifier s) = s
 
 -- | A Kleenex program is a list of assignments.
-data Kleenex            = Kleenex [KleenexAssignment] deriving (Eq, Ord)
+data Kleenex            = Kleenex [KleenexAssignment] deriving (Eq, Ord, Show)
 
 -- | Assigns the term to the name.
-data KleenexAssignment  = HA (Identifier, KleenexTerm) deriving (Eq, Ord)
+data KleenexAssignment  = HA (Identifier, KleenexTerm) deriving (Eq, Ord, Show)
 
 -- | The terms describe how regexps are mapped to strings.
 data KleenexTerm = Constant ByteString -- ^ A constant output.
@@ -72,23 +72,23 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
                | Sum KleenexTerm KleenexTerm
                | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
                | One
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
--- Some more friendly Show instances.
-instance Show Kleenex where
-    show (Kleenex l) = "Kleenex: {" ++ (concat $ map ("\n  " ++) (map show l)) ++ "\n}"
-instance Show KleenexAssignment where
-    show (HA (ident, term)) = show ident ++ " ::== " ++ show term
-instance Show Identifier where
-    show = fromIdent
-instance Show KleenexTerm where
-    show One = "1"
-    show (Sum l r) = "(" ++ show l ++ ") | (" ++ show r ++ ")"
-    show (Seq l r) = show l ++ " " ++ show r
-    show (Var i)   = show i
-    show (RE re) = "<" ++ unparse re ++ ">"
-    show (Constant s) = show s
-    show (Ignore e) = "drop:[" ++ show e ++ "]"
+-- -- Some more friendly Show instances.
+-- instance Show Kleenex where
+--     show (Kleenex l) = "Kleenex: {" ++ (concat $ map ("\n  " ++) (map show l)) ++ "\n}"
+-- instance Show KleenexAssignment where
+--     show (HA (ident, term)) = show ident ++ " ::== " ++ show term
+-- instance Show Identifier where
+--     show = fromIdent
+-- instance Show KleenexTerm where
+--     show One = "1"
+--     show (Sum l r) = "(" ++ show l ++ ") | (" ++ show r ++ ")"
+--     show (Seq l r) = show l ++ " " ++ show r
+--     show (Var i)   = show i
+--     show (RE re) = "<" ++ unparse re ++ ">"
+--     show (Constant s) = show s
+--     show (Ignore e) = "drop:[" ++ show e ++ "]"
 
 type HPState = ()
 
