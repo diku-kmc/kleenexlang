@@ -13,12 +13,29 @@ simple_id             cat,cpp11    DEFAULT           Mbit/s                simpl
 simple_id             ,            DEFAULT           Gbit/s                simple_id-ALL.pdf
 simple_id             cat          strings/ab_lines_len80_250mb.txt  Mbit/s        simple_id-l80.pdf
 simple_id             ,            DEFAULT           ms                    simple_id-ms.pdf
+
 as                    ,            DEFAULT           ms                    as-ms.pdf
 as                    ,            DEFAULT           Mbit/s                as-mbs.pdf
+
 email                 ,            DEFAULT           Mbit/s                email-all.pdf
 email                 ,            DEFAULT           ms                    email-all-ms.pdf
 email                 grep         DEFAULT           Mbit/s                email-nogrep.pdf
+
 issuu_json2sql        ,            DEFAULT           Mbit/s                issuu_json2sql-mbs.pdf
 issuu_json2sql        ,            DEFAULT           ms                    issuu_json2sql-ms.pdf
-flip_ab               ,            DEFAULT           Mbit/s                flip_ab.pdf
-flip_ab               ,            strings/ab_lines_len80_250mb.txt   Mbit/s    flip_ab-l80.pdf
+
+flip_ab               tr            DEFAULT           Mbit/s                flip_ab.pdf
+flip_ab               tr            strings/ab_lines_len80_250mb.txt   Mbit/s    flip_ab-l80.pdf
+flip_ab               ,            DEFAULT           Mbit/s                flip_ab-ALL.pdf
+
+issuu_fallback        ,            DEFAULT           Mbit/s                issuu_fallback.pdf
+issuu_fallback        ,            DEFAULT           ms                    issuu_fallback-ms.pdf
+
+rot13                 tr           DEFAULT           Mbit/s                rot13.pdf
+rot13                 ,            DEFAULT           Mbit/s                rot13-ALL.pdf
+
+csv_project3          ,            DEFAULT           Mbit/s                csv_project3.pdf
+csv_project3          ,            DEFAULT           ms                    csv_project3-ms.pdf
+
+csv2json              ,            DEFAULT           Mbit/s                csv2json.pdf
+csv2json              ,            DEFAULT           ms                    csv2json-ms.pdf
