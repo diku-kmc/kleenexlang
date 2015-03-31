@@ -8,7 +8,7 @@ message := word sep message
         |  word
         |  ""
 
-sep := <[^A-Za-zæøå0-9]*>
+sep := <[^A-Za-zæøå0-9]+>
 
 word := ~<computer> "datamat"
       | ~<debugger> "afluser"
