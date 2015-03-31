@@ -324,7 +324,7 @@ prettyStr = doubleQuotes . hcat . map prettyOrd
                            ,not (c `elem` "\"\\")] then
                       char c
                     else
-                      text "\\x" <> text (showHex n "")
+                      doubleQuotes . doubleQuotes $ text "\\x" <> text (showHex n "")
 
 -- | Pretty print a test expression.
 prettyExpr :: Expr -> Doc
