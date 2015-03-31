@@ -53,9 +53,9 @@ quickTest prop = do
 {--------------------------------------------------------------------}
 
 tests :: IO [TS.Test]
-tests = return [ {-simpleGroup True "Coding" codingTests
+tests = return [ simpleGroup True "Coding" codingTests
                , simpleGroup True "Regression" regressionTests
-               , -} simpleGroup True "Kleenex parsing" kleenexParserTests
+               , simpleGroup True "Kleenex parsing" kleenexParserTests
                ]
 
 prop_coding_bijective :: Property
