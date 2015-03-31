@@ -61,3 +61,24 @@
     the generated C code will reflect this.
 *** Status
     This is now handled by the more general array functions.
+
+
+** TODO (kris+sebbe) Add extra language features
+*** Description
+    We have brainstormed how to improve Kleenex' expressive power. Our idea is the following:
+
+    Add extra constructs to Kleenex Terms:
+      term*     - repeat 0 or more times
+      term+     - repeat 1 or more times
+      term{...} - repeat a number of times
+      term?     - repeat 0 or 1 times
+      term [X]  - embed X in the generated C code, and don't output the result of term
+      a@term    - output the term to a named register, all named registers are allocated
+                  at compile time
+
+    Add the following syntax for the first term:
+      term1 >> term 2 >> term3 ...
+
+      This compiles all the terms as seperate programs, and pipes the output between them.
+*** Status
+    WIP
