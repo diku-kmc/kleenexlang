@@ -35,18 +35,6 @@ changeState forward backward = mkPT . transform . runParsecT
     --          -> (State s v -> m (Consumed (m (Reply s v a))))
     transform p st = fmap3 (mapReply forward) (p (mapState backward st))
 
-
--- name: Kleenex : HAskell Stream Editor
-
--- Grammar:
--- parser ::= . | (name ":=" expr) parser
--- expr   ::= "C" expr
---          | <E>
---          | ~E // ignore result of E
---          | x
---          | expr expr
---          | expr "|" expr
-
 -- | An Identifier is a String that always starts with a lower-case char.
 newtype Identifier = Identifier String deriving (Eq, Ord, Show)
 
@@ -74,21 +62,6 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
                | One
   deriving (Eq, Ord, Show)
 
--- -- Some more friendly Show instances.
--- instance Show Kleenex where
---     show (Kleenex l) = "Kleenex: {" ++ (concat $ map ("\n  " ++) (map show l)) ++ "\n}"
--- instance Show KleenexAssignment where
---     show (HA (ident, term)) = show ident ++ " ::== " ++ show term
--- instance Show Identifier where
---     show = fromIdent
--- instance Show KleenexTerm where
---     show One = "1"
---     show (Sum l r) = "(" ++ show l ++ ") | (" ++ show r ++ ")"
---     show (Seq l r) = show l ++ " " ++ show r
---     show (Var i)   = show i
---     show (RE re) = "<" ++ unparse re ++ ">"
---     show (Constant s) = show s
---     show (Ignore e) = "drop:[" ++ show e ++ "]"
 
 type HPState = ()
 
@@ -111,11 +84,11 @@ spaceOrTab = ignore (char ' ' <|> char '\t')
 ignore :: Parsec s u a -> Parsec s u ()
 ignore p = p >> return ()
 
+skipAround :: KleenexParser a -> KleenexParser a
+skipAround = between skipped skipped
+
 parens :: KleenexParser a -> KleenexParser a
 parens = between (char '(') (char ')')
-
-spaceAround :: KleenexParser a -> KleenexParser a
-spaceAround = between (many spaceOrTab) (many spaceOrTab)
 
 -- | Identifiers are only allowed to start with lower-case characters.
 kleenexIdentifier :: KleenexParser Identifier
@@ -142,11 +115,10 @@ kleenexConstant = (char '"') *> (many escapedChar) <* (char '"')
                 <?> "string constant"
 
 kleenexBecomesToken :: KleenexParser ()
-kleenexBecomesToken = spaceAround (string ":=" >> return ())
+kleenexBecomesToken = skipAround (string ":=" >> return ())
 
 kleenexAssignment :: KleenexParser KleenexAssignment
 kleenexAssignment = do
-  skipComments
   ident <- kleenexIdentifier
   kleenexBecomesToken
   term <- kleenexTerm
@@ -156,45 +128,28 @@ foldr1ifEmpty :: (a -> a -> a) -> a -> [a] -> a
 foldr1ifEmpty _ e [] = e
 foldr1ifEmpty f _ l  = foldr1 f l
 
-skipComments :: KleenexParser ()
-skipComments = ignore $ spaces >> skipComment `sepEndBy` spaces
-
-skipComment :: KleenexParser ()
-skipComment = ignore $ try (char '/' >> (singleLine <|> multiLine))
+skipped :: KleenexParser ()
+skipped = ignore $ many (choice [ws, comment])
     where
-      singleLine = char '/' >> manyTill anyChar newline             >> return ()
-      multiLine  = char '*' >> manyTill anyChar (try $ string "*/") >> return ()
+      ws = ignore $ many1 space
+      comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
+      singleLine = char '/' >> manyTill anyChar (ignore newline <|> eof)
+      multiLine  = char '*' >> manyTill anyChar (try $ string "*/")
               
-
 kleenex :: KleenexParser Kleenex
-kleenex = Kleenex <$> kleenexAssignment `sepEndBy` spaces
+kleenex = Kleenex <$> (skipped *> (kleenexAssignment `sepEndBy` skipped))
 
 kleenexTerm :: KleenexParser KleenexTerm
-kleenexTerm = buildExpressionParser table (spaceAround kleenexPrimTerm)
+kleenexTerm = buildExpressionParser table kleenexPrimTerm
     where
       table = [ [Infix (char '|' >> return Sum) AssocRight] ]
 
-indentedNewline :: KleenexParser ()
-indentedNewline = ignore $ (many1 newline) >> (many1 spaceOrTab)
-
-start :: KleenexParser ()
-start = optional (i <|> c) <?> "start"
-    where
-      i = do
-        many1 newline
-        choice [many1 spaceOrTab, skipComment `sepEndBy` (many spaceOrTab)]
-        return ()
-      c = ignore $ skipComment `sepEndBy` (many spaceOrTab)
-
 kleenexPrimTerm :: KleenexParser KleenexTerm
-kleenexPrimTerm = start
-                >> elms `sepEndBy` sep
+kleenexPrimTerm = skipped
+                >> elms `sepEndBy` skipped
                 >>= return . foldr1ifEmpty Seq One
     where
       elms = choice [re, identifier, constant, ignored, parens kleenexTerm]
-      sep = many $ spaceOrTab 
-                   <|> try indentedNewline 
-                   <|>  ignore (skipComment >> many spaceOrTab)
       constant   = Constant . encodeString <$> kleenexConstant
                    <?> "Constant"
       re         = RE  <$> between (char '<') (char '>') regexP
@@ -216,7 +171,7 @@ firstName (Kleenex (HA (i,_):_)) = i
 firstName (Kleenex []) = error "firstName: no assignments"
 
 parseKleenex :: String -- ^ Input string
-           -> Either String (Identifier, Kleenex) 
+             -> Either String (Identifier, Kleenex) 
 parseKleenex str =
     case runParser (kleenex <* eof) hpInitState "" str of
       Left err -> Left (show err)
