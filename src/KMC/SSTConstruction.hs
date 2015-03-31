@@ -209,10 +209,7 @@ sstFromFST fst' singletonMode =
 
             ts   = do (ps, kills) <- prefixTests fst' singletonMode (tflat' tcl')
                       guard $ not $ null ps
-                      let (kappa, t'') = abstract'
-                                         $ closureTreeFunc fst'
-                                         $ consumeTreeMany fst' ps
-                                         $ killTree kills tcl'
+                      let (kappa, t'') = abstract' $ consumeTreeMany fst' ps $ killTree kills tcl'
                       guard (isJust t'')
                       return (t, ps, kappa, t'')
             wl'  = S.fromList [ newt | (_,_,_,newt) <- ts ]
