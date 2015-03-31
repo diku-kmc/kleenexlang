@@ -187,7 +187,7 @@ consumeTreeMany :: (PartialOrder pred, Ord st) =>
 consumeTreeMany fst' = go 0
     where
       go _ [] tr = tr
-      go i (p:ps) tr = go (i+1) ps (consumeTree fst' p i (closureTreeFunc fst' tr))
+      go i (p:ps) tr = go (i+1) ps (closureTreeFunc fst' (consumeTree fst' p i (closureTreeFunc fst' tr)))
 
 sstFromFST :: (Ord a, Ord pred, PartialOrder pred, Function func,
                Enumerable pred (Dom func), Rng func ~ [delta]) =>
