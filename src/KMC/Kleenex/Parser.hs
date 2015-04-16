@@ -92,6 +92,11 @@ ignore p = p >> return ()
 skipAround :: KleenexParser a -> KleenexParser a
 skipAround = between skipped skipped
 
+spaceAround :: KleenexParser a -> KleenexParser a
+spaceAround = between ws ws
+    where
+        ws = many $ oneOf " \t"
+
 parens :: KleenexParser a -> KleenexParser a
 parens = between (char '(') (char ')')
 
@@ -142,7 +147,7 @@ skipped = ignore $ many (choice [ws, comment])
       multiLine  = char '*' >> manyTill anyChar (try $ string "*/")
 
 parseOptions :: KleenexParser [Identifier]
-parseOptions = (kleenexIdentifier `sepEndBy1` string ">>") <* newline
+parseOptions = (kleenexIdentifier `sepEndBy1` spaceAround (string ">>")) <* newline
               
 kleenex :: KleenexParser ([Identifier], Kleenex)
 kleenex = do 

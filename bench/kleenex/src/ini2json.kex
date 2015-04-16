@@ -1,6 +1,6 @@
 /* Converts the an INI file to a corresponding JSON file */
 
-stripini>>ini2json
+stripini >> ini2json
 
 /* Strips the comments */
 stripini := comment stripini
