@@ -390,8 +390,10 @@ int main(int argc, char *argv[])
       dup2(pipes[i-1][READ_FD], STDIN_FILENO);
     }
 
+    #if NUM_PHASES>1
     close(pipes[NUM_PHASES-2][WRITE_FD]);
     dup2(orig_stdout, STDOUT_FILENO);
+    #endif
 
     // Run last phase in-process
     run(NUM_PHASES);

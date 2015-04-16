@@ -98,9 +98,10 @@ kleenexToSimpleMu initVar (H.Kleenex ass) = SMLoop $ go [initVar] (fromJust $ M.
                   Nothing -> error $ "Name not found: " ++ show name
                   Just t  -> SMLoop $ go (name : vars) t
             Just p  -> SMVar p
-      go vars (H.Sum l r) = SMAlt (go vars l) (go vars r)
-      go vars (H.Seq l r) = SMSeq (go vars l) (go vars r)
-      go _    H.One       = SMAccept
+      go vars (H.Sum l r)  = SMAlt (go vars l) (go vars r)
+      go vars (H.Seq l r)  = SMSeq (go vars l) (go vars r)
+      go vars (H.Star e)   = SMLoop (go vars e)
+      go _    H.One        = SMAccept
       go vars (H.Ignore e) = SMIgnore $ go vars e
       go _ (H.RE re) = SMRegex re
 
@@ -125,10 +126,10 @@ simpleMuToMuTerm st ign sm =
       SMIgnore sm' -> simpleMuToMuTerm st True sm'
       SMAccept     -> Accept
 
--- | Convert a Kleenex program to a mu-term that encodes the string transformation
+-- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
 -- expressed in Kleenex.
-kleenexToMuTerm :: (H.Identifier, H.Kleenex) -> KleenexMu a
-kleenexToMuTerm (i, h) = simpleMuToMuTerm [] False $ kleenexToSimpleMu i h
+kleenexToMuTerm :: ([H.Identifier], H.Kleenex) -> [KleenexMu a]
+kleenexToMuTerm (is, h) = map (\i -> simpleMuToMuTerm [] False $ kleenexToSimpleMu i h) is
 
 encodeChar :: Char -> [Word8]
 encodeChar = unpack . encodeUtf8 . T.singleton
@@ -172,6 +173,6 @@ regexToMuTerm o re =
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
 
-testKleenex :: String -> Either String (KleenexMu a)
-testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
+--testKleenex :: String -> Either String (KleenexMu a)
+--testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
   

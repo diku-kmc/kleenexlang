@@ -50,7 +50,9 @@ fromIdent (Identifier s) = s
 data Kleenex            = Kleenex [KleenexAssignment] deriving (Eq, Ord, Show)
 
 -- | Assigns the term to the name.
-data KleenexAssignment  = HA (Identifier, KleenexTerm) deriving (Eq, Ord, Show)
+data KleenexAssignment  = HA (Identifier, KleenexTerm) 
+                        | HB [Identifier]  -- A list of terms to be compiled, must be on first line
+    deriving (Eq, Ord, Show)
 
 -- | The terms describe how regexps are mapped to strings.
 data KleenexTerm = Constant ByteString -- ^ A constant output.
@@ -135,9 +137,15 @@ skipped = ignore $ many (choice [ws, comment])
       comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
       singleLine = char '/' >> manyTill anyChar (ignore newline <|> eof)
       multiLine  = char '*' >> manyTill anyChar (try $ string "*/")
+
+parseOptions :: KleenexParser [Identifier]
+parseOptions = (kleenexIdentifier `sepEndBy1` string ">>") <* newline
               
-kleenex :: KleenexParser Kleenex
-kleenex = Kleenex <$> (skipped *> (kleenexAssignment `sepEndBy` skipped))
+kleenex :: KleenexParser ([Identifier], Kleenex)
+kleenex = do 
+    idents <- skipped *> parseOptions
+    assignments <- skipped *> (kleenexAssignment `sepEndBy` skipped)
+    return (idents, Kleenex assignments)
 
 kleenexTerm :: KleenexParser KleenexTerm
 kleenexTerm = buildExpressionParser table kleenexPrimTerm
@@ -166,18 +174,14 @@ regexP :: KleenexParser Regex
 regexP = snd <$> (withHPState $
                   anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!<>" })
 
-firstName :: Kleenex -> Identifier
-firstName (Kleenex (HA (i,_):_)) = i
-firstName (Kleenex []) = error "firstName: no assignments"
-
 parseKleenex :: String -- ^ Input string
-             -> Either String (Identifier, Kleenex) 
+             -> Either String ([Identifier], Kleenex) 
 parseKleenex str =
     case runParser (kleenex <* eof) hpInitState "" str of
       Left err -> Left (show err)
-      Right h -> Right (firstName h, h)
+      Right h -> Right h
 
-parseKleenexFile :: FilePath -> IO (Either String (Identifier, Kleenex))
+parseKleenexFile :: FilePath -> IO (Either String ([Identifier], Kleenex))
 parseKleenexFile fp = readFile fp >>= return . parseKleenex
 
 -----------------------------------------------------------------
@@ -194,14 +198,14 @@ stateParseTest st p input
 parseTest :: (Show a) => KleenexParser a -> String -> IO ()
 parseTest = stateParseTest hpInitState
 
-parseTest' :: (Stream s Identity t)
-               => Parsec s HPState Kleenex -> s -> IO Kleenex
-parseTest' p input
-    = case runParser p hpInitState "" input of
-        Left err -> do putStr "parse error at "
-                       print err
-                       fail ""
-        Right x  -> return x
-
-pf = parseTest (kleenex <* eof)
-pf' = parseTest' (kleenex <* eof)
+--parseTest' :: (Stream s Identity t)
+--               => Parsec s HPState Kleenex -> s -> IO Kleenex
+--parseTest' p input
+--    = case runParser p hpInitState "" input of
+--        Left err -> do putStr "parse error at "
+--                       print err
+--                       fail ""
+--        Right x  -> return x
+--
+--pf = parseTest (kleenex <* eof)
+--pf' = parseTest' (kleenex <* eof)

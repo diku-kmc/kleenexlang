@@ -4,7 +4,7 @@
 module Main where
 
 import           Control.Applicative
-import           Control.Monad (when)
+import           Control.Monad (when, forM, forM_)
 import           Data.Char (toLower)
 import qualified Data.GraphViz.Commands as GC
 import           Data.Hash.MD5 (md5s, Str(..))
@@ -127,20 +127,20 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
 
 -- | Existential type representing transducers that can be determinized,
 -- compiled and pretty-printed.
-data Transducer where
-    Transducer :: (Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta], Pretty f, Pretty delta
-                  ,Ord delta, Enum delta, Bounded delta)
-                  => FST Int (RangeSet Word8) f -> Transducer
+data Transducers where
+    Transducers :: (Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta], Pretty f, Pretty delta
+                   ,Ord delta, Enum delta, Bounded delta)
+                   => [FST Int (RangeSet Word8) f] -> Transducers
 
 -- | Existential type representing determinized transducers that can be compiled.
-data DetTransducer where
-    DetTransducer :: (Function f, Ord f, Pretty f
-                     ,Ord delta, Enum delta, Bounded delta, Pretty delta
-                     ,Dom f ~ Word8, Rng f ~ [delta]) =>
-                     SST Int (RangeSet Word8) f Int -> DetTransducer
+data DetTransducers where
+    DetTransducers :: (Function f, Ord f, Pretty f
+                      ,Ord delta, Enum delta, Bounded delta, Pretty delta
+                      ,Dom f ~ Word8, Rng f ~ [delta]) =>
+                      [SST Int (RangeSet Word8) f Int] -> DetTransducers
 
-transducerSize :: Transducer -> Int
-transducerSize (Transducer fst') = S.size $ fstS fst'
+transducerSize :: Transducers -> Int
+transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
 
 data Flavor = CompilingKleenex | CompilingRegex deriving (Show, Eq)
 
@@ -152,12 +152,12 @@ getCompileFlavor args =
                           ".rx"  -> CompilingRegex
                           f      -> error $ "Unknown extension: " ++ f
                                    
-buildTransducer :: MainOptions -> [String] -> IO (Transducer, String, String, NominalDiffTime)
-buildTransducer mainOpts args = do
+buildTransducers :: MainOptions -> [String] -> IO (Transducers, String, String, NominalDiffTime)
+buildTransducers mainOpts args = do
   let [arg] = args
   let flav = getCompileFlavor args
   timeFSTgen <- getCurrentTime
-  (fst', srcName, src) <-
+  (fsts', srcName, src) <-
     if optExpressionArg mainOpts || flav == CompilingRegex then do
       (reSrcName, reSrc) <-
         if optExpressionArg mainOpts then
@@ -169,29 +169,33 @@ buildTransducer mainOpts args = do
         Left e -> do
           hPutStrLn stderr $ e
           exitWith $ ExitFailure 1
-        Right (_, re) -> return (Transducer (fromMu $ fromRegex re), reSrcName, reSrc)
+        Right (_, re) -> do
+          let fst = fromMu $ fromRegex re
+          return (Transducers [fst], reSrcName, reSrc)
     else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
-           return (Transducer (fstFromKleenex kleenexSrc), arg, kleenexSrc)
+           let fsts = fstFromKleenex kleenexSrc
+           return (Transducers fsts, arg, kleenexSrc)
          else do
            hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
            exitWith $ ExitFailure 1
-  when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (transducerSize fst')
+  when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (transducerSize fsts')
   timeFSTgen' <- getCurrentTime
-  return (fst', srcName, md5s (Str src), diffUTCTime timeFSTgen' timeFSTgen)
+  return (fsts', srcName, md5s (Str src), diffUTCTime timeFSTgen' timeFSTgen)
 
-compileTransducer :: MainOptions -> Transducer -> IO (DetTransducer, NominalDiffTime, NominalDiffTime)
-compileTransducer mainOpts (Transducer fst') = do
+compileTransducers :: MainOptions -> Transducers -> IO (DetTransducers, NominalDiffTime, NominalDiffTime)
+compileTransducers mainOpts (Transducers fsts') = do
   timeSSTgen <- getCurrentTime
-  let sst = enumerateVariables $ enumerateStates $ sstFromFST fst' (not $ optLookahead mainOpts)
-  when (not $ optQuiet mainOpts) $ do
-    putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
-    putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ sstE sst)
+  let ssts = map (\fst' -> enumerateVariables $ enumerateStates $ 
+                           sstFromFST fst' (not $ optLookahead mainOpts)) fsts'
+--  when (not $ optQuiet mainOpts) $ do
+--    putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
+--    putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ sstE sst)
   timeSSTgen' <- getCurrentTime
   timeSSTopt <- getCurrentTime
-  let (sstopt, i) = optimize (optOptimizeSST mainOpts) sst
+  let (sstopts, i) = unzip $ map (optimize (optOptimizeSST mainOpts)) ssts
   timeSSTopt' <- i `seq` getCurrentTime
-  return (DetTransducer sstopt
+  return (DetTransducers sstopts
          ,diffUTCTime timeSSTgen' timeSSTgen
          ,diffUTCTime timeSSTopt' timeSSTopt)
 
@@ -200,23 +204,23 @@ transducerToProgram :: MainOptions
                     -> Bool
                     -> String
                     -> String
-                    -> DetTransducer
+                    -> DetTransducers
                     -> IO (ExitCode, NominalDiffTime)
-transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5 (DetTransducer sst) = do
+transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5 (DetTransducers ssts) = do
   timeCompile <- getCurrentTime
-  let prog = compileAutomaton sst
+  let progs = map compileAutomaton ssts
   let envInfo = intercalate "\\n" [ "Options:"
                                   , prettyOptions mainOpts compileOpts
                                   , ""
                                   , "Time:        " ++ show timeCompile
                                   , "Source file: " ++ srcFile
                                   , "Source md5:  " ++ srcMd5
-                                  , "SST states:  " ++ show (S.size $ sstS sst)
+                                  , "SST states:  " ++ intercalate ", " (map (show . S.size . sstS) ssts)
                                   ]
   ret <- compileProgram (optWordSize compileOpts)
                         (optOptimizeLevelCC compileOpts)
                         (optQuiet mainOpts)
-                        prog
+                        progs
                         (Just envInfo)
                         (optAltCompiler compileOpts)
                         (optOutFile compileOpts)
@@ -237,12 +241,17 @@ checkArgs args = do
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
 compile mainOpts compileOpts args = do
   checkArgs args
-  (transducer, srcName, srcMd5, fstGenDuration) <- buildTransducer mainOpts args
-  (detTransducer, sstGenDuration, sstOptDuration) <- compileTransducer mainOpts transducer
+
+  -- FST step
+  (transducers, srcName, srcMd5, fstGenDuration) <- buildTransducers mainOpts args
+
+  -- SST step
+  (ssts, sstGenDuration, sstOptDuration) <- compileTransducers mainOpts transducers
+  
   let useWordAlignment = getCompileFlavor args == CompilingKleenex
   (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
                                                 useWordAlignment srcName
-                                                srcMd5 detTransducer
+                                                srcMd5 ssts
   when (not $ optQuiet mainOpts) $ do
     let fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
                 in replicate (8 - length s) ' ' ++ s
@@ -256,46 +265,46 @@ compile mainOpts compileOpts args = do
                                                       ,compileDuration])
   return ret
 
-visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
-visualize mainOpts visOpts args = do
-  checkArgs args
-  (Transducer fst', _, _, _) <- buildTransducer mainOpts args
-  dg <- case optVisStage visOpts of
-          VisFST -> return $ fstToDot fst'
-          VisSST -> do
-            (DetTransducer sst,_,_) <- compileTransducer mainOpts (Transducer fst')
-            return $ sstToDot sst
-  case optVisOut visOpts of
-    Nothing -> do
-        GC.runGraphvizCanvas GC.Dot dg GC.Xlib
-        return ExitSuccess
-    Just f -> do
-        let ext = map toLower (takeExtension f)
-        case output ext of
-          Nothing -> putStrLn ("Unknown extension \"" ++ ext ++ "\"")
-                     >> return (ExitFailure 1)
-          Just out -> do
-            _ <- GC.runGraphvizCommand GC.Dot dg out f
-            return ExitSuccess
-
-  where
-    output e = case e of
-                 ".pdf"  -> Just GC.Pdf
-                 ".png"  -> Just GC.Png
-                 ".eps"  -> Just GC.Eps
-                 ".dot"  -> Just GC.DotOutput
-                 ".svg"  -> Just GC.Svg
-                 ".svgz" -> Just GC.SvgZ
-                 _ -> Nothing
+--visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
+--visualize mainOpts visOpts args = do
+--  checkArgs args
+--  (Transducer fst', _, _, _) <- buildTransducers mainOpts args
+--  dg <- case optVisStage visOpts of
+--          VisFST -> return $ fstToDot fst'
+--          VisSST -> do
+--            (DetTransducer sst,_,_) <- compileTransducer mainOpts (Transducer fst')
+--            return $ sstToDot sst
+--  case optVisOut visOpts of
+--    Nothing -> do
+--        GC.runGraphvizCanvas GC.Dot dg GC.Xlib
+--        return ExitSuccess
+--    Just f -> do
+--        let ext = map toLower (takeExtension f)
+--        case output ext of
+--          Nothing -> putStrLn ("Unknown extension \"" ++ ext ++ "\"")
+--                     >> return (ExitFailure 1)
+--          Just out -> do
+--            _ <- GC.runGraphvizCommand GC.Dot dg out f
+--            return ExitSuccess
+--
+--  where
+--    output e = case e of
+--                 ".pdf"  -> Just GC.Pdf
+--                 ".png"  -> Just GC.Png
+--                 ".eps"  -> Just GC.Eps
+--                 ".dot"  -> Just GC.DotOutput
+--                 ".svg"  -> Just GC.Svg
+--                 ".svgz" -> Just GC.SvgZ
+--                 _ -> Nothing
 
 main :: IO ExitCode
 main = runSubcommand
        [ subcommand "compile" compile
-       , subcommand "visualize" visualize
+--       , subcommand "visualize" visualize
        ]
 
-fstFromKleenex :: String -> FST Int (RangeSet Word8) KleenexOutTerm
+fstFromKleenex :: String -> [FST Int (RangeSet Word8) KleenexOutTerm]
 fstFromKleenex str =
   case parseKleenex str of
     Left e -> error e
-    Right ih -> fromMu (kleenexToMuTerm ih)
+    Right ih -> map fromMu (kleenexToMuTerm ih)
