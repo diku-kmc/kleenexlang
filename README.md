@@ -5,7 +5,7 @@ This is a compiler that can:
 * compile regular expressions into fast, streaming parsers, and
 * compile programs written in the regular expression-based language Kleenex into fast, streaming string transformations.
 
-## Building ##
+## Build ##
 
 To build, run `cabal configure && cabal build`. This will place a binary in `dist/build/repg/repg`.
 
