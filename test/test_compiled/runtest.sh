@@ -10,7 +10,7 @@ for tst in $(ls $test_dir); do
     if [[ $tst != *".kex" ]]; then  #
         continue
     fi
-    compile="${repgc} compile --opt 0 --la=false --wa=false --out ${tst}_bin $test_dir/${tst}"
+    compile="${repgc} compile --opt 0 --la=false --out ${tst}_bin $test_dir/${tst}"
     eval "$compile > /dev/null"
     input=$(sed -n 's/\/\/ IN: \(.*\)/\1/p' < $test_dir/$tst)
     exp_out=$(sed -n 's/\/\/ OUT: \(.*\)/\1/p' < $test_dir/$tst)
