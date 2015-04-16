@@ -5,11 +5,11 @@ This is a compiler that can:
 * compile regular expressions into fast, streaming parsers, and
 * compile programs written in the regular expression-based language Kleenex into fast, streaming string transformations.
 
-# Building #
+## Building ##
 
 To build, run `cabal configure && cabal build`. This will place a binary in `dist/build/repg/repg`.
 
-# Test suite #
+## Test suite ##
 
 A number of test suites are included.
 
@@ -17,7 +17,7 @@ A number of test suites are included.
 * To test the C runtime: `cd crt_test && make`. Note that this uses the Valgrind tool.
 * To run the end-to-end blackbox tests: `cd test/test_compiled && make`.
 
-# Benchmark suite #
+## Benchmark suite ##
 
 The repository includes a benchmark suite that compares the performance of string transformation programs written in Kleenex with equivalent programs written using other regular expression-based libraries and tools.
 
