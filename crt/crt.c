@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
+#include <getopt.h>
+#include <unistd.h>
 #include <sys/time.h>
 
 #define RETC_PRINT_USAGE     1
@@ -25,9 +27,17 @@
 #define BUFFER_UNIT_T uint8_t
 #endif
 
+#ifndef NUM_PHASES
+#error "NUM_PHASES not defined."
+#endif
+
 #ifndef OUTSTREAM
 #define OUTSTREAM stdout
 #endif
+
+// Order of descriptors provided by pipe()
+#define  READ_FD 0
+#define WRITE_FD 1
 
 typedef BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
@@ -52,7 +62,7 @@ int in_cursor = 0;
 
 void printCompilationInfo();
 void init();
-void match();
+void match(int phase);
 
 void buf_flush(buffer_t *buf)
 {
@@ -291,58 +301,109 @@ void init_outbuf()
   reset(&outbuf);
 }
 
-void run()
+void run(int phase)
 {
-  match();
+  init_outbuf();
+  init();
+
+  match(phase);
+
   flush_outbuf();
 }
 
 #ifndef FLAG_NOMAIN
+static struct option long_options[] = {
+    { "phase", required_argument, 0, 'p' },
+    { 0, 0, 0, 0 }
+};
+
 int main(int argc, char *argv[])
 {
   bool do_timing = false;
+  int c;
+  int option_index = 0;
+  int phase;
+  bool do_phase = false;
 
-  if(argc > 2)
+  while ((c = getopt_long (argc, argv, "ihtp:", long_options, &option_index)) != -1)
   {
-    printUsage(argv[0]);
-    return RETC_PRINT_USAGE;
-  }
-  if (argc == 2) 
-  {
-    if(strcmp("-i", argv[1]) == 0)
+    switch (c)
     {
-      printCompilationInfo();
-      return RETC_PRINT_INFO;
-    }
-    else if(strcmp("-t", argv[1]) == 0)
-    {
-      do_timing = true;
-    }
-    else
-    {
-      printUsage(argv[0]);
-      return RETC_PRINT_USAGE;
+      case 'i':
+        printCompilationInfo();
+        return RETC_PRINT_INFO;
+      case 't':
+        do_timing = true;
+        break;
+      case 'p':
+        phase = atoi(optarg);
+        do_phase = true;
+        break;
+      case 'h':
+      default:
+        printUsage(argv[0]);
+        return RETC_PRINT_USAGE;
     }
   }
-    
-  init_outbuf();
-  init();
 
+  struct timeval time_before, time_after, time_result;
+  long int millis;
   if(do_timing)
   {
-    struct timeval time_before, time_after, time_result;
-    long int millis;
     gettimeofday(&time_before, NULL);
-    run();
+  }
+
+  if (do_phase)
+  {
+    run(phase);
+  }
+  else
+  {
+    // set up a pipeline
+    // stdin -> prog --phase 1 -> prog --phase 2 -> ... -> prog --phase n -> stdout
+
+    int orig_stdout = dup(STDOUT_FILENO);
+    int pipes[NUM_PHASES-1][2];
+
+    int i;
+    for (i = 1; i < NUM_PHASES; i++)
+    {
+      if (i != 1) close(pipes[i-2][WRITE_FD]);
+
+      pipe(pipes[i-1]);
+      dup2(pipes[i-1][WRITE_FD], STDOUT_FILENO);
+
+      if (! fork())
+      {
+        close(orig_stdout);
+        close(pipes[i-1][READ_FD]);
+
+        // Should use snprintf, but I assume something else will break before we hit 10^19 phases.
+        char phase[20] = {0};
+        sprintf(phase, "%d", i);
+
+        char *args[] = { argv[0], "--phase", phase, 0 };
+        execv(args[0], args);
+      }
+
+      close(STDIN_FILENO);
+      dup2(pipes[i-1][READ_FD], STDIN_FILENO);
+    }
+
+    close(pipes[NUM_PHASES-2][WRITE_FD]);
+    dup2(orig_stdout, STDOUT_FILENO);
+
+    // Run last phase in-process
+    run(NUM_PHASES);
+  }
+
+  if (do_timing)
+  {
     gettimeofday(&time_after, NULL);
     timersub(&time_after, &time_before, &time_result);
     // A timeval contains seconds and microseconds.
     millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
     fprintf(stderr, "time (ms): %ld\n", millis);
-  }
-  else
-  {
-    run();
   }
 
   return 0;
