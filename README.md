@@ -2,7 +2,7 @@
 
 This is a compiler that can:
 
-* compile regular expressions into fast, streaming parsers, and
+* compile regular expressions into fast, streaming parsers (see [http://www.diku.dk/kmc/documents/GHR14-0-paper.pdf]), and
 * compile programs written in the regular expression-based language Kleenex into fast, streaming string transformations.
 
 ## Build ##
