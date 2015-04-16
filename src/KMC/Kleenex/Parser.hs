@@ -60,6 +60,9 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
                | Var Identifier
                | Seq KleenexTerm KleenexTerm
                | Sum KleenexTerm KleenexTerm
+               | Star KleenexTerm
+               | Plus KleenexTerm
+               | Question KleenexTerm
                | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
                | One
   deriving (Eq, Ord, Show)
@@ -166,6 +169,12 @@ kleenexPrimTerm = skipped
                    <?> "Var"
       ignored    = Ignore <$> (char '~' *> elms)
                    <?> "Ignore"
+--      star       = Star <$> try (elms <* char '*')
+--                   <?> "Star"
+--      question   = Question <$> try (elms <* char '?')
+--                   <?> "Question"
+--      plus       = Plus <$> try (elms <* char '+')
+--                   <?> "Plus"
 
 encodeString :: String -> ByteString
 encodeString = encodeUtf8 . T.pack
