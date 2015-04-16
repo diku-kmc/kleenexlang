@@ -81,57 +81,6 @@ while getopts ":fhp:t:" opt; do
   esac
 done
 
-
-function compile_ini2json {
-    echo "# Handling ini2json as a special case!"
-    opt_la_level=$1
-    la_on_off=$2
-    cc_name=$3    
-    setname "ini2json" $opt_la_level $cc_name
-    timingdata1="${time_dir}/BIN1-${name}${compiletime_postfix}"
-    binary1="${bin_dir}/BIN1-${name}"
-    timingdata2="${time_dir}/BIN2-${name}${compiletime_postfix}"
-    binary2="${bin_dir}/BIN2-${name}"
-    scriptbin="${bin_dir}/${name}"    
-
-    precmd1="$repgc compile ${src_dir}/ini2json_PART1.kex --out $binary1 $la_on_off --opt $opt_level --cc $cc >> $timingdata1"
-    precmd2="$repgc compile ${src_dir}/ini2json_PART2.kex --out $binary2 $la_on_off --opt $opt_level --cc $cc >> $timingdata2"
-    if [ "$timeoutcmd" == "" ]; then
-        cmd1=$precmd1
-        cmd2=$precmd2
-    else
-        cmd1="$timeoutcmd $timeoutseconds $precmd1"
-        cmd2="$timeoutcmd $timeoutseconds $precmd2"
-    fi
-    for i in `seq 1 $reps`; do
-        echo "#$i"
-        echo $cmd1
-        echo $cmd2
-        if [ "$dryrun" = false ]; then
-            eval "$cmd1"
-            if [ $? == 124 ]; then
-                echo "# TIMED OUT!"
-            fi
-            eval "$cmd2"
-            if [ $? == 124 ]; then
-                echo "# TIMED OUT!"
-            fi
-        fi
-    done
-    echo "# Writing script $scriptbin"
-    echo '#!/bin/bash' > $scriptbin
-    echo 'DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )' >> $scriptbin
-    echo 'source "${BASH_SOURCE%/*}"/../timinghelper.sh' >> $scriptbin
-    echo "strip_comments=\"\$DIR/BIN1-${name}\"" >> $scriptbin
-    echo "tojson=\"\$DIR/BIN2-${name}\"" >> $scriptbin
-    echo 'start=$(get_millisecond_time)' >> $scriptbin
-    echo '$strip_comments | $tojson' >> $scriptbin
-    echo 'end=$(get_millisecond_time)' >> $scriptbin
-    echo 'elaps=$(expr $end - $start)' >> $scriptbin
-    echo 'printf "matching (ms): %d\n" $elaps >> /dev/stderr' >> $scriptbin
-    chmod +x $scriptbin
-}
-
 # Read in the compiler config file "compilers.txt" and set the names
 set_compiler_names
 mkdir -p $time_dir
@@ -157,16 +106,7 @@ for opt_la_level in ${opt_levels[@]}; do # for each SST optimization level
             else
                 la_on_off="--la=false"
             fi
-            
-            if [ $n == "ini2json_PART1.kex" ]; then
-                # This is a special case!
-                compile_ini2json $opt_la_level $la_on_off $cc_name
-                continue
-            fi
-            if [ $n == "ini2json_PART2.kex" ]; then
-                # this one is always handled by PART1
-                continue
-            fi
+
             setname $n $opt_la_level $cc_name
             
             timingdata="${time_dir}/${name}${compiletime_postfix}"

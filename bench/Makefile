@@ -118,46 +118,6 @@ utils/extracttime:
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
 
-# So hacky. Special cased because it's two-phase.
-ini2json.ko: $(KLEENEXDIR)/ini2json.kex  $(KLEENEXDIR)/ini_stripcomments.kex utils/extracttime
-	@bash -c "if [[ \"${testinput.ini2json}\" == \"\" ]] ; then \
-		echo No test data specified for ini2json ; \
-		false ; \
-	fi"
-	@echo "------------------------------------------"
-	@echo "Checking ini2json..."
-	$(REPG) compile $(KLEENEXDIR)/ini_stripcomments.kex --out kex_ini_stripcomments --quiet=true
-	$(REPG) compile $< --out kex_ini2json --quiet=true
-	./kex_ini_stripcomments < ${testinput.ini2json} | ./kex_ini2json > ini2json.out 2> /dev/null
-	shasum ini2json.out > ini2json.sha
-
-	@bash utils/runequalstest.sh "RE2 == Kleenex     " \
-		ini2json $(RE2_BINDIR)/ini2json ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "Python == Kleenex    " \
-		ini2json $(PYTHON_BINDIR)/ini2json.py ${testinput.ini2json} ini2json.out python
-	@bash utils/runequalstest.sh "Perl == Kleenex      " \
-		ini2json $(PERL_BINDIR)/ini2json.pl ${testinput.ini2json} ini2json.out perl
-	@bash utils/runequalstest.sh "Tcl == Kleenex       " \
-		ini2json $(TCL_BINDIR)/ini2json.tcl ${testinput.ini2json} ini2json.out tclsh
-	@bash utils/runequalstest.sh "RE2/J == Kleenex     " \
-		ini2json $(RE2J_BINDIR)/ini2json.jar ${testinput.ini2json} ini2json.out "java -jar"
-	@bash utils/runequalstest.sh "Sed == Kleenex       " \
-		ini2json $(SED_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "Awk == Kleenex       " \
-		ini2json $(AWK_BINDIR)/ini2json.awk ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "Grep == Kleenex      " \
-		ini2json $(GREP_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "C++11 == Kleenex     " \
-		ini2json $(CPP11_BINDIR)/ini2json ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "Oniguruma == Kleenex " \
-		ini2json $(ONIGURUMA_BINDIR)/ini2json ${testinput.ini2json} ini2json.out
-	@bash utils/runequalstest.sh "Cat == Kleenex       " \
-		ini2json $(CAT_BINDIR)/ini2json.sh ${testinput.ini2json} ini2json.out
-
-
-# Do some cleanup!
-	@rm ini2json.out ini2json.sha kex_ini2json kex_ini_stripcomments tmp_timing
-
 # Check each program individually
 patho2: patho2.ko
 csv_project3: csv_project3.ko
