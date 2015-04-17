@@ -1,5 +1,7 @@
 # The KMC regular expression compiler #
 
+![Travis status](https://travis-ci.org/diku-kmc/repg.svg?branch=master)
+
 This is a compiler that can:
 
 * compile regular expressions into fast, streaming parsers (see [http://www.diku.dk/kmc/documents/GHR14-0-paper.pdf]), and
