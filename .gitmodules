@@ -1,3 +1,6 @@
 [submodule "bench/re2/re2"]
 	path = bench/re2/libre2
 	url = https://github.com/google/re2.git
+[submodule "regexps-syntax"]
+	path = regexps-syntax
+	url = https://github.com/diku-kmc/regexps-syntax/
