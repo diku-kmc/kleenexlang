@@ -2,6 +2,9 @@
 # NB: don't set `language: haskell` here
 language: c
 
+notifications:
+ email: false
+
 # The following lines enable several GHC versions and/or HP versions
 # to be tested; often it's enough to test only against the last
 # release of a major GHC version. Setting HPVER implictly sets
@@ -50,4 +53,3 @@ script:
  - SRC_TGZ=$(cabal info . | awk '{print $2;exit}').tar.gz &&
    (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
 
-# EOF
