@@ -6,4 +6,6 @@ before_install:
  - cabal sandbox add-source regexps-syntax
  
 install: cabal install --only-dependencies
-script: cabal test && cd test/test_compiled && make
+script: 
+ - cabal test 
+ - cd test/test_compiled && make
