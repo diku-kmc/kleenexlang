@@ -2,6 +2,12 @@
 # NB: don't set `language: haskell` here
 language: c
 
+cache:
+  directories:
+    - $HOME/build/diku-kmc/repg/.cabal-sandbox
+  apt: true
+  
+
 notifications:
   email: false
 
