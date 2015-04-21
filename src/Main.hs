@@ -150,7 +150,9 @@ getCompileFlavor args =
                           ".kex" -> CompilingKleenex
                           ".re"  -> CompilingRegex
                           ".rx"  -> CompilingRegex
-                          f      -> error $ "Unknown extension: " ++ f
+                          f      -> error $ unlines [ "Unknown extension: '" ++ f ++ "'."
+                                                    , "Expects one of '.kex', '.re', or '.rx'."
+                                                    ]
                                    
 buildTransducer :: MainOptions -> [String] -> IO (Transducer, String, String, NominalDiffTime)
 buildTransducer mainOpts args = do
