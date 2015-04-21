@@ -6,7 +6,7 @@ module KMC.FSTConstruction
 where
 
 import           Control.Monad.State
-import           Data.Monoid
+import           Data.Monoid (Monoid, mempty)
 import qualified Data.Set as S
 
 import           KMC.Expression
