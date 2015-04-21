@@ -265,42 +265,43 @@ compile mainOpts compileOpts args = do
                                                       ,compileDuration])
   return ret
 
---visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
---visualize mainOpts visOpts args = do
---  checkArgs args
---  (Transducer fst', _, _, _) <- buildTransducers mainOpts args
---  dg <- case optVisStage visOpts of
---          VisFST -> return $ fstToDot fst'
---          VisSST -> do
---            (DetTransducer sst,_,_) <- compileTransducer mainOpts (Transducer fst')
---            return $ sstToDot sst
---  case optVisOut visOpts of
---    Nothing -> do
---        GC.runGraphvizCanvas GC.Dot dg GC.Xlib
---        return ExitSuccess
---    Just f -> do
---        let ext = map toLower (takeExtension f)
---        case output ext of
---          Nothing -> putStrLn ("Unknown extension \"" ++ ext ++ "\"")
---                     >> return (ExitFailure 1)
---          Just out -> do
---            _ <- GC.runGraphvizCommand GC.Dot dg out f
---            return ExitSuccess
---
---  where
---    output e = case e of
---                 ".pdf"  -> Just GC.Pdf
---                 ".png"  -> Just GC.Png
---                 ".eps"  -> Just GC.Eps
---                 ".dot"  -> Just GC.DotOutput
---                 ".svg"  -> Just GC.Svg
---                 ".svgz" -> Just GC.SvgZ
---                 _ -> Nothing
+visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
+visualize mainOpts visOpts args = do
+  checkArgs args
+  (Transducers (fst':rest), _, _, _) <- buildTransducers mainOpts args
+  when (not $ null rest) $ hPutStrLn stderr "WARNING: Multiple stages, only the first is visualized"
+  dg <- case optVisStage visOpts of
+          VisFST -> return $ fstToDot fst'
+          VisSST -> do
+            (DetTransducers (sst:_),_,_) <- compileTransducers mainOpts (Transducers [fst'])
+            return $ sstToDot sst
+  case optVisOut visOpts of
+    Nothing -> do
+        GC.runGraphvizCanvas GC.Dot dg GC.Xlib
+        return ExitSuccess
+    Just f -> do
+        let ext = map toLower (takeExtension f)
+        case output ext of
+          Nothing -> putStrLn ("Unknown extension \"" ++ ext ++ "\"")
+                     >> return (ExitFailure 1)
+          Just out -> do
+            _ <- GC.runGraphvizCommand GC.Dot dg out f
+            return ExitSuccess
+
+  where
+    output e = case e of
+                 ".pdf"  -> Just GC.Pdf
+                 ".png"  -> Just GC.Png
+                 ".eps"  -> Just GC.Eps
+                 ".dot"  -> Just GC.DotOutput
+                 ".svg"  -> Just GC.Svg
+                 ".svgz" -> Just GC.SvgZ
+                 _ -> Nothing
 
 main :: IO ExitCode
 main = runSubcommand
        [ subcommand "compile" compile
---       , subcommand "visualize" visualize
+       , subcommand "visualize" visualize
        ]
 
 fstFromKleenex :: String -> [FST Int (RangeSet Word8) KleenexOutTerm]
