@@ -2,6 +2,7 @@
 # NB: don't set `language: haskell` here
 language: c
 
+# Cache the cabal sandbox and the apt-gotten packages
 cache:
   directories:
     - $HOME/build/diku-kmc/repg/.cabal-sandbox
