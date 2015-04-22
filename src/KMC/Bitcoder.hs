@@ -34,7 +34,15 @@ fromRegex (Question e)   = Alt (W [False] (fromRegex e))
 fromRegex (LazyQuestion e) = Alt (W [False] Accept)
                                  (W [True] (fromRegex e))
 fromRegex (Suppress e)   = fromRegex e
+fromRegex (Range e n m)  = case m of
+                             Nothing -> Seq (repeatRegex n e) (fromRegex (Star e))
+                             Just m' -> if n == m' then repeatRegex n e
+                                        else Seq (repeatRegex n e) (repeatRegex m' (Question e))
 fromRegex (NamedSet _ _) = error "Named sets not yet supported"
-fromRegex (Range _ _ _) = error "Ranges not yet supported"
 fromRegex (LazyRange _ _ _) = error "Lazy ranges not yet supported"
 
+
+repeatRegex :: (Ord sigma, Enum sigma, Bounded sigma)
+       => Int -> Regex -> Mu (RangeSet sigma) (BitOutputTerm sigma) a
+repeatRegex n e = foldr Seq Accept (replicate n (fromRegex e))
+          
