@@ -58,6 +58,12 @@ unionEdges es es' =
   , eBackwardEpsilon = M.unionWith (++) (eBackwardEpsilon es) (eBackwardEpsilon es')
   }
 
+flipEdges :: OrderedEdgeSet q pred func -> OrderedEdgeSet q pred func
+flipEdges es = OrderedEdgeSet {eForward = eBackward es
+                              ,eBackward = eForward es
+                              ,eForwardEpsilon = eBackwardEpsilon es
+                              ,eBackwardEpsilon = eForwardEpsilon es}
+
 edgesToList :: OrderedEdgeSet q pred func -> [(q, Either (pred, func) (Rng func), q)]
 edgesToList es =
   [ (q, Left (a,b), q') | (q, xs) <- M.toList (eForward es), (a,b,q') <- xs ]
@@ -147,24 +153,43 @@ coarsestPredicateSet fst' qs = coarsestPartition ps
            [ p | q <- qs
                , (p, _, _) <- maybe [] id (M.lookup q (eForward . fstE $ fst')) ]
 
--- | Compute an unordered right epsilon closure on the input automaton of an FST.
-rightClosure :: (Ord st) => FST st pred func -> st -> S.Set st
-rightClosure fst' = snd . go S.empty
+-- | Compute an ordered right closure with output
+rightClosure :: (Ord st, Monoid (Rng func)) => FST st pred func -> st -> [(Rng func, st)]
+rightClosure fst' = snd . go S.empty mempty
+    where
+      go vis out q =
+        case fstEvalEpsilonEdges fst' q of
+          [] -> (vis, [(out, q)])
+          xs -> foldl (\(vis', acc) (w, q') ->
+                        if S.member q' vis' then
+                            (vis', acc)
+                        else
+                            let (vis'', ys) = go (S.insert q' vis') (mappend out w) q'
+                            in (vis'', acc ++ ys))
+                      (vis, [])
+                      xs
+
+-- | Compute an unordered right closure without output on the input automaton of an FST
+rightInputClosure :: (Ord st) => FST st pred func -> st -> S.Set st
+rightInputClosure fst' = snd . go S.empty
     where
       go vis q =
-          foldl (\(vis', acc) q' ->
-                     if S.member q' vis' then
+       case fstEvalEpsilonEdges fst' q of
+         [] -> (vis, S.singleton q)
+         xs -> foldl (\(vis', acc) (_, q') ->
+                       if S.member q' vis then
                          (vis', acc)
-                     else
-                         let (vis'', ys) = go (S.insert q' vis') q' in
-                         (vis'', S.union acc ys))
-                (vis, S.singleton q)
-                (map snd $ fstEvalEpsilonEdges fst' q)
+                       else
+                         let (vis'', ys) = go (S.insert q' vis') q'
+                         in (vis'', S.union acc ys))
+                     (vis, S.empty)
+                     xs
 
 stepAll :: (Ord st, PartialOrder pred) => FST st pred func -> pred -> S.Set st -> S.Set st
 stepAll fst' p = S.unions . map aux . S.toList
     where
-      aux q = S.unions $ map (rightClosure fst' . snd) $ fstAbstractEvalEdgesAll fst' q p
+      aux q = S.unions $ map (rightInputClosure fst' . snd)
+                       $ fstAbstractEvalEdgesAll fst' q p
 
 {-- LCP analysis --}
 
@@ -193,6 +218,47 @@ prefixTests fst' singletonMode states =
     entails _ [] = True
     entails (t:ts) (p:ps) = (t `eq` p) && (ts `entails` ps)
     entails [] (_:_) = False
+
+enumerateStates :: (Ord st, Ord a, Enum a) => FST st pred func -> FST a pred func
+enumerateStates fst' =
+  FST { fstS = S.fromList (M.elems statesMap)
+      , fstE = edgesFromList
+                 [ (aux q, lbl, aux q') | (q, lbl, q') <- edgesToList (fstE fst') ]
+      , fstI = aux (fstI fst')
+      , fstF = S.fromList [ aux q | q <- S.toList (fstF fst') ]
+      }
+  where
+    statesMap = M.fromList (zip (S.toList (fstS fst')) [toEnum 0..])
+    aux q = statesMap M.! q
+
+accessibleStates :: (Ord q, PartialOrder pred, Boolean pred)
+                 => OrderedEdgeSet q pred func -> S.Set q -> S.Set q
+accessibleStates es initialWS = go initialWS S.empty
+  where
+    go ws acc
+      | S.null ws = acc
+      | (q, ws') <- S.deleteFindMin ws =
+          let succs = S.fromList $ map snd (abstractEvalEdgesAll es q bot)
+                                   ++ map snd (evalEpsilonEdges es q)
+          in go (S.union ws' (S.difference succs acc)) (S.insert q acc)
+
+coaccessibleStates :: (Ord q, PartialOrder pred, Boolean pred)
+                   => OrderedEdgeSet q pred func -> S.Set q -> S.Set q
+coaccessibleStates es = accessibleStates (flipEdges es)
+
+trim :: (Ord q, PartialOrder pred, Boolean pred)
+     => FST q pred func -> FST q pred func
+trim fst' =
+  FST { fstI = fstI fst'
+      , fstF = S.intersection (fstF fst') useful
+      , fstS = useful
+      , fstE = edgesFromList [ (q, lbl, q') | (q, lbl, q') <- edgesToList (fstE fst')
+                                            , S.member q useful
+                                            , S.member q' useful ]
+      }
+  where
+    useful = S.intersection (accessibleStates (fstE fst') (S.singleton (fstI fst')))
+                            (coaccessibleStates (fstE fst') (fstF fst'))
 
 {-- Simulation --}
 

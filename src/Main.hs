@@ -28,6 +28,8 @@ import           KMC.RangeSet (RangeSet)
 import           KMC.SSTCompiler (compileAutomaton)
 import           KMC.SSTConstruction (sstFromFST)
 import           KMC.SymbolicFST (FST, fstS)
+import qualified KMC.SymbolicFST as FST
+import           KMC.SymbolicFST.Functionalization (functionalize)
 import           KMC.SymbolicSST
 import           KMC.Syntax.Config
 import           KMC.Syntax.Parser
@@ -36,10 +38,11 @@ import           KMC.Visualization
 
 data MainOptions =
     MainOptions
-    { optQuiet         :: Bool
-    , optOptimizeSST   :: Int
-    , optLookahead     :: Bool
-    , optExpressionArg :: Bool
+    { optQuiet            :: Bool
+    , optOptimizeSST      :: Int
+    , optPreFunctionalize :: Bool
+    , optLookahead        :: Bool
+    , optExpressionArg    :: Bool
     }
 
 data CompileOptions =
@@ -92,6 +95,7 @@ instance Options MainOptions where
       MainOptions
       <$> simpleOption "quiet" False "Be quiet"
       <*> simpleOption "opt" 3 "SST optimization level (1-3)"
+      <*> simpleOption "func" False "Functionalize FST before SST construction"
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
 
@@ -142,6 +146,13 @@ data DetTransducers where
 transducerSize :: Transducers -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
 
+transducerSizeTrans :: Transducer -> Int
+transducerSizeTrans (Transducer fst') = length $ FST.edgesToList $ FST.fstE fst'
+
+functionalizeTransducer :: Transducer -> Transducer
+functionalizeTransducer (Transducer fst') =
+  Transducer $ FST.trim $ FST.enumerateStates $ functionalize fst'
+
 data Flavor = CompilingKleenex | CompilingRegex deriving (Show, Eq)
 
 getCompileFlavor :: [String] -> Flavor
@@ -150,7 +161,9 @@ getCompileFlavor args =
                           ".kex" -> CompilingKleenex
                           ".re"  -> CompilingRegex
                           ".rx"  -> CompilingRegex
-                          f      -> error $ "Unknown extension: " ++ f
+                          f      -> error $ unlines [ "Unknown extension: '" ++ f ++ "'."
+                                                    , "Expects one of '.kex', '.re', or '.rx'."
+                                                    ]
                                    
 buildTransducers :: MainOptions -> [String] -> IO (Transducers, String, String, NominalDiffTime)
 buildTransducers mainOpts args = do
@@ -179,9 +192,11 @@ buildTransducers mainOpts args = do
          else do
            hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
            exitWith $ ExitFailure 1
-  when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (transducerSize fsts')
+  let fsts'' = if optPreFunctionalize mainOpts then functionalizeTransducer fsts' else fsts'
+  when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (transducerSize fsts'')
+  when (not $ optQuiet mainOpts) $ putStrLn $ "FST transitions: " ++ show (transducerSizeTrans fsts'')
   timeFSTgen' <- getCurrentTime
-  return (fsts', srcName, md5s (Str src), diffUTCTime timeFSTgen' timeFSTgen)
+  return (fsts'', srcName, md5s (Str src), diffUTCTime timeFSTgen' timeFSTgen)
 
 compileTransducers :: MainOptions -> Transducers -> IO (DetTransducers, NominalDiffTime, NominalDiffTime)
 compileTransducers mainOpts (Transducers fsts') = do
