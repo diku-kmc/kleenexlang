@@ -146,12 +146,12 @@ data DetTransducers where
 transducerSize :: Transducers -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
 
-transducerSizeTrans :: Transducer -> Int
-transducerSizeTrans (Transducer fst') = length $ FST.edgesToList $ FST.fstE fst'
+transducerSizeTrans :: Transducers -> Int
+transducerSizeTrans (Transducers fsts) = sum $ map(length . FST.edgesToList . FST.fstE) fsts
 
-functionalizeTransducer :: Transducer -> Transducer
-functionalizeTransducer (Transducer fst') =
-  Transducer $ FST.trim $ FST.enumerateStates $ functionalize fst'
+functionalizeTransducers :: Transducers -> Transducers
+functionalizeTransducers (Transducers fsts) =
+  Transducers $ map (FST.trim . FST.enumerateStates . functionalize) fsts
 
 data Flavor = CompilingKleenex | CompilingRegex deriving (Show, Eq)
 
@@ -192,7 +192,7 @@ buildTransducers mainOpts args = do
          else do
            hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
            exitWith $ ExitFailure 1
-  let fsts'' = if optPreFunctionalize mainOpts then functionalizeTransducer fsts' else fsts'
+  let fsts'' = if optPreFunctionalize mainOpts then functionalizeTransducers fsts' else fsts'
   when (not $ optQuiet mainOpts) $ putStrLn $ "FST states: " ++ show (transducerSize fsts'')
   when (not $ optQuiet mainOpts) $ putStrLn $ "FST transitions: " ++ show (transducerSizeTrans fsts'')
   timeFSTgen' <- getCurrentTime
