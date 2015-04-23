@@ -2,3 +2,4 @@ ragel
 ragel-6.9/
 bin/
 src/*.c
+graphs/
