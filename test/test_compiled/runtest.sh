@@ -5,7 +5,7 @@ repgc=../../dist/build/repg/repg
 
 getinput="sed -n 's/\/\/ IN: \(.*\)/\1/p'"
 getoutput="sed -n 's/\/\/ OUT: \(.*\)/\1/p'"
-
+failed=0
 for tst in $(ls $test_dir); do
     if [[ $tst != *".kex" ]]; then  #
         continue
@@ -22,5 +22,9 @@ for tst in $(ls $test_dir); do
         echo "  Output: $out"
         echo "  Expected: $exp_out"
         echo "  Cmd: $compile"
+        ((failed++))
     fi
 done
+
+exit $failed
+   
