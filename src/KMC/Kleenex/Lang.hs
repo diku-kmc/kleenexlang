@@ -173,6 +173,6 @@ regexToMuTerm o re =
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
 
---testKleenex :: String -> Either String (KleenexMu a)
---testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
+testKleenex :: String -> Either String ([KleenexMu a])
+testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
   

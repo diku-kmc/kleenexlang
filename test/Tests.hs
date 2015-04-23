@@ -71,6 +71,7 @@ regressionTests =
     [ simpleTest "unsound_lookahead" unsound_lookahead
     , simpleTest "character class accepts dash" charclass_accept_dash
     , simpleTest "newline bug" newline_bug
+    , simpleTest "pipeline" pipeline
     ]
 
 unsound_lookahead :: IO TS.Result
@@ -97,19 +98,31 @@ encodeChar = BS.unpack . encodeUtf8 . T.singleton
 
 charclass_accept_dash :: IO TS.Result
 charclass_accept_dash = 
-    let prog = [strQ|test := <[a-z-]*>|]
+    let prog = [strQ|test
+test := <[a-z-]*>|]
     in kleenexIdTest prog "a-b-c-d---d-f-eerasdfs-"
 
 -- This was a bug in the C generation.  Works in the SST world it seems.
 newline_bug :: IO TS.Result
 newline_bug =
-    let prog = [strQ|
+    let prog = [strQ|test
 test := ( keep "\n" | ~drop ) ~<\n> test
       | ( keep "\n" | ~drop ) ~<\n>
 keep := <(a|b)+(a|b)(a|b)+>
 drop := <[^\n]*>
 |]
     in kleenexIdTest prog $ unlines ["aaaba","aabbaa"]
+
+-- Test that pipelining works
+pipeline :: IO TS.Result
+pipeline =
+    let prog = [strQ|p >> a >> b
+p := ~<abc> "a"
+a := <.> "b"
+b := <ab> "c"
+   | ~<[^ab]> "lol"
+|]
+    in kleenexIdTest prog "abc"
 
 
 kleenexIdTest :: String -> String -> IO TS.Result
@@ -118,8 +131,8 @@ kleenexIdTest prog str =
     case H.testKleenex prog of
       Left err -> return $ TS.Fail err
       Right m  ->
-          let sst = sstFromFST (fromMu m :: FST Int (RangeSet Word8) H.KleenexOutTerm) True
-              out = SST.flattenStream $ SST.run sst inp
+          let ssts = map (flip sstFromFST True) ((map fromMu m) :: [FST Int (RangeSet Word8) H.KleenexOutTerm])
+              out  = foldl (\acc sst -> SST.flattenStream $ SST.run sst acc) inp ssts
           in if inp == out
              then return TS.Pass
              else return $ TS.Fail "Identity failed"
@@ -182,20 +195,20 @@ kp_assertIs prog expected =
 
 kp_test1 :: (String, IO TS.Result)
 kp_test1 = "Mid-of-line //" <@>
-    let pa = [strQ|p := "a" <b> // | "b" <a>
-|]
-        pb = [strQ|p := "a" <b>
-|]
+    let pa = [strQ|p
+p := "a" <b> // | "b" <a> |]
+        pb = [strQ|p
+p := "a" <b> |]
     in kp_compare pa pb
 
 kp_test2 :: (String, IO TS.Result)
 kp_test2 = "First-on-line // in def." <@>
-    let pa = [strQ|
+    let pa = [strQ|p
 p := "a" <b>
 //  | "c" <d>
     | "e" <f>
 |]
-        pb = [strQ|
+        pb = [strQ|p
 p := "a" <b>
    | "e" <f>
 |]
@@ -203,12 +216,12 @@ p := "a" <b>
 
 kp_test2' :: (String, IO TS.Result)
 kp_test2' = "Second-on-line // in def." <@>
-    let pa = [strQ|
+    let pa = [strQ|p
 p := "a" <b>
  // | "c" <d>
     | "e" <f>
 |]
-        pb = [strQ|
+        pb = [strQ|p
 p := "a" <b>
    | "e" <f>
 |]
@@ -216,13 +229,13 @@ p := "a" <b>
 
 kp_test3 :: (String, IO TS.Result)
 kp_test3 = "Last-line //" <@>
-    let pa = [strQ|
+    let pa = [strQ|p
 p := "a" e
 e := "b" c
 c := "c" <a>
 // c := "d" <b>
 |]
-        pb = [strQ|
+        pb = [strQ|p
 p := "a" e
 e := "b" c
 c := "c" <a>
@@ -231,11 +244,11 @@ c := "c" <a>
 
 kp_test4 :: (String, IO TS.Result)
 kp_test4 = "C and C++ style equal" <@>
-    let pa = [strQ|
+    let pa = [strQ|p
 //p := "a" <b>
 p := "a" <b>
 |]
-        pb = [strQ|
+        pb = [strQ|p
 /*p := "a" <b>*/
 p := "a" <b>
 |]
@@ -243,87 +256,105 @@ p := "a" <b>
 
 kp_test5 :: (String, IO TS.Result)
 kp_test5 = "C comment in term" <@>
-    let pa = [strQ|
+    let pa = [strQ|p
 p := "a" /*"b"*/ <b>
 |]
-        pb = [strQ|
+        pb = [strQ|p
 p := "a" <b>
 |]
     in kp_compare pa pb
 
 kp_test6 :: (String, IO TS.Result)
 kp_test6 = "C comment remove choice" <@>
-    let pa = [strQ|
+    let pa = [strQ|p
 p := "a" <b> /* | */ <c>
 |]
-        pb = [strQ|
+        pb = [strQ|p
 p := "a" <b> <c>
 |]
     in kp_compare pa pb
 
 kp_test8 :: (String, IO TS.Result)
 kp_test8 = "Comment out last part of file" <@>
-    let pa = [strQ|p := "a" <b> //|]
-        pb = [strQ|p := "a" <b>|]
+    let pa = [strQ|p
+p := "a" <b> //|]
+        pb = [strQ|p
+p := "a" <b>|]
     in kp_compare pa pb
 
 kp_test8' :: (String, IO TS.Result)
 kp_test8' = "Non-empty comment at end of file" <@>
-    let pa = [strQ|p := "a" <b> // hello|]
-        pb = [strQ|p := "a" <b>|]
+    let pa = [strQ|p
+p := "a" <b> // hello|]
+        pb = [strQ|p
+p := "a" <b>|]
     in kp_compare pa pb
             
 
 kp_test7 :: (String, IO TS.Result)
 kp_test7 = "No newline at end of file" <@>
-    let pa = [strQ|p := "a" <b>|]
-        pb = [strQ|p := "a" <b>
+    let pa = [strQ|p
+p := "a" <b>|]
+        pb = [strQ|p
+p := "a" <b>
 |]
     in kp_compare pa pb
 
 kp_test9 :: (String, IO TS.Result)
 kp_test9 = "Indented name def." <@>
-    let pa = [strQ|   p := "a"|]
-        pb = [strQ|p := "a"|]
+    let pa = [strQ|p
+p := "a"|]
+        pb = [strQ|p
+p := "a"|]
     in kp_compare pa pb
 
 kp_test10 :: (String, IO TS.Result)
 kp_test10 = "Comment before def." <@>
-    let pa = [strQ|/* hey dr. dickhead */p := "a"|]
-        pb = [strQ|p := "a"|]
+    let pa = [strQ|/* foo */ /* bar */
+/*asdf */ p >> p /* hey dr. dickhead */
+//asfd
+p := "a"|]
+        pb = [strQ|p >> p
+p := "a"|]
     in kp_compare pa pb
 
 kp_test11 :: (String, IO TS.Result)
 kp_test11 = "Whitespace around := (1)" <@>
-    let pa = [strQ|p:="a"|]
-        pb = [strQ|p := "a"|]
+    let pa = [strQ|p
+p:="a"|]
+        pb = [strQ|p
+p := "a"|]
     in kp_compare pa pb
 
 kp_test12 :: (String, IO TS.Result)
 kp_test12 = "Whitespace around := (2)" <@>
     let pa = [strQ|p
-                    :=
-                    "a"|]
-        pb = [strQ|p := "a"|]
+p
+   :=
+        "a"|]
+        pb = [strQ|p
+p := "a"|]
     in kp_compare pa pb
 
 kp_test12' :: (String, IO TS.Result)
 kp_test12' = "Whitespace before first def." <@>
     let pa = [strQ|
-
+p
 p := "a"|]
-        pb = [strQ|p := "a"|]
+        pb = [strQ|p
+p := "a"|]
     in kp_compare pa pb
 
 kp_test13 :: (String, IO TS.Result)
 kp_test13 = "Sanity check #1" <@>
-    let p = [strQ|p := "a" <b>|]
+    let p = [strQ|p
+p := "a" <b>|]
         e = HP.Kleenex [HP.HA (HP.mkIdent "p", HP.Seq (HP.Constant "a") (HP.RE (R.Chr 'b')))]
     in kp_assertIs p e
 
 kp_test14 :: (String, IO TS.Result)
 kp_test14 = "Sanity check #2" <@>
-    let p = [strQ|
+    let p = [strQ|p
 p:="a" q | "b" r
 r:= <A>
 q:= <B> "B" p
@@ -336,4 +367,3 @@ q:= <B> "B" p
                                                                (HP.Var (HP.mkIdent "p"))))
                        ]
     in kp_assertIs p e
-          
