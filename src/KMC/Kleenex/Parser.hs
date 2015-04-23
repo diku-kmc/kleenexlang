@@ -209,14 +209,14 @@ stateParseTest st p input
 parseTest :: (Show a) => KleenexParser a -> String -> IO ()
 parseTest = stateParseTest hpInitState
 
---parseTest' :: (Stream s Identity t)
---               => Parsec s HPState Kleenex -> s -> IO Kleenex
---parseTest' p input
---    = case runParser p hpInitState "" input of
---        Left err -> do putStr "parse error at "
---                       print err
---                       fail ""
---        Right x  -> return x
---
---pf = parseTest (kleenex <* eof)
---pf' = parseTest' (kleenex <* eof)
+parseTest' :: (Stream s Identity t)
+               => Parsec s HPState ([Identifier], Kleenex) -> s -> IO ([Identifier], Kleenex)
+parseTest' p input
+    = case runParser p hpInitState "" input of
+        Left err -> do putStr "parse error at "
+                       print err
+                       fail ""
+        Right x  -> return x
+
+pf = parseTest (kleenex <* eof)
+pf' = parseTest' (kleenex <* eof)
