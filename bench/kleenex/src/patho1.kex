@@ -1,4 +1,5 @@
 // Pathological case for SST
+evil
 
 evil := x flip_a <\n?>
       | y flipUp_b <\n?>

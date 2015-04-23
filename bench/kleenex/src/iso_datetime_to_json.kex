@@ -1,6 +1,7 @@
 // Kleenex program to transform datetime corresponding to the xml schema
 // "datetime" object.  Outputs a JSON-like format.
 // More or less completely taken from "Regular Expressions Cookbook", p. 237.
+dateTimes
 
 dateTimes := dateTime ~<\n> dateTimes
            | dateTime ~<\n>

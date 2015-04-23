@@ -1,6 +1,7 @@
 /* Parses a list of RFC1738 generic URLs into their consituent parts
    https://www.ietf.org/rfc/rfc1738.txt
 */
+prog
 
 prog := genericurl <\n> prog
      |  ""

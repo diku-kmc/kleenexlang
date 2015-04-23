@@ -6,6 +6,7 @@ INSERT INTO  aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsn
 
 TODO:  Figure out what the third number in ST_SetSRID is supposed to mean...
 */
+start
 
 start := "INSERT INTO aws_adresser (id, kommunekode, vejkode, husnr, postnr, esrejendomsnr, geom) VALUES\n" json2sql
 

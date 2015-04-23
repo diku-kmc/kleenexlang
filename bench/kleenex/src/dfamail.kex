@@ -1,3 +1,5 @@
+del
+
 del := ~emailLines
 
 emailLines := ( simpleEmail <\n> | ~fb ~<\n> ) emailLines

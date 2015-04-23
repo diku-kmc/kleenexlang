@@ -1,4 +1,5 @@
 /* Performs Apache log parsing */
+logfile
 
 logfile := "[" (loglines | "") "]\n"
 

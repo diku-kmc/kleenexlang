@@ -1,5 +1,6 @@
 /* Convert (Issuu) JSON to (Issuu) SQL insert statements. */
 /* http://aws.dk/ */
+start
 
 start := "INSERT INTO issuu_log (ts, visitor_uuid, visitor_useragent, visitor_country) VALUES\n" json2sql
 

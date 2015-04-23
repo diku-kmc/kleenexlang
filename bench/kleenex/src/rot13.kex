@@ -1,5 +1,6 @@
 /* Performs ROT-13 encoding on the input string.
    Non A-Za-z characters are left unchanged. */
+rot13
 
 rot13 := ~<A> "N" rot13
       |  ~<B> "O" rot13

@@ -10,6 +10,7 @@
    * Can't do links. (Wrong order of arguments.)
        * Especially can't do links with references.
 */
+markdown
 
 markdown := markdownElement <\n> markdown
           | <\n?>

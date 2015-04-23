@@ -1,5 +1,6 @@
 // Validate a list of email addresses, one per line.
 // Emits a list of all the valid email addresses.
+emailLines
 
 emailLines := ( simpleEmail <\n> | ~fb ~<\n> ) emailLines
             | ( simpleEmail <\n> | ~fb ~<\n>)

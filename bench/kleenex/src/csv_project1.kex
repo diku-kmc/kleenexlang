@@ -3,6 +3,7 @@
    Does no checks on the format, except requiring it to have at least one
    column.
 */
+csvProj1
 
 csvProj1 := row <\n> csvProj1
           | row <\n?>

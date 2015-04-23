@@ -8,6 +8,7 @@
 
    [03/Mar/2015:00:00:01 +0100]    "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 13265 
 */
+log
 
 log := logline nl log
      | logline nl
@@ -19,7 +20,7 @@ ip := integer <\.> integer <\.> integer <\.> integer
 
 rfc931 := <->
 
-authuser := <[^ ]+>
+authuser := <[^ \n]+>
 
 timestamp := <\[[A-Za-z0-9: /+-]+]>
 
@@ -41,8 +42,8 @@ frontend := quotedString
 
 backend := quotedString
 
-ws := <[\t ]*>
+ws := <[\t ]+>
 nl := <\n>
 
-quotedString := <"([^"]|\\")*">
+quotedString := <"([^"\n]|\\")*">
 integer := <[0-9]+>

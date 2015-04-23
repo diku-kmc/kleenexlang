@@ -5,6 +5,7 @@
    to construct a corresponding regexp in RE2 and compare.  RE2 would not
    be able to handle CSV files with arbitrary column counts.
 */
+csvProj3
 
 csvProj3 := row <\n> csvProj3
           | row <\n?>

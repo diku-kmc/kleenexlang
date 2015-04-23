@@ -1,6 +1,7 @@
 /* Convert a (specific) JSON format to a CSV format.  Should be the identity when composed 
 with either csv2json.kex or csv2json_nows.kex
 */
+json2csv
 
 json2csv := ~<\{> block "\n" ~<}> ws json2csv
           | ~<\{> block "\n" ~<}> ws

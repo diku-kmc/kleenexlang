@@ -2,6 +2,7 @@
    The input is copied to the output, but it is also validated in the process.
    If an unexpected key is encountered, it is reported but still output.
 */
+objects
 
 objects := object <\n> objects
          | object <\n?>

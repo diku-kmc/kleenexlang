@@ -12,6 +12,7 @@
    - Macros: TODO
      p(x1, x2) := <"> x1 <"> x2
 */
+objects
 
 objects := object <\n> objects
          | object ~<\n?>

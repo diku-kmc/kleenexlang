@@ -1,0 +1,16 @@
+/* Substituerer smileyer i tekst. */
+program
+
+program := "Vær så god: " smileyMessage
+         | ~message
+
+smileyMessage := smiley message
+               | <.> smileyMessage
+
+message := smiley message
+         | <.> message
+         | ""
+
+smiley := ~<:-?\)> "☺"
+        | ~<:-?\(> "☹"
+        | ~<:-?O>  "😲"

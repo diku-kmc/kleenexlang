@@ -3,6 +3,7 @@
    Intended for use in the concieggs irc bot: https://github.com/Athas/EggsML/tree/master/concieggs 
    Based on the word list: https://github.com/Athas/EggsML/blob/master/concieggs/db/ordbog-engelsk-dansk
 */
+message
 
 message := word sep message
         |  word
