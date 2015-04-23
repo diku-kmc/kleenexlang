@@ -2,5 +2,5 @@ void printCompilationInfo()
 {
   printf("test\n");
 }
-void match() {}
+void match(int n) {}
 void init() {}
