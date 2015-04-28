@@ -56,17 +56,24 @@ data KleenexAssignment  = HA (Identifier, KleenexTerm)
 
 -- | The terms describe how regexps are mapped to strings.
 data KleenexTerm = Constant ByteString -- ^ A constant output.
-               | RE Regex
-               | Var Identifier
-               | Seq KleenexTerm KleenexTerm
-               | Sum KleenexTerm KleenexTerm
-               | Star KleenexTerm
-               | Plus KleenexTerm
-               | Question KleenexTerm
-               | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
-               | One
+                 | RE Regex
+                 | Var Identifier
+                 | Seq KleenexTerm KleenexTerm
+                 | Sum KleenexTerm KleenexTerm
+                 | Star KleenexTerm
+                 | Plus KleenexTerm
+                 | Question KleenexTerm
+                 | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
+                 | Action KleenexAction
+                 | One
   deriving (Eq, Ord, Show)
 
+data KleenexAction = ConcatL Identifier [OutputTerm]
+                   | ConcatR Identifier [OutputTerm]
+                   | Assign Identifier  [OutputTerm]
+                   | Output Identifier
+
+data OutputTerm = Reg Identifier | Const ByteString
 
 type HPState = ()
 
