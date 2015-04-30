@@ -47,11 +47,10 @@ fromIdent :: Identifier -> String
 fromIdent (Identifier s) = s
 
 -- | A Kleenex program is a list of assignments.
-data Kleenex            = Kleenex [KleenexAssignment] deriving (Eq, Ord, Show)
+data Kleenex            = Kleenex [Identifier] [KleenexAssignment] deriving (Eq, Ord, Show)
 
 -- | Assigns the term to the name.
 data KleenexAssignment  = HA (Identifier, KleenexTerm) 
-                        | HB [Identifier]  -- A list of terms to be compiled, must be on first line
     deriving (Eq, Ord, Show)
 
 -- | The terms describe how regexps are mapped to strings.
@@ -72,8 +71,10 @@ data KleenexAction = ConcatL Identifier [OutputTerm]
                    | ConcatR Identifier [OutputTerm]
                    | Assign Identifier  [OutputTerm]
                    | Output Identifier
+  deriving (Eq, Ord, Show)
 
 data OutputTerm = Reg Identifier | Const ByteString
+  deriving (Eq, Ord, Show)
 
 type HPState = ()
 
@@ -150,14 +151,14 @@ comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
       singleLine = char '/' >> manyTill anyChar (ignore newline <|> eof)
       multiLine  = char '*' >> manyTill anyChar (try $ string "*/")
 
-parseOptions :: KleenexParser [Identifier]
-parseOptions = kleenexIdentifier `sepBy1` (try $ skipAround (string ">>"))
-              
-kleenex :: KleenexParser ([Identifier], Kleenex)
-kleenex = do 
-    idents <- skipped *> parseOptions
+parsePipeline :: KleenexParser [Identifier]
+parsePipeline = kleenexIdentifier `sepBy1` (try $ skipAround (string ">>"))
+
+kleenex :: KleenexParser (Kleenex)
+kleenex = do
+    idents <- skipped *> parsePipeline
     assignments <- skipped *> (kleenexAssignment `sepEndBy` skipped)
-    return (idents, Kleenex assignments)
+    return $ Kleenex idents assignments
 
 kleenexTerm :: KleenexParser KleenexTerm
 kleenexTerm = skipAround kleenexExpr
@@ -176,13 +177,18 @@ kleenexTerm = skipAround kleenexExpr
 kleenexPrimTerm :: KleenexParser KleenexTerm
 kleenexPrimTerm = skipAround elms
     where
-      elms = choice [re, identifier, constant]
+      elms = choice [re, identifier, constant, ignored, action, output, parens kleenexTerm]
       constant   = Constant . encodeString <$> kleenexConstant
                    <?> "Constant"
       re         = RE  <$> between (char '/') (char '/') regexP
                    <?> "RE"
       identifier = Var <$> try (kleenexIdentifier <* notFollowedBy kleenexBecomesToken)
                    <?> "Var"
+      ignored    = Ignore <$> (char '~' *> elms)
+                   <?> "Ignore"
+      action     = Action <$> between (char '[') (char ']') actionP
+                   <?> "Action"
+      output     = Action <$> (char '!' *> (Output <$> kleenexIdentifier))
 
 encodeString :: String -> ByteString
 encodeString = encodeUtf8 . T.pack
@@ -191,14 +197,27 @@ regexP :: KleenexParser Regex
 regexP = snd <$> (withHPState $
                   anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!/" })
 
+actionP :: KleenexParser KleenexAction
+actionP = do
+    ident <- kleenexIdentifier
+    skipAround $ string "<-"
+    actions <- choice [reg, const] `sepEndBy1` skipped 
+    return $ case () of 
+            _ | head actions == Reg ident -> ConcatL ident actions
+              | last actions == Reg ident -> ConcatR ident actions
+              | otherwise                 -> Assign ident actions
+        where
+            reg = Reg <$> kleenexIdentifier
+            const = Const . encodeString <$> kleenexConstant
+
 parseKleenex :: String -- ^ Input string
-             -> Either String ([Identifier], Kleenex) 
+             -> Either String Kleenex
 parseKleenex str =
     case runParser (kleenex <* eof) hpInitState "" str of
       Left err -> Left (show err)
       Right h -> Right h
 
-parseKleenexFile :: FilePath -> IO (Either String ([Identifier], Kleenex))
+parseKleenexFile :: FilePath -> IO (Either String Kleenex)
 parseKleenexFile fp = readFile fp >>= return . parseKleenex
 
 -----------------------------------------------------------------
@@ -216,7 +235,7 @@ parseTest :: (Show a) => KleenexParser a -> String -> IO ()
 parseTest = stateParseTest hpInitState
 
 parseTest' :: (Stream s Identity t)
-               => Parsec s HPState ([Identifier], Kleenex) -> s -> IO ([Identifier], Kleenex)
+               => Parsec s HPState (Kleenex) -> s -> IO (Kleenex)
 parseTest' p input
     = case runParser p hpInitState "" input of
         Left err -> do putStr "parse error at "

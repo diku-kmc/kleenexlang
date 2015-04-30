@@ -83,10 +83,9 @@ getStack _ _            = Nothing
 -- | Converts a Kleenex AST which consists of a set of terms bound to variables
 -- to one simplified mu term, with the terms inlined appropriately.
 -- The given identifier is treated as the top-level bound variable,
--- i.e., it becomes the first mu.  
+-- i.e., it becomes the first mu.
 kleenexToSimpleMu :: H.Identifier -> H.Kleenex -> SimpleMu
-kleenexToSimpleMu initVar (H.Kleenex ass) =
-        SMLoop $ flip evalState 0 $ go [initVar] (fromJust $ M.lookup initVar mp)
+kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ go [initVar] (fromJust $ M.lookup initVar mp)
     where
       mp :: M.Map H.Identifier H.KleenexTerm
       mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
@@ -143,8 +142,8 @@ simpleMuToMuTerm st ign sm =
 
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
 -- expressed in Kleenex.
-kleenexToMuTerm :: ([H.Identifier], H.Kleenex) -> [KleenexMu a]
-kleenexToMuTerm (is, h) = map (\i -> simpleMuToMuTerm [] False $ kleenexToSimpleMu i h) is
+kleenexToMuTerm :: H.Kleenex -> [KleenexMu a]
+kleenexToMuTerm k@(H.Kleenex is terms) = map (\i -> simpleMuToMuTerm [] False $ kleenexToSimpleMu i k) is
 
 encodeChar :: Char -> [Word8]
 encodeChar = unpack . encodeUtf8 . T.singleton

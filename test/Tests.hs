@@ -187,7 +187,7 @@ kp_compare progA progB =
 kp_assertIs :: String -> HP.Kleenex -> IO TS.Result
 kp_assertIs prog expected =
     case (HP.parseKleenex prog) of
-      Right (_, p) -> if p == expected
+      Right p -> if p == expected
                       then return TS.Pass
                       else return $ TS.Fail $ "[ " ++ show p ++ "] != [ " ++ show expected ++ "]"
       Left e  -> return $ TS.Fail e
@@ -289,7 +289,7 @@ p := "a" /b/ // hello|]
         pb = [strQ|p
 p := "a" /b/|]
     in kp_compare pa pb
-            
+
 
 kp_test7 :: (String, IO TS.Result)
 kp_test7 = "No newline at end of file" <@>
@@ -349,7 +349,7 @@ kp_test13 :: (String, IO TS.Result)
 kp_test13 = "Sanity check #1" <@>
     let p = [strQ|p
 p := "a" /b/|]
-        e = HP.Kleenex [HP.HA (HP.mkIdent "p", HP.Seq (HP.Constant "a") (HP.RE (R.Chr 'b')))]
+        e = HP.Kleenex [HP.mkIdent "p"] [HP.HA (HP.mkIdent "p", HP.Seq (HP.Constant "a") (HP.RE (R.Chr 'b')))]
     in kp_assertIs p e
 
 kp_test14 :: (String, IO TS.Result)
@@ -359,7 +359,7 @@ p:="a" q | "b" r
 r:= /A/
 q:= /B/ "B" p
 |]
-        e = HP.Kleenex [ HP.HA (HP.mkIdent "p", HP.Sum (HP.Seq (HP.Constant "a") (HP.Var (HP.mkIdent "q")))
+        e = HP.Kleenex [HP.mkIdent "p"] [ HP.HA (HP.mkIdent "p", HP.Sum (HP.Seq (HP.Constant "a") (HP.Var (HP.mkIdent "q")))
                                                        (HP.Seq (HP.Constant "b") (HP.Var (HP.mkIdent "r"))))
                        , HP.HA (HP.mkIdent "r", HP.RE (R.Chr 'A'))
                        , HP.HA (HP.mkIdent "q", HP.Seq (HP.RE (R.Chr 'B'))
