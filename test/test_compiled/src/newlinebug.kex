@@ -1,6 +1,8 @@
 // IN:aabbaa
 // OUT:aabbaa
 
+test
+
 test := ( keep "\n" | ~drop ) ~<\n> test
       | ( keep "\n" | ~drop ) ~<\n>
 
