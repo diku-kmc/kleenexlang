@@ -1,14 +1,24 @@
 {-# LANGUAGE TypeOperators #-}
-module KMC.Bitcoder(BitOutputTerm, fromRegex) where
+module KMC.Bitcoder
+  ( BitOutputTerm
+  , fromRegex
+  , kleenexToBitcodeMuTerm
+  ) where
 
-import Data.Char
-import KMC.Syntax.External
-import KMC.Theories
-import KMC.OutputTerm
-import KMC.RangeSet
-import KMC.Expression
+import           Data.Char
+import           Data.Word (Word8)
+
+import           KMC.Syntax.External
+import           KMC.Theories
+import           KMC.OutputTerm
+import           KMC.RangeSet
+import           KMC.Expression
+import           KMC.Kleenex.Lang
+import qualified KMC.Kleenex.Parser as H
 
 type BitOutputTerm sigma = (Join (Const sigma [Bool] :+: Enumerator (RangeSet sigma) sigma Bool) [Bool])
+
+type BitcodeMu sigma a = Mu (RangeSet sigma) (BitOutputTerm sigma) a
 
 -- | Translate a regular expression to a mu-expression which denotes the parsing relation.
 fromRegex :: (Ord sigma, Enum sigma, Bounded sigma) =>
@@ -45,4 +55,24 @@ fromRegex (LazyRange _ _ _) = error "Lazy ranges not yet supported"
 repeatRegex :: (Ord sigma, Enum sigma, Bounded sigma)
        => Int -> Regex -> Mu (RangeSet sigma) (BitOutputTerm sigma) a
 repeatRegex n e = foldr Seq Accept (replicate n (fromRegex e))
-          
+
+-- | Convert a Kleenex program to a list of mu-terms, which output a bitcode signifying the path
+-- traversed.
+kleenexToBitcodeMuTerm :: H.Kleenex -> [BitcodeMu Word8 Int]
+kleenexToBitcodeMuTerm k@(H.Kleenex is terms) = map (\i -> simpleMuToBitcodeMuTerm [] $ kleenexToSimpleMu i k) is
+
+-- | A simple mu term is converted to a "real" mu term, that outputs the bitcode
+-- of the path chosen, rather than its normal outputs.
+simpleMuToBitcodeMuTerm :: (Ord sigma, Enum sigma, Bounded sigma) =>
+                           [BitcodeMu sigma a] -> SimpleMu -> BitcodeMu sigma a
+simpleMuToBitcodeMuTerm st sm =
+    case sm of
+      SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
+      SMLoop sm'   -> (Loop $ \x -> simpleMuToBitcodeMuTerm ((Var x) : st) sm')
+      SMAlt l r    -> (W [False] $ simpleMuToBitcodeMuTerm st l) `Alt`
+                        (W [True] $ simpleMuToBitcodeMuTerm st r)
+      SMSeq l r    -> (simpleMuToBitcodeMuTerm st l) `Seq` (simpleMuToBitcodeMuTerm st r)
+      SMWrite _    -> Accept
+      SMRegex re   -> fromRegex re
+      SMIgnore sm' -> simpleMuToBitcodeMuTerm st sm'
+      SMAccept     -> Accept

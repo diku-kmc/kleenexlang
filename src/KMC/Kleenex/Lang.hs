@@ -13,7 +13,7 @@ import           Data.Maybe (fromJust)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 
-import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
+import           KMC.Coding (decodeEnum)
 import           KMC.Expression (Mu (..))
 import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
