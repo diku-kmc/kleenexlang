@@ -7,7 +7,7 @@ module KMC.Kleenex.Lang where
 import           Control.Monad.State
 import qualified Data.Map as M
 import           Data.Word (Word8)
-import           Data.ByteString (unpack, ByteString)
+import           Data.ByteString (unpack, ByteString, empty)
 import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust)
 import qualified Data.Text as T
@@ -15,12 +15,13 @@ import           Data.Text.Encoding (encodeUtf8)
 
 import           KMC.Coding (decodeEnum)
 import           KMC.Expression (Mu (..))
+import           KMC.Kleenex.Action
 import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet)
 import           KMC.Syntax.External (Regex (..), unparse)
-import           KMC.Theories (top)
-import           KMC.Visualization (Pretty(..))
+import           KMC.SymbolicSST (RegisterUpdate(..))
+import           KMC.Theories (top, indexOf)
 
 toChar :: (Enum a, Bounded a) => [a] -> Char
 toChar = chr . decodeEnum
@@ -34,8 +35,10 @@ data SimpleMu = SMVar Nat
               | SMWrite ByteString
               | SMRegex Regex
               | SMIgnore SimpleMu
+              | SMAction KleenexAction
               | SMAccept
   deriving (Eq, Ord)
+
 nat2int :: Nat -> Int
 nat2int Z = 0
 nat2int (S n) = 1 + nat2int n
@@ -53,10 +56,6 @@ instance Show SimpleMu where
 -- the input character, injected into a list, or the output a constant list
 -- of characters.
 type KleenexOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
-instance Pretty KleenexOutTerm where
-    pretty (Inl (InList _)) = "COPY"
-    pretty (Inr (Const [])) = "SKIP"
-    pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
 
 type KleenexMu a = Mu (RangeSet Word8) KleenexOutTerm a
 
@@ -118,6 +117,7 @@ kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ go [initVar] (fromJust $ 
       go _    H.One          = return $ SMAccept
       go vars (H.Ignore e)   = fmap SMIgnore $ go vars e
       go _    (H.RE re)      = return $ SMRegex re
+      go _ (H.Action a)      = return $ SMAction a
 
 -- | A simple mu term is converted to a "real" mu term by converting the
 -- de Bruijn-indexed variables to Haskell variables, and encoding the mu
@@ -138,6 +138,7 @@ simpleMuToMuTerm st ign sm =
                       then regexToMuTerm (out []) re
                       else regexToMuTerm copyInput re
       SMIgnore sm' -> simpleMuToMuTerm st True sm'
+      SMAction a   -> error "Cannot handle actions in this mode"
       SMAccept     -> Accept
 
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
@@ -190,3 +191,68 @@ regexToMuTerm o re =
 testKleenex :: String -> Either String ([KleenexMu a])
 testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
   
+
+
+
+--- Kleenex with actions translation
+
+-- | The term that copies the input char to output.
+parseBitsAction :: KleenexAction
+parseBitsAction = Inl ParseBits
+
+-- | The term that outputs a fixed string (list of Word8).
+out' :: [Word8]-> KleenexAction
+out' = Inr . Const
+
+simpleMuToActionMuTerm :: [KleenexActionMu a] -> Bool -> SimpleMu -> KleenexActionMu a
+simpleMuToActionMuTerm st ign sm =
+    case sm of
+      SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
+      SMLoop sm'   -> (Loop $ \x -> simpleMuToActionMuTerm ((Var x) : st) ign sm')
+      SMAlt l r    -> (RW (matchVal 0) (Inl Id) $ simpleMuToActionMuTerm st ign l) `Alt`
+                      (RW (matchVal 1) (Inl Id) $ simpleMuToActionMuTerm st ign r)
+      SMSeq l r    -> (simpleMuToActionMuTerm st ign l) `Seq` (simpleMuToActionMuTerm st ign r)
+      SMWrite bs   -> if ign 
+                      then Accept
+                      else W (unpack bs) Accept
+      SMRegex re   -> if ign
+                      then regexToActionMuTerm (out' []) re
+                      else regexToActionMuTerm parseBitsAction re
+      SMIgnore sm' -> simpleMuToActionMuTerm st True sm'
+      SMAction a   -> Action a
+      SMAccept     -> Accept
+
+regexToActionMuTerm  :: KleenexAction -> Regex -> KleenexActionMu a
+regexToActionMuTerm o re = 
+    case re of
+        One          -> Accept
+        Dot          -> RWN top o Accept
+        Chr a        -> RW (matchVal $ ord a) o Accept
+        Group _ e    -> regexToActionMuTerm o e
+        Concat e1 e2 -> Seq (regexToActionMuTerm o e1) (regexToActionMuTerm o e2)
+        Branch e1 e2 -> Alt (RW (matchVal 0) (Inl Id) (regexToActionMuTerm o e1)) 
+                            (RW (matchVal 1) (Inl Id) (regexToActionMuTerm o e2))
+        (Class b rs)   ->  let rs' = (if b then id else complement)
+                                     $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
+                           in  RW rs' o Accept
+        (Star e)       -> Loop $ \x -> Alt (RW (matchVal 0) (Inl Id) (Seq (regexToActionMuTerm o e) (Var x)))
+                                           (RW (matchVal 1) (Inl Id) Accept)
+        (LazyStar e)   -> Loop $ \x -> Alt (RW (matchVal 0) (Inl Id) Accept)
+                                           (RW (matchVal 1) (Inl Id) (Seq (regexToActionMuTerm o e) (Var x)))
+        (Plus e)       -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (Star e))
+        (LazyPlus e)   -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (LazyStar e))
+        (Question e)   -> Alt (RW (matchVal 0) (Inl Id) (regexToActionMuTerm o e))
+                              (RW (matchVal 1) (Inl Id) Accept)
+        (LazyQuestion e)   -> Alt (RW (matchVal 0) (Inl Id) (regexToActionMuTerm o e))
+                              (RW (matchVal 1) (Inl Id) Accept)
+        (Suppress e)   -> regexToActionMuTerm (Inl Id) e
+        (Range e n m)  -> case m of
+                           Nothing -> Seq (repeatRegex' o n e) (regexToActionMuTerm o (Star e))
+                           Just m' -> if n == m' then repeatRegex' o n e
+                                      else Seq (repeatRegex' o n e) (repeatRegex' o m' (Question e))
+        (NamedSet _ _) -> error "Named sets not yet supported"
+        (LazyRange _ _ _) -> error "Lazy ranges not yet supported"
+
+
+repeatRegex' :: KleenexAction -> Int -> Regex -> KleenexActionMu a
+repeatRegex' o n re = foldr Seq Accept (replicate n (regexToActionMuTerm o re))

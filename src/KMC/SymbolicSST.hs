@@ -58,6 +58,8 @@ sstOut :: (Ord var) => SST st pred func var -> var
 sstOut = S.findMin . sstV
 
 deriving instance (Show var, Show func, Show (Rng func)) => Show (Atom var func)
+deriving instance (Eq var, Eq func, Eq (Rng func)) => Eq (Atom var func)
+deriving instance (Ord var, Ord func, Ord (Rng func)) => Ord (Atom var func)
 deriving instance (Show st, Show pred, Show func, Show var, Show (Rng func))
              => Show (SST st pred func var)
 
@@ -349,7 +351,7 @@ run :: forall var st pred func delta.
     -> Stream [delta]
 run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
     where
-      outVar = S.findMin (sstV sst)
+      outVar = sstOut sst
 
       extractOutput s =
         case M.lookup outVar s of

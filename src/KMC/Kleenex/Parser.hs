@@ -4,6 +4,7 @@
 
 module KMC.Kleenex.Parser where
 
+<<<<<<< HEAD
 import           Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import           Control.Monad.Identity (Identity)
 import           Data.ByteString (ByteString)
@@ -18,6 +19,27 @@ import           KMC.Syntax.External (Regex, unparse)
 import           KMC.Syntax.Parser (anchoredRegexP)
 import           KMC.Util.List (foldr1ifEmpty)
     
+=======
+import Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
+import Control.Monad.Identity (Identity)
+import Data.Word
+import Data.ByteString (ByteString, unpack)
+import qualified Data.Text as T
+import qualified Data.Map as M
+import Data.Text.Encoding (encodeUtf8)
+import Text.Parsec hiding (parseTest)
+import Text.Parsec.Prim (runParser)
+import Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
+
+import KMC.Kleenex.Action
+import KMC.SymbolicSST (Atom(..))
+import KMC.OutputTerm ((:+:)(..))
+import KMC.Syntax.Config
+import KMC.Syntax.External (Regex, unparse)
+import KMC.Syntax.Parser (anchoredRegexP)
+
+import Debug.Trace
+>>>>>>> Preliminary support for Kleenex actions
     
 -- | Change the type of a state in a parser.  
 changeState :: forall m s u v a . (Functor m, Monad m)
@@ -65,15 +87,6 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
                  | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
                  | Action KleenexAction
                  | One
-  deriving (Eq, Ord, Show)
-
-data KleenexAction = ConcatL Identifier [OutputTerm]
-                   | ConcatR Identifier [OutputTerm]
-                   | Assign Identifier  [OutputTerm]
-                   | Output Identifier
-  deriving (Eq, Ord, Show)
-
-data OutputTerm = Reg Identifier | Const ByteString
   deriving (Eq, Ord, Show)
 
 type HPState = ()
@@ -177,16 +190,14 @@ kleenexTerm = skipAround kleenexExpr
 kleenexPrimTerm :: KleenexParser KleenexTerm
 kleenexPrimTerm = skipAround elms
     where
-      elms = choice [re, identifier, constant, ignored, action, output, parens kleenexTerm]
+      elms = choice [re, identifier, constant, action, output]
       constant   = Constant . encodeString <$> kleenexConstant
                    <?> "Constant"
       re         = RE  <$> between (char '/') (char '/') regexP
                    <?> "RE"
       identifier = Var <$> try (kleenexIdentifier <* notFollowedBy kleenexBecomesToken)
                    <?> "Var"
-      ignored    = Ignore <$> (char '~' *> elms)
-                   <?> "Ignore"
-      action     = Action <$> between (char '[') (char ']') actionP
+      action     = Action <$> between (char '[') (char ']') actionP <*> One
                    <?> "Action"
       output     = Action <$> (char '!' *> (Output <$> kleenexIdentifier))
 
@@ -197,18 +208,15 @@ regexP :: KleenexParser Regex
 regexP = snd <$> (withHPState $
                   anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!/" })
 
-actionP :: KleenexParser KleenexAction
+actionP :: KleenexParser (KleenexAction)
 actionP = do
     ident <- kleenexIdentifier
     skipAround $ string "<-"
     actions <- choice [reg, const] `sepEndBy1` skipped 
-    return $ case () of 
-            _ | head actions == Reg ident -> ConcatL ident actions
-              | last actions == Reg ident -> ConcatR ident actions
-              | otherwise                 -> Assign ident actions
+    return $ Inl . RegUpdate $ M.insert (fromIdent ident) actions M.empty
         where
-            reg = Reg <$> kleenexIdentifier
-            const = Const . encodeString <$> kleenexConstant
+            reg = VarA . fromIdent <$> kleenexIdentifier
+            const = ConstA . unpack . encodeString <$> kleenexConstant
 
 parseKleenex :: String -- ^ Input string
              -> Either String Kleenex

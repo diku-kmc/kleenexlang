@@ -16,6 +16,7 @@ import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
 
+import           KMC.Kleenex.Lang
 import           KMC.OutputTerm
 import           KMC.RangeSet
 import           KMC.SSTConstruction
@@ -65,6 +66,11 @@ instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) 
 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate var func) where
   pretty m = "[" ++ intercalate "\\l," [ pretty v ++ ":=" ++ pretty f | (v,f) <- M.toList m ] ++ "]"
+
+instance Pretty KleenexOutTerm where
+    pretty (Inl (InList _)) = "COPY"
+    pretty (Inr (Const [])) = "SKIP"
+    pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
 
 fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]
