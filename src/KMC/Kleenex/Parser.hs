@@ -134,9 +134,12 @@ foldr1ifEmpty _ e [] = e
 foldr1ifEmpty f _ l  = foldr1 f l
 
 skipped :: KleenexParser ()
-skipped = ignore $ many (choice [ws, comment])
-    where
-      ws = ignore $ many1 space
+skipped = ignore $ many skipped1
+
+skipped1 :: KleenexParser ()
+skipped1 = ignore $ many1 (choice [ws, comment])
+    where ws = ignore $ many1 space
+
 
 comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
     where
@@ -153,30 +156,29 @@ kleenex = do
     return (idents, Kleenex assignments)
 
 kleenexTerm :: KleenexParser KleenexTerm
-kleenexTerm = buildExpressionParser table kleenexPrimTerm
+kleenexTerm = skipAround kleenexExpr
     where
-      table = [ [Infix (char '|' >> return Sum) AssocRight] ]
+      kleenexExpr = buildExpressionParser table $ skipAround (kleenexPrimTerm <|> parens kleenexTerm)
+      schar = skipAround . char
+      table = [
+          [ Prefix (schar '~' >> return Ignore <?> "Ignored") ],
+          [ Postfix (schar '*' >> return Star <?> "Star"),
+            Postfix (schar '?' >> return Question <?> "Question"),
+            Postfix (schar '+' >> return Plus <?> "Plus") ],
+          [ Infix (skipped >> notFollowedBy (char '|') >> return Seq) AssocRight ],
+          [ Infix (schar '|' >> return Sum) AssocRight ]
+        ]
 
 kleenexPrimTerm :: KleenexParser KleenexTerm
-kleenexPrimTerm = skipped
-                >> elms `sepEndBy` skipped
-                >>= return . foldr1ifEmpty Seq One
+kleenexPrimTerm = skipAround elms
     where
-      elms = choice [re, identifier, constant, ignored, parens kleenexTerm]
+      elms = choice [re, identifier, constant]
       constant   = Constant . encodeString <$> kleenexConstant
                    <?> "Constant"
       re         = RE  <$> between (char '<') (char '>') regexP
                    <?> "RE"
       identifier = Var <$> try (kleenexIdentifier <* notFollowedBy kleenexBecomesToken)
                    <?> "Var"
-      ignored    = Ignore <$> (char '~' *> elms)
-                   <?> "Ignore"
---      star       = Star <$> try (elms <* char '*')
---                   <?> "Star"
---      question   = Question <$> try (elms <* char '?')
---                   <?> "Question"
---      plus       = Plus <$> try (elms <* char '+')
---                   <?> "Plus"
 
 encodeString :: String -> ByteString
 encodeString = encodeUtf8 . T.pack

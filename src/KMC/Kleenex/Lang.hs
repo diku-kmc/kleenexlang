@@ -4,6 +4,7 @@
 
 module KMC.Kleenex.Lang where
 
+import           Control.Monad.State
 import qualified Data.Map as M
 import           Data.Word (Word8)
 import           Data.ByteString (unpack, ByteString)
@@ -83,27 +84,41 @@ getStack _ _            = Nothing
 -- to one simplified mu term, with the terms inlined appropriately.
 -- The given identifier is treated as the top-level bound variable,
 -- i.e., it becomes the first mu.  
-kleenexToSimpleMu :: H.Identifier -> H.Kleenex -> SimpleMu 
-kleenexToSimpleMu initVar (H.Kleenex ass) = SMLoop $ go [initVar] (fromJust $ M.lookup initVar mp)
+kleenexToSimpleMu :: H.Identifier -> H.Kleenex -> SimpleMu
+kleenexToSimpleMu initVar (H.Kleenex ass) =
+        SMLoop $ flip evalState 0 $ go [initVar] (fromJust $ M.lookup initVar mp)
     where
       mp :: M.Map H.Identifier H.KleenexTerm
       mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
-      
-      go :: [H.Identifier] -> H.KleenexTerm -> SimpleMu
-      go _    (H.Constant n) = SMWrite n
+
+      nextIdent :: State Int H.Identifier
+      nextIdent = do i <- get
+                     put (i+1)
+                     return $ H.Identifier $ "|_kleenex_to_simple_mu_ident_" ++ show i
+
+      go :: [H.Identifier] -> H.KleenexTerm -> State Int SimpleMu
+      go _    (H.Constant n) = return $ SMWrite n
       go vars (H.Var name) =
           case name `pos` vars of
             Nothing ->
                 case M.lookup name mp of
                   Nothing -> error $ "Name not found: " ++ show name
-                  Just t  -> SMLoop $ go (name : vars) t
-            Just p  -> SMVar p
-      go vars (H.Sum l r)  = SMAlt (go vars l) (go vars r)
-      go vars (H.Seq l r)  = SMSeq (go vars l) (go vars r)
-      go vars (H.Star e)   = SMLoop (go vars e)
-      go _    H.One        = SMAccept
-      go vars (H.Ignore e) = SMIgnore $ go vars e
-      go _ (H.RE re) = SMRegex re
+                  Just t  -> fmap SMLoop $ go (name : vars) t
+            Just p  -> return $ SMVar p
+      go vars (H.Sum l r)    = do gol <- go vars l
+                                  gor <- go vars r
+                                  return $ SMAlt gol gor
+      go vars (H.Seq l r)    = do gol <- go vars l
+                                  gor <- go vars r
+                                  return $ SMSeq gol gor
+      go vars (H.Star e)     = do i <- nextIdent
+                                  fmap SMLoop $ go (i : vars) $ H.Sum (H.Seq e $ H.Var i) H.One
+      go vars (H.Plus e)     = go vars $ H.Seq e $ H.Star e
+      go vars (H.Question e) = do goe <- go vars e
+                                  return $ SMAlt goe SMAccept
+      go _    H.One          = return $ SMAccept
+      go vars (H.Ignore e)   = fmap SMIgnore $ go vars e
+      go _    (H.RE re)      = return $ SMRegex re
 
 -- | A simple mu term is converted to a "real" mu term by converting the
 -- de Bruijn-indexed variables to Haskell variables, and encoding the mu
