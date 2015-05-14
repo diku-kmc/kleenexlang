@@ -1,0 +1,11 @@
+// IN:
+// IN:a
+// IN:aa
+// IN:aaa
+// OUT:b
+// OUT:a
+// OUT:a
+// OUT:a
+program
+
+program := ( (~<a>+ "a" | ~<a>* "b") <\n> ) *

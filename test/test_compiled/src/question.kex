@@ -1,0 +1,14 @@
+// IN:a
+// IN:aa
+// IN:aaa
+// IN:aaaa
+// IN:aaaaa
+// OUT:c
+// OUT:ac
+// OUT:abc
+// OUT:abcd
+// OUT:abcde
+
+program
+
+program := ((~<a> "a")? (~<a> "b")? (~<a> "c") (~<a> "d")? (~<a> "e")? <\n>)*

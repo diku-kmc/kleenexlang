@@ -367,3 +367,18 @@ q:= <B> "B" p
                                                                (HP.Var (HP.mkIdent "p"))))
                        ]
     in kp_assertIs p e
+
+kp_test15 :: (String, IO TS.Result)
+kp_test15 = "Sanity check #3" <@>
+    let p = [strQ|p
+p := (<a>* | <b>? | ~<c>+)*+?
+|]
+        e = HP.Kleenex [
+            HP.HA (HP.mkIdent "p",
+                HP.Question $ HP.Plus $ HP.Star $
+                    HP.Sum (HP.Star $ HP.RE (R.Chr 'a')) $
+                    HP.Sum (HP.Question $ HP.RE (R.Chr 'b')) $
+                           (HP.Plus $ HP.Ignore $ HP.RE $ R.Chr 'c')
+            )
+          ]
+    in kp_assertIs p e
