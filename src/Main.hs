@@ -100,7 +100,7 @@ instance Options MainOptions where
       <*> simpleOption "func" False "Functionalize FST before SST construction"
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
-      <*> simpleOption "act" True "Enable actions in the language"
+      <*> simpleOption "act" False "Enable actions in the language"
 
 instance Options CompileOptions where
     defineOptions =
@@ -188,12 +188,13 @@ buildTransducers mainOpts args = do
           hPutStrLn stderr $ e
           exitWith $ ExitFailure 1
         Right (_, re) -> do
-          let fst = fromMu $ fromRegex re
+          let reMu = fromRegex re :: BitcodeMu Word8 Bool a
+          let fst = fromMu reMu
           return (Transducers [fst], reSrcName, reSrc)
     else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
            let fsts = if optActionEnabled mainOpts
-                      then Transducers $ bitcodeFstFromKleenex kleenexSrc
+                      then Transducers $ bytecodeFstFromKleenex kleenexSrc
                       else Transducers $ fstFromKleenex kleenexSrc
            return (fsts, arg, kleenexSrc)
          else do
@@ -271,8 +272,7 @@ compile mainOpts compileOpts args = do
   -- SST step
   (ssts, sstGenDuration, sstOptDuration) <- compileTransducers mainOpts transducers
   
-  let useWordAlignment = (getCompileFlavor args == CompilingKleenex) &&
-                         not (optActionEnabled mainOpts)
+  let useWordAlignment = getCompileFlavor args == CompilingKleenex
   (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
                                                 useWordAlignment srcName
                                                 srcMd5 ssts
@@ -334,8 +334,8 @@ fstFromKleenex str =
     Left e -> error e
     Right ih -> map fromMu (kleenexToMuTerm ih)
 
-bitcodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (BitOutputTerm Word8)]
-bitcodeFstFromKleenex str =
+bytecodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (BitOutputTerm Word8 Word8)]
+bytecodeFstFromKleenex str =
   case parseKleenex str of
     Left e -> error e
-    Right ih -> map fromMu (kleenexToBitcodeMuTerm ih)
+    Right ih -> map fromMu (kleenexToBytecodeMuTerm ih)
