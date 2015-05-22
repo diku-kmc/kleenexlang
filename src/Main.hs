@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Main where
 
 import           Control.Applicative
@@ -21,8 +22,9 @@ import           System.IO
 
 import           KMC.Bitcoder
 import           KMC.FSTConstruction hiding (Var)
-import           KMC.Kleenex.Lang (KleenexOutTerm, kleenexToMuTerm)
+import           KMC.Kleenex.Lang (KleenexOutTerm, kleenexToMuTerm, kleenexToActionMuTerm)
 import           KMC.Kleenex.Parser (parseKleenex)
+import           KMC.Kleenex.Action
 import           KMC.Program.Backends.C (CType(..), compileProgram)
 import           KMC.RangeSet (RangeSet)
 import           KMC.SSTCompiler (elimIdTables, compileAutomaton)
@@ -169,7 +171,7 @@ getCompileFlavor args =
                           f      -> error $ unlines [ "Unknown extension: '" ++ f ++ "'."
                                                     , "Expects one of '.kex', '.re', or '.rx'."
                                                     ]
-                                   
+
 buildTransducers :: MainOptions -> [String] -> IO (Transducers, String, String, NominalDiffTime)
 buildTransducers mainOpts args = do
   let [arg] = args
@@ -209,7 +211,7 @@ buildTransducers mainOpts args = do
 compileTransducers :: MainOptions -> Transducers -> IO (DetTransducers, NominalDiffTime, NominalDiffTime)
 compileTransducers mainOpts (Transducers fsts') = do
   timeSSTgen <- getCurrentTime
-  let ssts = map (\fst' -> enumerateVariables $ enumerateStates $ 
+  let ssts = map (\fst' -> enumerateVariables $ enumerateStates $
                            sstFromFST fst' (not $ optLookahead mainOpts)) fsts'
 --  when (not $ optQuiet mainOpts) $ do
 --    putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
@@ -228,11 +230,14 @@ transducerToProgram :: MainOptions
                     -> String
                     -> String
                     -> DetTransducers
+                    -> DetTransducers
                     -> IO (ExitCode, NominalDiffTime)
-transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5 (DetTransducers ssts) = do
+transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
+                    (DetTransducers ssts) (DetTransducers assts) = do
   timeCompile <- getCurrentTime
   let optimizeTables = if optElimIdTables compileOpts then elimIdTables else id
   let progs = map (optimizeTables . compileAutomaton) ssts
+  let aprogs = map (optimizeTables . compileAutomaton) assts
   let envInfo = intercalate "\\n" [ "Options:"
                                   , prettyOptions mainOpts compileOpts
                                   , ""
@@ -252,6 +257,9 @@ transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5 (DetTra
                         useWordAlignment
   timeCompile' <- getCurrentTime
   return (ret, diffUTCTime timeCompile' timeCompile)
+    where
+      zipLists (a:as) (b:bs) = a : b : zipLists as bs
+      zipLists _      _      = []
 
 
 checkArgs :: [String] -> IO ()
@@ -260,7 +268,7 @@ checkArgs args = do
     prog <- getProgName
     putStrLn $ "Usage: " ++ prog ++ " <compile|visualize> [options] <kleenex_file|re_file|re>"
     exitWith $ ExitFailure 1
-  
+
 
 compile :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
 compile mainOpts compileOpts args = do
@@ -271,11 +279,16 @@ compile mainOpts compileOpts args = do
 
   -- SST step
   (ssts, sstGenDuration, sstOptDuration) <- compileTransducers mainOpts transducers
-  
+
+  assts <- if optActionEnabled mainOpts && getCompileFlavor args == CompilingKleenex
+           then case ssts of
+             DetTransducers ssts'' -> buildActionSSTs mainOpts args
+           else return $ DetTransducers []
+
   let useWordAlignment = getCompileFlavor args == CompilingKleenex
   (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
                                                 useWordAlignment srcName
-                                                srcMd5 ssts
+                                                srcMd5 ssts assts
   when (not $ optQuiet mainOpts) $ do
     let fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
                 in replicate (8 - length s) ' ' ++ s
@@ -288,6 +301,7 @@ compile mainOpts compileOpts args = do
                                                       ,sstOptDuration
                                                       ,compileDuration])
   return ret
+
 
 visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
 visualize mainOpts visOpts args = do
@@ -339,3 +353,11 @@ bytecodeFstFromKleenex str =
   case parseKleenex str of
     Left e -> error e
     Right ih -> map fromMu (kleenexToBytecodeMuTerm ih)
+
+buildActionSSTs :: MainOptions -> [String] -> IO DetTransducers
+buildActionSSTs mainOpts args = do
+  let [arg] = args
+  kleenexSrc <- readFile arg
+  return $ case parseKleenex kleenexSrc of
+    Left e   -> error e
+    Right ih -> DetTransducers $ map genActionSST (kleenexToActionMuTerm ih)

@@ -146,6 +146,9 @@ simpleMuToMuTerm st ign sm =
 kleenexToMuTerm :: H.Kleenex -> [KleenexMu a]
 kleenexToMuTerm k@(H.Kleenex is terms) = map (\i -> simpleMuToMuTerm [] False $ kleenexToSimpleMu i k) is
 
+kleenexToActionMuTerm :: H.Kleenex -> [KleenexActionMu a]
+kleenexToActionMuTerm k@(H.Kleenex is terms) = map (\i -> simpleMuToActionMuTerm [] False $ kleenexToSimpleMu i k) is
+
 encodeChar :: Char -> [Word8]
 encodeChar = unpack . encodeUtf8 . T.singleton
 
