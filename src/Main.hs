@@ -46,6 +46,7 @@ data MainOptions =
     , optLookahead        :: Bool
     , optExpressionArg    :: Bool
     , optActionEnabled    :: Bool
+    , optActionOnly       :: Bool
     }
 
 data CompileOptions =
@@ -103,6 +104,7 @@ instance Options MainOptions where
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
       <*> simpleOption "act" False "Enable actions in the language"
+      <*> simpleOption "ao" False "Only create action SST"
 
 instance Options CompileOptions where
     defineOptions =
@@ -230,14 +232,12 @@ transducerToProgram :: MainOptions
                     -> String
                     -> String
                     -> DetTransducers
-                    -> DetTransducers
                     -> IO (ExitCode, NominalDiffTime)
 transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
-                    (DetTransducers ssts) (DetTransducers assts) = do
+                    (DetTransducers ssts) = do
   timeCompile <- getCurrentTime
-  let optimizeTables = if optElimIdTables compileOpts then elimIdTables else id
-  let progs = map (optimizeTables . compileAutomaton) ssts
-  let aprogs = map (optimizeTables . compileAutomaton) assts
+  let progs  = map compileAutomaton ssts
+  let aprogs = map compileAutomaton assts
   let envInfo = intercalate "\\n" [ "Options:"
                                   , prettyOptions mainOpts compileOpts
                                   , ""
@@ -280,15 +280,15 @@ compile mainOpts compileOpts args = do
   -- SST step
   (ssts, sstGenDuration, sstOptDuration) <- compileTransducers mainOpts transducers
 
-  assts <- if optActionEnabled mainOpts && getCompileFlavor args == CompilingKleenex
-           then case ssts of
-             DetTransducers ssts'' -> buildActionSSTs mainOpts args
-           else return $ DetTransducers []
+  assts <- buildActionSSTs mainOpts args
+  let ssts' = if optActionOnly mainOpts
+              then assts
+              else ssts
 
   let useWordAlignment = getCompileFlavor args == CompilingKleenex
   (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
                                                 useWordAlignment srcName
-                                                srcMd5 ssts assts
+                                                srcMd5 ssts'
   when (not $ optQuiet mainOpts) $ do
     let fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
                 in replicate (8 - length s) ' ' ++ s

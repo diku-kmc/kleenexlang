@@ -17,6 +17,7 @@ import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
 
 import           KMC.Kleenex.Lang
+import           KMC.Kleenex.Action
 import           KMC.OutputTerm
 import           KMC.RangeSet
 import           KMC.SSTConstruction
@@ -71,6 +72,9 @@ instance Pretty KleenexOutTerm where
     pretty (Inl (InList _)) = "COPY"
     pretty (Inr (Const [])) = "SKIP"
     pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
+
+instance Pretty ActionFunc where
+    pretty ParseBitsFunc = "BITS!"
 
 fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]

@@ -67,8 +67,7 @@ data ActionFunc = ParseBitsFunc
     deriving (Ord, Show, Eq)
 
 data (Ord var, Eq var, Show var) => 
-    ActionExpr var = Id
-                   | RegUpdate (RegisterUpdate var ActionFunc)
+    ActionExpr var = RegUpdate (RegisterUpdate var ActionFunc)
                    | ParseBits
     deriving (Ord, Show, Eq)
 
@@ -76,8 +75,6 @@ data (Ord var, Eq var, Show var) =>
 instance Function (ActionExpr var) where
     type Dom (ActionExpr var) = Word8
     type Rng (ActionExpr var) = [Word8]
-    eval Id x = const [] x
---    eval (RegUpdate _) x = const [] x
     eval ParseBits x = const [] x
     isConst _ = Nothing
     inDom _ _ = True
@@ -124,5 +121,6 @@ genActionSST mu = evalState sst []
                 toRegUpd (Inl (RegUpdate ru)) = mmapM (\(a,b) -> do id <- getBufId a
                                                                     atoms <- mapM updateAtom b
                                                                     return (id,atoms)) ru
-                toRegUpd (Inl (ParseBits))    = return $ M.singleton outputbuf [FuncA ParseBitsFunc 0]
+                toRegUpd (Inl (ParseBits)) = return $ M.singleton outputbuf [FuncA ParseBitsFunc 0]
+                toRegUpd (Inr (Const xs))  = return $ M.singleton outputbuf [ConstA xs]
                 final = M.fromList $ map (\s -> (s, [Left outputbuf])) $  S.toList $ fstF fst

@@ -5,6 +5,8 @@ module KMC.Bitcoder
   , fromRegex
   , kleenexToBitcodeMuTerm
   , kleenexToBytecodeMuTerm
+  , bTrue
+  , bFalse
   ) where
 
 import           Data.Char
@@ -22,13 +24,6 @@ type BitOutputTerm bit sigma = (Join (Const sigma [bit] :+: Enumerator (RangeSet
 
 type BitcodeMu sigma bit a = Mu (RangeSet sigma) (BitOutputTerm bit sigma) a
 
--- | Bit-code value for true (top)
-bTrue :: (Bounded bit) => bit
-bTrue = maxBound
-
--- | Bit-code value for false (bottom)
-bFalse :: (Bounded bit) => bit
-bFalse = minBound
 
 -- | Translate a regular expression to a mu-expression which denotes the parsing relation.
 fromRegex :: (Ord sigma, Enum sigma, Bounded sigma, Bounded bit) =>

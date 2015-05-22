@@ -1,10 +1,17 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RankNTypes #-}
-module KMC.Expression
-(Mu(..))
-where
+module KMC.Expression where
+
 
 import KMC.Theories
+
+-- | Bit-code value for true (top)
+bTrue :: (Bounded bit) => bit
+bTrue = maxBound
+
+-- | Bit-code value for false (bottom)
+bFalse :: (Bounded bit) => bit
+bFalse = minBound
 
 -- | Symbolic mu-recursive expressions with output.
 data Mu pred func a =

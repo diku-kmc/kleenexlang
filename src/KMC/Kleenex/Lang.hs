@@ -14,7 +14,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 
 import           KMC.Coding (decodeEnum)
-import           KMC.Expression (Mu (..))
+import           KMC.Expression 
 import           KMC.Kleenex.Action
 import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
@@ -212,8 +212,8 @@ simpleMuToActionMuTerm st ign sm =
     case sm of
       SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
       SMLoop sm'   -> (Loop $ \x -> simpleMuToActionMuTerm ((Var x) : st) ign sm')
-      SMAlt l r    -> (RW (matchVal 0) (Inl Id) $ simpleMuToActionMuTerm st ign l) `Alt`
-                      (RW (matchVal 1) (Inl Id) $ simpleMuToActionMuTerm st ign r)
+      SMAlt l r    -> (RW (matchVal bFalse) (out' []) $ simpleMuToActionMuTerm st ign l) `Alt`
+                      (RW (matchVal bTrue) (out' []) $ simpleMuToActionMuTerm st ign r)
       SMSeq l r    -> (simpleMuToActionMuTerm st ign l) `Seq` (simpleMuToActionMuTerm st ign r)
       SMWrite bs   -> if ign 
                       then Accept
@@ -233,22 +233,22 @@ regexToActionMuTerm o re =
         Chr a        -> RW (matchVal $ ord a) o Accept
         Group _ e    -> regexToActionMuTerm o e
         Concat e1 e2 -> Seq (regexToActionMuTerm o e1) (regexToActionMuTerm o e2)
-        Branch e1 e2 -> Alt (RW (matchVal 0) (Inl Id) (regexToActionMuTerm o e1)) 
-                            (RW (matchVal 1) (Inl Id) (regexToActionMuTerm o e2))
+        Branch e1 e2 -> Alt (RW (matchVal bFalse) (out' []) (regexToActionMuTerm o e1)) 
+                            (RW (matchVal bTrue) (out' []) (regexToActionMuTerm o e2))
         (Class b rs)   ->  let rs' = (if b then id else complement)
                                      $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
                            in  RW rs' o Accept
-        (Star e)       -> Loop $ \x -> Alt (RW (matchVal 0) (Inl Id) (Seq (regexToActionMuTerm o e) (Var x)))
-                                           (RW (matchVal 1) (Inl Id) Accept)
-        (LazyStar e)   -> Loop $ \x -> Alt (RW (matchVal 0) (Inl Id) Accept)
-                                           (RW (matchVal 1) (Inl Id) (Seq (regexToActionMuTerm o e) (Var x)))
+        (Star e)       -> Loop $ \x -> Alt (RW (matchVal bFalse) (out' []) (Seq (regexToActionMuTerm o e) (Var x)))
+                                           (RW (matchVal bTrue) (out' []) Accept)
+        (LazyStar e)   -> Loop $ \x -> Alt (RW (matchVal bFalse) (out' []) Accept)
+                                           (RW (matchVal bTrue) (out' []) (Seq (regexToActionMuTerm o e) (Var x)))
         (Plus e)       -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (Star e))
         (LazyPlus e)   -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (LazyStar e))
-        (Question e)   -> Alt (RW (matchVal 0) (Inl Id) (regexToActionMuTerm o e))
-                              (RW (matchVal 1) (Inl Id) Accept)
-        (LazyQuestion e)   -> Alt (RW (matchVal 0) (Inl Id) (regexToActionMuTerm o e))
-                              (RW (matchVal 1) (Inl Id) Accept)
-        (Suppress e)   -> regexToActionMuTerm (Inl Id) e
+        (Question e)   -> Alt (RW (matchVal bFalse) (out' []) (regexToActionMuTerm o e))
+                              (RW (matchVal bTrue) (out' []) Accept)
+        (LazyQuestion e)   -> Alt (RW (matchVal bFalse) (out' []) (regexToActionMuTerm o e))
+                                  (RW (matchVal bTrue)  (out' []) Accept)
+        (Suppress e)   -> regexToActionMuTerm (out' []) e
         (Range e n m)  -> case m of
                            Nothing -> Seq (repeatRegex' o n e) (regexToActionMuTerm o (Star e))
                            Just m' -> if n == m' then repeatRegex' o n e
