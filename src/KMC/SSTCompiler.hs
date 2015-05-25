@@ -19,6 +19,7 @@ import qualified KMC.RangeSet as RS
 import           KMC.SymbolicSST
 import           KMC.Theories
 import           KMC.Util.Map (swapMap)
+import Debug.Trace
 
 class PredicateListToExpr p where
     predListToExpr :: [p] -> Int -> Expr
@@ -103,13 +104,13 @@ usFunctions (_:xs) = usFunctions xs
 -- | Tabulate a function. It is assumed that the codomain is a set of
 -- bit-vectors with pairwise equal length.
 tabulate :: (Function t,Enum (Dom t),Bounded (Dom t)
-            ,Rng t ~ [delta])
+            ,Rng t ~ [delta], Show (Dom t))
          => t -> Table delta
 tabulate f = Table bitTable bitSize
   where
     bitTable = map eval' [minBound .. maxBound]
     bitSize = foldr max 0 (map length bitTable)
-    eval' x | inDom x f = eval f x
+    eval' x | inDom x f = eval f (trace (show x) x)
             | otherwise = []
 
 -- | Compile a single variable update into a sequence of instructions.
@@ -252,7 +253,7 @@ elimIdTables prog = prog { progTables = rest
 compileAutomaton :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta
     , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
-    , PredicateListToExpr pred) =>
+    , PredicateListToExpr pred, Show (Dom func)) =>
     SST st pred func var
     -> Program delta
 compileAutomaton sst =

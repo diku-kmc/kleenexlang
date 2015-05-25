@@ -1,12 +1,13 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
---{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 --{-# LANGUAGE MultiParamTypeClasses #-}
 
 module KMC.Kleenex.Action where
 
 
+import Data.Monoid (Monoid, mempty)
 import Data.ByteString (ByteString, pack)
 import Data.Char
 import Data.Word
@@ -34,8 +35,8 @@ type BitInputTerm = RS.RangeSet Word8
 --newtype Bits sigma = Bits [Bool]
 --    deriving (Ord, Eq, Show)
 
-matchVal :: Int -> BitInputTerm
-matchVal = RS.singleton . fromIntegral
+matchVal :: BitInputTerm
+matchVal = RS.singleton minBound
 
 --instance Enum (Bits sigma) where
 --    toEnum = Bits . toBinary
@@ -63,34 +64,78 @@ matchVal = RS.singleton . fromIntegral
 --        go n (False : bs) = go (n-1) bs
 
 
-data ActionFunc = ParseBitsFunc
+data ActionFunc = ParseBitsFunc (RS.RangeSet Word8)
     deriving (Ord, Show, Eq)
 
 data (Ord var, Eq var, Show var) => 
     ActionExpr var = RegUpdate (RegisterUpdate var ActionFunc)
-                   | ParseBits
+                   | ParseBits (RS.RangeSet Word8)
+                   | Id
     deriving (Ord, Show, Eq)
 
 
 instance Function (ActionExpr var) where
     type Dom (ActionExpr var) = Word8
     type Rng (ActionExpr var) = [Word8]
-    eval ParseBits x = const [] x
+    eval (ParseBits rs) x = [decodeRangeSet rs x]
+    eval Id x = [x]
     isConst _ = Nothing
+    inDom x (ParseBits rs) = member x rs
     inDom _ _ = True
 
 instance Function (ActionFunc) where
     type Dom (ActionFunc) = Word8
     type Rng (ActionFunc) = [Word8]
-    eval ParseBitsFunc x = const [] x
+    eval (ParseBitsFunc rs) x = [decodeRangeSet rs x]
     isConst _ = Nothing
-    inDom _ _ = True
+    inDom x (ParseBitsFunc rs) = (fromEnum x) < size rs
+
+actionConstruct :: (Enum st, Ord st, Monoid (Rng KleenexAction), Bounded pred)
+             => st -> Mu pred KleenexAction st -> Construct st pred KleenexAction st
+actionConstruct _ (Var q) = return q
+actionConstruct qf (Loop e) = mfix (actionConstruct qf . e)
+actionConstruct qf (RW p f e) = do
+  q' <- actionConstruct qf e
+  q <- fresh
+  addEdge q (Left (p, f)) q'
+  return q
+actionConstruct qf (W d e) = do
+  q' <- actionConstruct qf e
+  q <- fresh
+  addEdge q (Right d) q'
+  return q
+actionConstruct qf (Alt e1 e2) = do
+  q1 <- actionConstruct qf e1
+  q2 <- actionConstruct qf e2
+  q <- fresh
+  addEdge q (Left (bFalse, Inr $ Const [])) q1
+  addEdge q (Left (bTrue, Inr $ Const [])) q2
+  return q
+actionConstruct qf Accept = return qf
+actionConstruct qf (Seq e1 e2) = do
+  q2 <- actionConstruct qf e2
+  actionConstruct q2 e1
+
+fromBitcodeMu :: (Enum st, Ord st, Monoid (Rng KleenexAction), Bounded pred) =>
+          Mu pred KleenexAction st
+       -> FST st pred KleenexAction
+fromBitcodeMu e =
+  let (qin, cs) = runState (actionConstruct (toEnum 0) e)
+                           (ConstructState { edges     = []
+                                           , nextState = toEnum 1
+                                           , states    = S.singleton (toEnum 0)
+                                           })
+  in FST { fstS = states cs
+         , fstE = edgesFromList (edges cs)
+         , fstI = qin
+         , fstF = S.singleton (toEnum 0)
+         }
 
 
 genActionSST :: (Ord st, Enum st) => KleenexActionMu st -> SST st BitInputTerm (ActionFunc) Int
 genActionSST mu = evalState sst []
     where
-        fst = fromMu mu
+        fst = fromBitcodeMu mu
         sst = do es <- edges
                  return $ SST { sstS = fstS fst
                               , sstE = es
@@ -121,6 +166,6 @@ genActionSST mu = evalState sst []
                 toRegUpd (Inl (RegUpdate ru)) = mmapM (\(a,b) -> do id <- getBufId a
                                                                     atoms <- mapM updateAtom b
                                                                     return (id,atoms)) ru
-                toRegUpd (Inl (ParseBits)) = return $ M.singleton outputbuf [FuncA ParseBitsFunc 0]
+                toRegUpd (Inl (ParseBits rs)) = return $ M.singleton outputbuf [FuncA (ParseBitsFunc rs) 0]
                 toRegUpd (Inr (Const xs))  = return $ M.singleton outputbuf [ConstA xs]
                 final = M.fromList $ map (\s -> (s, [Left outputbuf])) $  S.toList $ fstF fst

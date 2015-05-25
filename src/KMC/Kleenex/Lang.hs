@@ -138,7 +138,7 @@ simpleMuToMuTerm st ign sm =
                       then regexToMuTerm (out []) re
                       else regexToMuTerm copyInput re
       SMIgnore sm' -> simpleMuToMuTerm st True sm'
-      SMAction a   -> error "Cannot handle actions in this mode"
+      SMAction a   -> error "Actions are not supported in this mode"
       SMAccept     -> Accept
 
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
@@ -200,55 +200,49 @@ testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
 --- Kleenex with actions translation
 
 -- | The term that copies the input char to output.
-parseBitsAction :: KleenexAction
-parseBitsAction = Inl ParseBits
+parseBitsAction :: RangeSet Word8 -> KleenexAction
+parseBitsAction rs = Inl $ ParseBits rs
 
--- | The term that outputs a fixed string (list of Word8).
-out' :: [Word8]-> KleenexAction
-out' = Inr . Const
+-- | The term that outputs nothing.
+nop :: RangeSet Word8 -> KleenexAction
+nop = const (Inr $ Const [])
 
 simpleMuToActionMuTerm :: [KleenexActionMu a] -> Bool -> SimpleMu -> KleenexActionMu a
 simpleMuToActionMuTerm st ign sm =
     case sm of
       SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
       SMLoop sm'   -> (Loop $ \x -> simpleMuToActionMuTerm ((Var x) : st) ign sm')
-      SMAlt l r    -> (RW (matchVal bFalse) (out' []) $ simpleMuToActionMuTerm st ign l) `Alt`
-                      (RW (matchVal bTrue) (out' []) $ simpleMuToActionMuTerm st ign r)
+      SMAlt l r    -> (simpleMuToActionMuTerm st ign l) `Alt` (simpleMuToActionMuTerm st ign r)
       SMSeq l r    -> (simpleMuToActionMuTerm st ign l) `Seq` (simpleMuToActionMuTerm st ign r)
       SMWrite bs   -> if ign 
                       then Accept
                       else W (unpack bs) Accept
       SMRegex re   -> if ign
-                      then regexToActionMuTerm (out' []) re
+                      then regexToActionMuTerm nop re
                       else regexToActionMuTerm parseBitsAction re
       SMIgnore sm' -> simpleMuToActionMuTerm st True sm'
       SMAction a   -> Action a
       SMAccept     -> Accept
 
-regexToActionMuTerm  :: KleenexAction -> Regex -> KleenexActionMu a
+regexToActionMuTerm  :: (RangeSet Word8 -> KleenexAction) -> Regex -> KleenexActionMu a
 regexToActionMuTerm o re = 
     case re of
         One          -> Accept
-        Dot          -> RWN top o Accept
-        Chr a        -> RW (matchVal $ ord a) o Accept
+        Dot          -> RW top (o top) Accept
+        Chr a        -> foldr1 Seq $ map (\c -> RW (matchVal) (o $ singleton c) Accept) (encodeChar a)
         Group _ e    -> regexToActionMuTerm o e
         Concat e1 e2 -> Seq (regexToActionMuTerm o e1) (regexToActionMuTerm o e2)
-        Branch e1 e2 -> Alt (RW (matchVal bFalse) (out' []) (regexToActionMuTerm o e1)) 
-                            (RW (matchVal bTrue) (out' []) (regexToActionMuTerm o e2))
+        Branch e1 e2 -> Alt (regexToActionMuTerm o e1) (regexToActionMuTerm o e2)
         (Class b rs)   ->  let rs' = (if b then id else complement)
                                      $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
-                           in  RW rs' o Accept
-        (Star e)       -> Loop $ \x -> Alt (RW (matchVal bFalse) (out' []) (Seq (regexToActionMuTerm o e) (Var x)))
-                                           (RW (matchVal bTrue) (out' []) Accept)
-        (LazyStar e)   -> Loop $ \x -> Alt (RW (matchVal bFalse) (out' []) Accept)
-                                           (RW (matchVal bTrue) (out' []) (Seq (regexToActionMuTerm o e) (Var x)))
+                           in  RW rs' (o rs') Accept
+        (Star e)       -> Loop $ \x -> Alt (Seq (regexToActionMuTerm o e) (Var x)) Accept
+        (LazyStar e)   -> Loop $ \x -> Alt Accept (Seq (regexToActionMuTerm o e) (Var x))
         (Plus e)       -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (Star e))
         (LazyPlus e)   -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (LazyStar e))
-        (Question e)   -> Alt (RW (matchVal bFalse) (out' []) (regexToActionMuTerm o e))
-                              (RW (matchVal bTrue) (out' []) Accept)
-        (LazyQuestion e)   -> Alt (RW (matchVal bFalse) (out' []) (regexToActionMuTerm o e))
-                                  (RW (matchVal bTrue)  (out' []) Accept)
-        (Suppress e)   -> regexToActionMuTerm (out' []) e
+        (Question e)   -> Alt (regexToActionMuTerm o e) Accept
+        (LazyQuestion e)   -> Alt (regexToActionMuTerm o e) Accept
+        (Suppress e)   -> regexToActionMuTerm nop e
         (Range e n m)  -> case m of
                            Nothing -> Seq (repeatRegex' o n e) (regexToActionMuTerm o (Star e))
                            Just m' -> if n == m' then repeatRegex' o n e
@@ -257,5 +251,5 @@ regexToActionMuTerm o re =
         (LazyRange _ _ _) -> error "Lazy ranges not yet supported"
 
 
-repeatRegex' :: KleenexAction -> Int -> Regex -> KleenexActionMu a
+repeatRegex' :: (RangeSet Word8 -> KleenexAction) -> Int -> Regex -> KleenexActionMu a
 repeatRegex' o n re = foldr Seq Accept (replicate n (regexToActionMuTerm o re))

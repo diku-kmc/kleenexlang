@@ -4,7 +4,27 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.SymbolicSST where
+module KMC.SymbolicSST
+(UpdateString(..)
+,UpdateStringFunc(..)
+,Atom(..)
+,constUpdateStringFunc
+,normalizeUpdateStringFunc
+,evalUpdateStringFunc
+,SST(..)
+,construct
+,RegisterUpdate(..)
+,eForwardLookup
+,sstOut
+,edgesToList
+,sstV
+,enumerateStates
+,enumerateVariables
+,optimize
+,run
+,flattenStream
+)
+where
 
 import           Control.Applicative
 

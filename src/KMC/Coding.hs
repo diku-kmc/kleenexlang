@@ -5,8 +5,11 @@ module KMC.Coding
     ,codeFixedWidthEnum
     ,codeFixedWidthEnumSized
     ,decode
-    ,decodeEnum)
+    ,decodeEnum
+    ,decodeRangeSet)
 where
+
+import KMC.RangeSet
 
 -- | Compute the number of digits required to fit n values in a word of digits of a given base
 bitWidth :: Int -- ^ Base
@@ -72,3 +75,6 @@ decodeEnum :: forall a b. (Enum b, Bounded b, Enum a, Num a) => [b] -> a
 decodeEnum ds = decode base (map (toEnum . fromEnum) ds)
     where
       base = toEnum (fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1)
+
+decodeRangeSet :: (Enum a, Enum b, Bounded b) => RangeSet a -> b -> a
+decodeRangeSet rs b = lookupIndex (fromEnum b) rs

@@ -121,6 +121,10 @@ instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
     lte = RS.isSubsetOf
     eq = (==)
 
+instance (Bounded a) => Bounded (RangeSet a) where
+   maxBound = RS.singleton maxBound
+   minBound = RS.singleton minBound
+
 data Prefix a = Prefix [a] deriving (Eq, Ord, Show)
 
 instance (Eq a) => PartialOrder (Prefix a) where

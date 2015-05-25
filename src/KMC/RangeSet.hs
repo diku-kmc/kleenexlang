@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 module KMC.RangeSet
-(RangeSet
+(RangeSet(..)
 ,rangeSet
 ,singleton
 ,findMin
@@ -17,7 +17,6 @@ module KMC.RangeSet
 ,size
 ,indexOf
 ,lookupIndex
-,ranges
 ,isSubsetOf
 ,member
 ) where

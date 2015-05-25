@@ -2,7 +2,12 @@
 {-# LANGUAGE RankNTypes #-}
 module KMC.FSTConstruction
 (Mu(..)
-,fromMu)
+,fromMu
+,fresh
+,addEdge
+,Construct(..)
+,ConstructState(..)
+,edgesFromList)
 where
 
 import           Control.Monad.State

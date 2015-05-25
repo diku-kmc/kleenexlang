@@ -308,7 +308,10 @@ visualize mainOpts visOpts args = do
   checkArgs args
   (Transducers (fst':rest), _, _, _) <- buildTransducers mainOpts args
   when (not $ null rest) $ hPutStrLn stderr "WARNING: Multiple stages, only the first is visualized"
-  dg <- case optVisStage visOpts of
+  dg <- if optActionOnly mainOpts
+        then do (DetTransducers (sst:_))  <- buildActionSSTs mainOpts args
+                return $ sstToDot sst
+        else case optVisStage visOpts of
           VisFST -> return $ fstToDot fst'
           VisSST -> do
             (DetTransducers (sst:_),_,_) <- compileTransducers mainOpts (Transducers [fst'])
@@ -360,4 +363,4 @@ buildActionSSTs mainOpts args = do
   kleenexSrc <- readFile arg
   return $ case parseKleenex kleenexSrc of
     Left e   -> error e
-    Right ih -> DetTransducers $ map genActionSST (kleenexToActionMuTerm ih)
+    Right ih -> DetTransducers $ map (fst . optimize 3 . genActionSST) (kleenexToActionMuTerm ih)
