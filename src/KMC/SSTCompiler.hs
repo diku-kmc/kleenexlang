@@ -109,7 +109,7 @@ tabulate f = Table bitTable bitSize
   where
     bitTable = map eval' [minBound .. maxBound]
     bitSize = foldr max 0 (map length bitTable)
-    eval' x | inDom x f = eval f x)
+    eval' x | inDom x f = eval f x
             | otherwise = []
 
 -- | Compile a single variable update into a sequence of instructions.

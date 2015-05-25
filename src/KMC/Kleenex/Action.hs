@@ -166,6 +166,6 @@ genActionSST mu = evalState sst []
                 toRegUpd (Inl (RegUpdate ru)) = mmapM (\(a,b) -> do id <- getBufId a
                                                                     atoms <- mapM updateAtom b
                                                                     return (id,atoms)) ru
-                toRegUpd (Inl (ParseBits rs)) = return $ M.singleton outputbuf [FuncA (ParseBitsFunc rs) 0]
-                toRegUpd (Inr (Const xs))  = return $ M.singleton outputbuf [ConstA xs]
+                toRegUpd (Inl (ParseBits rs)) = return $ M.singleton outputbuf [VarA outputbuf, FuncA (ParseBitsFunc rs) 0]
+                toRegUpd (Inr (Const xs))  = return $ M.singleton outputbuf [VarA outputbuf, ConstA xs]
                 final = M.fromList $ map (\s -> (s, [Left outputbuf])) $  S.toList $ fstF fst

@@ -18,7 +18,7 @@ import           KMC.Expression
 import           KMC.Kleenex.Action
 import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
-import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet)
+import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size)
 import           KMC.Syntax.External (Regex (..), unparse)
 import           KMC.SymbolicSST (RegisterUpdate(..))
 import           KMC.Theories (top, indexOf)
@@ -235,7 +235,8 @@ regexToActionMuTerm o re =
         Branch e1 e2 -> Alt (regexToActionMuTerm o e1) (regexToActionMuTerm o e2)
         (Class b rs)   ->  let rs' = (if b then id else complement)
                                      $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
-                           in  RW rs' (o rs') Accept
+                               rs'' = rangeSet [ (toEnum 0, toEnum $ size rs' - 1) ]
+                           in  RW rs'' (o rs') Accept
         (Star e)       -> Loop $ \x -> Alt (Seq (regexToActionMuTerm o e) (Var x)) Accept
         (LazyStar e)   -> Loop $ \x -> Alt Accept (Seq (regexToActionMuTerm o e) (Var x))
         (Plus e)       -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (Star e))
