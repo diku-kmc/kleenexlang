@@ -30,7 +30,7 @@ fromRegex :: (Ord sigma, Enum sigma, Bounded sigma, Bounded bit) =>
              Regex -> BitcodeMu sigma bit a
 fromRegex One            = Accept
 fromRegex Dot            = RW top (Join [Inr $ Enumerator $ top]) Accept
-fromRegex (Chr a)        = RW (singleton n) (Join [Inr $ Enumerator (singleton n)]) Accept
+fromRegex (Chr a)        = RW (singleton n) (Join [Inl $ Const [bFalse]]) Accept
                            where n = toEnum (ord a)
 fromRegex (Group _ e)    = fromRegex e
 fromRegex (Concat e1 e2) = Seq (fromRegex e1) (fromRegex e2)
