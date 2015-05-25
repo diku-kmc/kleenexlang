@@ -85,4 +85,5 @@ simpleMuToBitcodeMuTerm st sm =
       SMWrite _    -> Accept
       SMRegex re   -> fromRegex re
       SMIgnore sm' -> simpleMuToBitcodeMuTerm st sm'
+      SMAction a   -> W [bFalse] Accept
       SMAccept     -> Accept

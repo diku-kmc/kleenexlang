@@ -26,6 +26,7 @@ import KMC.SymbolicFST
 import KMC.SymbolicSST
 import KMC.Theories
 import KMC.OutputTerm
+import Debug.Trace
 
 type KleenexAction = (ActionExpr String) :+: (Const [Bool] [Word8])
 type KleenexActionMu a = Mu BitInputTerm KleenexAction a
@@ -37,6 +38,14 @@ type BitInputTerm = RS.RangeSet Word8
 
 matchVal :: BitInputTerm
 matchVal = RS.singleton minBound
+
+-- | The term that copies the input char to output.
+parseBitsAction :: RS.RangeSet Word8 -> KleenexAction
+parseBitsAction rs = Inl $ ParseBits rs
+
+-- | The term that outputs nothing.
+nop :: a -> KleenexAction
+nop = const (Inr $ Const [])
 
 --instance Enum (Bits sigma) where
 --    toEnum = Bits . toBinary
@@ -65,12 +74,12 @@ matchVal = RS.singleton minBound
 
 
 data ActionFunc = ParseBitsFunc (RS.RangeSet Word8)
+                | Id
     deriving (Ord, Show, Eq)
 
 data (Ord var, Eq var, Show var) => 
     ActionExpr var = RegUpdate (RegisterUpdate var ActionFunc)
                    | ParseBits (RS.RangeSet Word8)
-                   | Id
     deriving (Ord, Show, Eq)
 
 
@@ -78,7 +87,6 @@ instance Function (ActionExpr var) where
     type Dom (ActionExpr var) = Word8
     type Rng (ActionExpr var) = [Word8]
     eval (ParseBits rs) x = [decodeRangeSet rs x]
-    eval Id x = [x]
     isConst _ = Nothing
     inDom x (ParseBits rs) = member x rs
     inDom _ _ = True
@@ -87,11 +95,13 @@ instance Function (ActionFunc) where
     type Dom (ActionFunc) = Word8
     type Rng (ActionFunc) = [Word8]
     eval (ParseBitsFunc rs) x = [decodeRangeSet rs x]
+    eval Id x = [x]
     isConst _ = Nothing
     inDom x (ParseBitsFunc rs) = (fromEnum x) < size rs
+    inDom x Id = True
 
-actionConstruct :: (Enum st, Ord st, Monoid (Rng KleenexAction), Bounded pred)
-             => st -> Mu pred KleenexAction st -> Construct st pred KleenexAction st
+actionConstruct :: (Enum st, Ord st, Monoid (Rng KleenexAction))
+             => st -> Mu BitInputTerm KleenexAction st -> Construct st BitInputTerm KleenexAction st
 actionConstruct _ (Var q) = return q
 actionConstruct qf (Loop e) = mfix (actionConstruct qf . e)
 actionConstruct qf (RW p f e) = do
@@ -103,6 +113,11 @@ actionConstruct qf (W d e) = do
   q' <- actionConstruct qf e
   q <- fresh
   addEdge q (Right d) q'
+  return q
+actionConstruct qf (Action a e) = do
+  q' <- actionConstruct qf e
+  q <- fresh
+  addEdge q (Left (bFalse, a)) q'
   return q
 actionConstruct qf (Alt e1 e2) = do
   q1 <- actionConstruct qf e1
@@ -116,9 +131,9 @@ actionConstruct qf (Seq e1 e2) = do
   q2 <- actionConstruct qf e2
   actionConstruct q2 e1
 
-fromBitcodeMu :: (Enum st, Ord st, Monoid (Rng KleenexAction), Bounded pred) =>
-          Mu pred KleenexAction st
-       -> FST st pred KleenexAction
+fromBitcodeMu :: (Enum st, Ord st, Monoid (Rng KleenexAction)) =>
+          Mu BitInputTerm KleenexAction st
+       -> FST st BitInputTerm KleenexAction
 fromBitcodeMu e =
   let (qin, cs) = runState (actionConstruct (toEnum 0) e)
                            (ConstructState { edges     = []
@@ -145,10 +160,12 @@ genActionSST mu = evalState sst []
             where
                 getBufId :: String -> State [String] Int
                 getBufId var = do names <- get
-                                  case elemIndex var names of
-                                    Just idx -> return $ idx + 1
-                                    Nothing  -> do put $ names ++ [var]
-                                                   return $ length names + 1
+                                  if var == "outbuf"
+                                  then return 0
+                                  else case elemIndex var names of
+                                        Just idx -> return $ idx + 1
+                                        Nothing  -> do put $ names ++ [var]
+                                                       return $ length names + 1
                 outputbuf = 0
                 mmapM :: (Monad m, Functor m, Ord c) => ((a,b) -> m (c,d)) -> M.Map a b -> m (M.Map c d)
                 mmapM f = fmap M.fromList . mapM f . M.toList

@@ -4,44 +4,27 @@
 
 module KMC.Kleenex.Parser where
 
-<<<<<<< HEAD
 import           Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import           Control.Monad.Identity (Identity)
-import           Data.ByteString (ByteString)
+import           Data.Word
+import           Data.ByteString (ByteString, unpack)
 import qualified Data.Text as T
+import qualified Data.Map as M
 import           Data.Text.Encoding (encodeUtf8)
 import           Text.Parsec hiding (parseTest)
 import           Text.Parsec.Prim (runParser)
 import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
+import           KMC.Kleenex.Action
+import           KMC.SymbolicSST (Atom(..))
+import           KMC.OutputTerm ((:+:)(..))
 import           KMC.Syntax.Config
 import           KMC.Syntax.External (Regex, unparse)
 import           KMC.Syntax.Parser (anchoredRegexP)
-import           KMC.Util.List (foldr1ifEmpty)
-    
-=======
-import Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
-import Control.Monad.Identity (Identity)
-import Data.Word
-import Data.ByteString (ByteString, unpack)
-import qualified Data.Text as T
-import qualified Data.Map as M
-import Data.Text.Encoding (encodeUtf8)
-import Text.Parsec hiding (parseTest)
-import Text.Parsec.Prim (runParser)
-import Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
-import KMC.Kleenex.Action
-import KMC.SymbolicSST (Atom(..))
-import KMC.OutputTerm ((:+:)(..))
-import KMC.Syntax.Config
-import KMC.Syntax.External (Regex, unparse)
-import KMC.Syntax.Parser (anchoredRegexP)
+import           Debug.Trace
 
-import Debug.Trace
->>>>>>> Preliminary support for Kleenex actions
-    
--- | Change the type of a state in a parser.  
+-- | Change the type of a state in a parser.
 changeState :: forall m s u v a . (Functor m, Monad m)
             => (u -> v) -> (v -> u) -> ParsecT s u m a -> ParsecT s v m a
 changeState forward backward = mkPT . transform . runParsecT
@@ -72,7 +55,7 @@ fromIdent (Identifier s) = s
 data Kleenex            = Kleenex [Identifier] [KleenexAssignment] deriving (Eq, Ord, Show)
 
 -- | Assigns the term to the name.
-data KleenexAssignment  = HA (Identifier, KleenexTerm) 
+data KleenexAssignment  = HA (Identifier, KleenexTerm)
     deriving (Eq, Ord, Show)
 
 -- | The terms describe how regexps are mapped to strings.
@@ -102,7 +85,7 @@ withHPState p = getState >>= \hps -> changeState (const hps) (const ()) p
 
 separator :: KleenexParser ()
 separator = spaceOrTab <|> ignore (try (lookAhead newline))
-  
+
 -- Parse one space or tab character.
 spaceOrTab :: KleenexParser ()
 spaceOrTab = ignore (char ' ' <|> char '\t')
@@ -134,7 +117,7 @@ escapedChar = satisfy (not . mustBeEscaped)
       escaped = char '\\' >> choice (map escapedChar cr)
       escapedChar (code, replacement) = replacement <$ char code
       cr = [('\\', '\\'), ('"', '"'), ('n', '\n'), ('t', '\t')]
-               
+
 -- | A "constant" is a string enclosed in quotes.
 kleenexConstant :: KleenexParser String
 kleenexConstant = (char '"') *> (many escapedChar) <* (char '"')
@@ -199,7 +182,10 @@ kleenexPrimTerm = skipAround elms
                    <?> "Var"
       action     = Action <$> between (char '[') (char ']') actionP <*> One
                    <?> "Action"
-      output     = Action <$> (char '!' *> (Output <$> kleenexIdentifier))
+      output     = do ident <- skipAround (char '!' *> kleenexIdentifier)
+                      let buf = fromIdent ident
+                      return $ Action $ Inl $ RegUpdate $ M.singleton "outbuf" [VarA "outbuf", VarA buf]
+                   <?> "OutputTerm"
 
 encodeString :: String -> ByteString
 encodeString = encodeUtf8 . T.pack
@@ -212,7 +198,7 @@ actionP :: KleenexParser (KleenexAction)
 actionP = do
     ident <- kleenexIdentifier
     skipAround $ string "<-"
-    actions <- choice [reg, const] `sepEndBy1` skipped 
+    actions <- choice [reg, const] `sepEndBy1` skipped
     return $ Inl . RegUpdate $ M.insert (fromIdent ident) actions M.empty
         where
             reg = VarA . fromIdent <$> kleenexIdentifier

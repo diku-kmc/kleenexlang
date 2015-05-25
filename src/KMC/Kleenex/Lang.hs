@@ -138,7 +138,7 @@ simpleMuToMuTerm st ign sm =
                       then regexToMuTerm (out []) re
                       else regexToMuTerm copyInput re
       SMIgnore sm' -> simpleMuToMuTerm st True sm'
-      SMAction a   -> error "Actions are not supported in this mode"
+      SMAction a   -> Accept
       SMAccept     -> Accept
 
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
@@ -199,13 +199,6 @@ testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
 
 --- Kleenex with actions translation
 
--- | The term that copies the input char to output.
-parseBitsAction :: RangeSet Word8 -> KleenexAction
-parseBitsAction rs = Inl $ ParseBits rs
-
--- | The term that outputs nothing.
-nop :: RangeSet Word8 -> KleenexAction
-nop = const (Inr $ Const [])
 
 simpleMuToActionMuTerm :: [KleenexActionMu a] -> Bool -> SimpleMu -> KleenexActionMu a
 simpleMuToActionMuTerm st ign sm =
@@ -221,7 +214,7 @@ simpleMuToActionMuTerm st ign sm =
                       then regexToActionMuTerm nop re
                       else regexToActionMuTerm parseBitsAction re
       SMIgnore sm' -> simpleMuToActionMuTerm st True sm'
-      SMAction a   -> Action a
+      SMAction a   -> Action a Accept
       SMAccept     -> Accept
 
 regexToActionMuTerm  :: (RangeSet Word8 -> KleenexAction) -> Regex -> KleenexActionMu a
