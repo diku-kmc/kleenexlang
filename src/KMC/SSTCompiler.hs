@@ -19,7 +19,6 @@ import qualified KMC.RangeSet as RS
 import           KMC.SymbolicSST
 import           KMC.Theories
 import           KMC.Util.Map (swapMap)
-import Debug.Trace
 
 class PredicateListToExpr p where
     predListToExpr :: [p] -> Int -> Expr
@@ -110,7 +109,7 @@ tabulate f = Table bitTable bitSize
   where
     bitTable = map eval' [minBound .. maxBound]
     bitSize = foldr max 0 (map length bitTable)
-    eval' x | inDom x f = eval f (trace (show x) x)
+    eval' x | inDom x f = eval f x)
             | otherwise = []
 
 -- | Compile a single variable update into a sequence of instructions.
