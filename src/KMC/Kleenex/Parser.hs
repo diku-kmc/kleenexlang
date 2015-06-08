@@ -4,20 +4,20 @@
 
 module KMC.Kleenex.Parser where
 
-import Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
-import Control.Monad.Identity (Identity)
-import Data.ByteString (ByteString)
+import           Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
+import           Control.Monad.Identity (Identity)
+import           Data.ByteString (ByteString)
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
-import Text.Parsec hiding (parseTest)
-import Text.Parsec.Prim (runParser)
-import Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
+import           Data.Text.Encoding (encodeUtf8)
+import           Text.Parsec hiding (parseTest)
+import           Text.Parsec.Prim (runParser)
+import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
-import KMC.Syntax.Config
-import KMC.Syntax.External (Regex, unparse)
-import KMC.Syntax.Parser (anchoredRegexP)
-
-import Debug.Trace
+import           KMC.Syntax.Config
+import           KMC.Syntax.External (Regex, unparse)
+import           KMC.Syntax.Parser (anchoredRegexP)
+import           KMC.Util.List (foldr1ifEmpty)
+    
     
 -- | Change the type of a state in a parser.  
 changeState :: forall m s u v a . (Functor m, Monad m)
@@ -129,9 +129,6 @@ kleenexAssignment = do
   term <- kleenexTerm
   return $ HA (ident, term)
 
-foldr1ifEmpty :: (a -> a -> a) -> a -> [a] -> a
-foldr1ifEmpty _ e [] = e
-foldr1ifEmpty f _ l  = foldr1 f l
 
 skipped :: KleenexParser ()
 skipped = ignore $ many skipped1

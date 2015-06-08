@@ -27,7 +27,7 @@ class Boolean b => SetLike b dom | b -> dom where
   member :: dom -> b -> Bool
 
 -- | An Enumerable is a set-like boolean algebra for which we can enumerate all
--- members by consecutive none-negative integers.
+-- members by consecutive non-negative integers.
 class SetLike b dom => Enumerable b dom | b -> dom where
   indexOf :: dom -> b -> Int
   lookupIndex :: Int -> b -> dom
