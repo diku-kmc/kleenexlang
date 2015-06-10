@@ -20,6 +20,8 @@ import           KMC.Coding
 import           KMC.Program.IL
 import           KMC.Util.Heredoc
 
+import KMC.SSTCompiler
+
 {- Utility functions -}
 -- | Chunk a list into list of lists of length n, starting from the left. The
 -- last list in the result may be shorter than n.
@@ -228,6 +230,7 @@ splitAppends buftype digits = [ (decodeEnum bs, length bs * baseBits) | bs <- gr
     split [] = []
     split xs = let (l, r) = splitAt digitsPerAppend xs in l:split r
 
+
 -- | Pretty print an append table instruction, taking into account whether the
 -- destination buffer is the output buffer or a regular bufer. An optional
 -- dynamic offset variable can be specified for printing append instructions
@@ -253,6 +256,17 @@ prettyAppendTbl buftype tbltype prog bid tid i mx phase =
          <> parens (hcat [buf bid, comma, arg, comma, lendoc])
          <> semi
 
+prettyAppendSym :: BufferId -> BufferId -> Int -> Maybe String -> Doc
+prettyAppendSym bid outBuf i mx =
+    let offsetdoc = maybe (int i) (\s -> int i <+> text "+" <+> text s) mx
+        symb = text "next" <> brackets offsetdoc
+    in if bid == outBuf then
+        text "outputconst" <> parens (hcat [symb, comma, int 8]) <> semi
+    else
+        text "append"
+        <> parens (hcat [buf bid, comma, symb, comma, int 8]) <> semi
+
+            
 -- | Pretty print an instruction. Note that the C runtime currently
 -- distinguishes between regular buffers and the output buffer, and hence the
 -- pretty printer needs to handle this case specially.
@@ -279,6 +293,7 @@ prettyInstr buftype tbltype prog instr phase =
                <> parens (hcat [buf bid, comma, cid constid phase, comma, lendoc])
                <> semi
     AppendTblI bid tid i -> prettyAppendTbl buftype tbltype prog bid tid i Nothing phase
+    AppendSymI bid i   -> prettyAppendSym bid streamBuf i Nothing
     ConcatI bid1 bid2  -> if bid1 == streamBuf then
                               text "output" <> parens (buf bid2) <> semi
                           else
@@ -314,11 +329,36 @@ appendSpan bid tid i is =
       isAppendTbl (AppendTblI bid' tid' _) = bid == bid' && tid == tid'
       isAppendTbl _ = False
 
+appendSymSpan :: BufferId -> Int -> Block delta -> Maybe (Int, Block delta)
+appendSymSpan bid i is =
+    let (is1, is2) = span isAppendSym is
+    in if not (null is1)
+           && and (zipWith (==) [ j | AppendSymI _ j <- is1 ] [i+1..])
+       then
+           Just (length is1, is2)
+       else
+           Nothing
+    where
+      isAppendSym (AppendSymI bid' _) = bid == bid'
+      isAppendSym _ = False
+
 -- | Pretty print a list of instructions.
 prettyBlock :: (Enum delta, Bounded delta) => CType -> CType -> Program delta -> Block delta -> Int -> Doc
 prettyBlock buftype tbltype prog is phase = go is
   where
     go [] = empty
+    go (app@(AppendSymI bid i):is) =
+        case appendSymSpan bid i is of
+          Nothing -> prettyInstr buftype tbltype prog app phase $+$ go is
+          Just (n, is') ->
+              vcat [ hcat [ text "for"
+                          , parens (text "i = 0; i < " <> int (n+1) <> text "; i++")
+                          ]
+                   , lbrace
+                   , nest 3 (prettyAppendSym bid (progStreamBuffer prog) i (Just "i"))
+                   , rbrace
+                   , go is'
+                   ]
     go (app@(AppendTblI bid tid i):is) =
       case appendSpan bid tid i is of
         Nothing       -> prettyInstr buftype tbltype prog app phase $+$ go is

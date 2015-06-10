@@ -40,7 +40,8 @@ data Instr delta =
     AcceptI                             -- ^ accept (Program stops)
   | FailI                               -- ^ fail   (Program stops)
   | AppendI    BufferId ConstId         -- ^ buf  := buf ++ bs
-  | AppendTblI BufferId TableId Int     -- ^ bif ::= buf ++ tbl(id)(next[i])[0 .. sz(id) - 1]
+  | AppendTblI BufferId TableId Int     -- ^ buf  := buf ++ tbl(id)(next[i])[0 .. sz(id) - 1]
+  | AppendSymI BufferId Int             -- ^ buf  := buf ++ next[i]
   | ConcatI    BufferId BufferId        -- ^ buf1 := buf1 ++ buf2; reset(buf2)
   | ResetI     BufferId                 -- ^ buf1 := []
   | AlignI     BufferId BufferId        -- ^ align buf1 buf2. assert that buf1 is empty, and
@@ -52,7 +53,7 @@ data Instr delta =
   | IfI        Expr (Block delta)       -- ^ if (e :: Bool) { ... }
   | GotoI      BlockId                  -- ^ goto b
   | NextI      Int Int (Block delta)    -- ^ if (!getChars(min,max)) { ... }
-  | ConsumeI   Int                      -- next += i
+  | ConsumeI   Int                      -- ^ next += i
   deriving (Eq, Ord, Show)
 
 type Block delta = [Instr delta]
@@ -66,3 +67,4 @@ data Program delta =
   , progInitBlock    :: BlockId
   , progBlocks       :: M.Map BlockId (Block delta)
   }
+  deriving (Eq, Show)

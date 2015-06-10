@@ -25,7 +25,7 @@ import           KMC.Kleenex.Lang (KleenexOutTerm, kleenexToMuTerm)
 import           KMC.Kleenex.Parser (parseKleenex)
 import           KMC.Program.Backends.C (CType(..), compileProgram)
 import           KMC.RangeSet (RangeSet)
-import           KMC.SSTCompiler (compileAutomaton)
+import           KMC.SSTCompiler (elimIdTables, compileAutomaton)
 import           KMC.SSTConstruction (sstFromFST)
 import           KMC.SymbolicFST (FST, fstS)
 import qualified KMC.SymbolicFST as FST
@@ -52,6 +52,7 @@ data CompileOptions =
     , optCFile           :: Maybe FilePath
     , optWordSize        :: CType
     , optAltCompiler     :: FilePath
+    , optElimIdTables    :: Bool
     }
 
 data VisualizeOptions =
@@ -111,6 +112,7 @@ instance Options CompileOptions where
                        , optionDescription = "Buffer word size"
                        })
       <*> simpleOption "cc" "gcc" "C compiler"
+      <*> simpleOption "rmidtbls" False "Eliminate C-tables that implement the identity function."
 
 instance Options VisualizeOptions where
     defineOptions =
@@ -125,8 +127,9 @@ instance Options VisualizeOptions where
 
 prettyOptions :: MainOptions -> CompileOptions -> String
 prettyOptions mainOpts compileOpts = intercalate "\\n"
-                     [ "SST optimization level: " ++ show (optOptimizeSST mainOpts)
-                     , "Word size:              " ++ show (optWordSize compileOpts)
+                     [ "SST optimization level:  " ++ show (optOptimizeSST mainOpts)
+                     , "Word size:               " ++ show (optWordSize compileOpts)
+                     , "Identity tables removed: " ++ show (optElimIdTables compileOpts)
                      ]
 
 -- | Existential type representing transducers that can be determinized,
@@ -223,7 +226,8 @@ transducerToProgram :: MainOptions
                     -> IO (ExitCode, NominalDiffTime)
 transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5 (DetTransducers ssts) = do
   timeCompile <- getCurrentTime
-  let progs = map compileAutomaton ssts
+  let optimizeTables = if optElimIdTables compileOpts then elimIdTables else id
+  let progs = map (optimizeTables . compileAutomaton) ssts
   let envInfo = intercalate "\\n" [ "Options:"
                                   , prettyOptions mainOpts compileOpts
                                   , ""
@@ -324,3 +328,4 @@ fstFromKleenex str =
   case parseKleenex str of
     Left e -> error e
     Right ih -> map fromMu (kleenexToMuTerm ih)
+

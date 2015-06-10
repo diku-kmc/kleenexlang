@@ -55,13 +55,28 @@
 *** Status
     Is done.
 ** DONE The runtime should detect if the program is byte-aligned
+
 *** Description
     If the word size is 8 everything is always byte-aligned, and all the checks pertaining to 
     this should be removed.  Consider wrapping the key parts of crt.c in suitable #DEFINEs, so
     the generated C code will reflect this.
 *** Status
     This is now handled by the more general array functions.
-
+    
+** DONE Detect and remove "identity tables" from the C code
+*** Description: 
+    Often tables of the form:
+    "const uint8_t tbl1[1][256] =
+      {{ 0x0,  0x1,  0x2,  0x3,  0x4,  0x5,  0x6,  0x7,
+         0x8,  0x9,  0xa,  0xb,  0xc,  0xd,  0xe,  0xf,
+      ..."
+    are generated.  They just implement the identity function, and
+    are therefore superfluous.
+*** Status: 
+    Done.  Turns out, this makes a very small difference, and it can even 
+    cause the compiled binaries to /grow/ slightly in size!  On my MacBook,
+    the "simpleid" program with this optimization runs slightly slower when 
+    compiled with clang and slightly faster when compiled with GCC.
 
 ** TODO (kris+sebbe) Add extra language features
 *** Description
