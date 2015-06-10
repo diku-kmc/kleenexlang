@@ -72,6 +72,8 @@ tell w = wrap (Out w (return ()))
 evalTreeWriterT :: (Monad m, Monoid w) => TreeWriterT w m a -> m (Maybe (Tree w a))
 evalTreeWriterT x = runFT x (return . Just . Tip mempty) ev
     where
+      ev :: (Monoid w, Monad m) =>
+            T w (m (Maybe (Tree w a))) -> m (Maybe (Tree w a))
       ev Zero = return Nothing
       ev (Plus x1 x2) =
         do { t1 <- x1; t2 <- x2;
