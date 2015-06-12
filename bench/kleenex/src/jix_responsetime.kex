@@ -6,7 +6,7 @@
 
    Into:
 
-   [03/Mar/2015:00:00:01 +0100]    "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 13265 
+   [03/Mar/2015:00:00:01 +0100]    "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 13265
 */
 log
 
@@ -16,19 +16,19 @@ log := logline nl log
 
 logline := ~ip ~ws ~rfc931 ~ws ~authuser ~ws timestamp ws request ws ~code ~ws ~bytes ~ws ~referer ~ws ~useragent ~ws responsetime ~ws ~hostname ~ws ~frontend ~ws ~backend ~ws
 
-ip := integer <\.> integer <\.> integer <\.> integer
+ip := integer /\./ integer /\./ integer /\./ integer
 
-rfc931 := <->
+rfc931 := /-/
 
-authuser := <[^ \n]+>
+authuser := /[^ \n]+/
 
-timestamp := <\[[A-Za-z0-9: /+-]+]>
+timestamp := /\[[A-Za-z0-9: /+-]+]/
 
 request := quotedString
 
 code := integer
 
-bytes := integer | <->
+bytes := integer | /-/
 
 referer := quotedString
 
@@ -42,8 +42,8 @@ frontend := quotedString
 
 backend := quotedString
 
-ws := <[\t ]+>
-nl := <\n>
+ws := /[\t ]+/
+nl := /\n/
 
-quotedString := <"([^"\n]|\\")*">
-integer := <[0-9]+>
+quotedString := /"([^"\n]|\\")*"/
+integer := /[0-9]+/

@@ -7,32 +7,32 @@ start := "INSERT INTO issuu_log (ts, visitor_uuid, visitor_useragent, visitor_co
 json2sql := object ",\n" ws json2sql
           | object ";\n" ws
 
-object := "(" ~<\{> ws keyVals ws ~<}> ")"
+object := "(" ~/\{/ ws keyVals ws ~/}/ ")"
 
 // keyVals := kvs0
 keyVals := ws keyVal keyVals
          | ws keyVal
 
-keyVal := ~<"ts">                sep someInt             keepComma
-        | ~<"visitor_uuid">      sep stringReplaceQuotes keepComma
-        | ~<"visitor_useragent"> sep stringReplaceQuotes keepComma
-        | ~<"visitor_country">   sep stringReplaceQuotes dropComma
+keyVal := ~/"ts"/                sep someInt             keepComma
+        | ~/"visitor_uuid"/      sep stringReplaceQuotes keepComma
+        | ~/"visitor_useragent"/ sep stringReplaceQuotes keepComma
+        | ~/"visitor_country"/   sep stringReplaceQuotes dropComma
         | fb
 
-fb := ~(<"> someString <">   sep ( <"> someString <">
+fb := ~(/"/ someString /"/   sep ( /"/ someString /"/
                                      | someInt
                                      ) (dropComma | ""))
 
 
 stringReplaceQuotes := qt someString qt
-qt := "'" ~<"> // replace double with single quote
-sep := ws ~<:> ws
-someString := <[^"\n]*>
-someInt := <-?[0-9]*>
-someNumber := someInt <\.> someInt
-contryCode := <[A-Z]{2}>
+qt := "'" ~/"/ // replace double with single quote
+sep := ws ~/:/ ws
+someString := /[^"\n]*/
+someInt := /-?[0-9]*/
+someNumber := someInt /\./ someInt
+contryCode := /[A-Z]{2}/
 
 // Skip whitespace
-ws := ~<[ \n]*>
-keepComma := ws <,>
-dropComma := ws ~<,>
+ws := ~/[ \n]*/
+keepComma := ws /,/
+dropComma := ws ~/,/

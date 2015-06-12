@@ -5,12 +5,12 @@
 */
 csvProj1
 
-csvProj1 := row <\n> csvProj1
-          | row <\n?>
+csvProj1 := row /\n/ csvProj1
+          | row /\n?/
 
-row := ~col ~<,> rowPrime
+row := ~col ~/,/ rowPrime
 
-rowPrime := col <,> rowPrime
+rowPrime := col /,/ rowPrime
           | col
 
-col := <[^,\n]*>
+col := /[^,\n]*/

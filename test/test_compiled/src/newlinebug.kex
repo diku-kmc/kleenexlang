@@ -3,9 +3,9 @@
 
 test
 
-test := ( keep "\n" | ~drop ) ~<\n> test
-      | ( keep "\n" | ~drop ) ~<\n>
+test := ( keep "\n" | ~drop ) ~/\n/ test
+      | ( keep "\n" | ~drop ) ~/\n/
 
-keep := <(a|b)+(a|b)(a|b)+>
+keep := /(a|b)+(a|b)(a|b)+/
 
-drop := <[^\n]*>
+drop := /[^\n]*/

@@ -1,4 +1,4 @@
 // Identity on a and b
 x
 
-x := <(a|b)*> ~<.>
+x := /(a|b)*/ ~/./

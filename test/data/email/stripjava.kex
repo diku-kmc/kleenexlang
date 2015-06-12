@@ -1,10 +1,10 @@
 // Strip away everything but the e-mail addresses in the Apache email test suite source.
-strip := line ~<\n> strip
-       | line ~<\n?>
+strip := line ~/\n/ strip
+       | line ~/\n?/
 
-line := assertLine "\n" | ~<[^\n]*>
+line := assertLine "\n" | ~/[^\n]*/
 
-assertLine := ~<[ ]*(assertTrue|assertFalse)\(validator.isValid\(">
-               <(\\"|[^"])*>
-              ~<"[^\n]*>
+assertLine := ~/[ ]*(assertTrue|assertFalse)\(validator.isValid\("/
+               /(\\"|[^"])*/
+              ~/"[^\n]*/
 

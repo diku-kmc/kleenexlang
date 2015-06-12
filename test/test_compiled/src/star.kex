@@ -6,4 +6,4 @@
 // OUT:Weee!
 program
 
-program := ("W" (~<a> "e" | ~<b> "-")* "!" <\n>)*
+program := ("W" (~/a/ "e" | ~/b/ "-")* "!" /\n/)*

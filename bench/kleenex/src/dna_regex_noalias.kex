@@ -15,16 +15,16 @@
 */
 fasta
 
-fasta := sequenceIdent ~<\n> sequence ~<\n> fasta
-       | sequenceIdent ~<\n> sequence ~<\n?>
+fasta := sequenceIdent ~/\n/ sequence ~/\n/ fasta
+       | sequenceIdent ~/\n/ sequence ~/\n?/
 
 /* for now we ignore the sequence separation */
-sequenceIdent := ~<\>[^\n]*>
+sequenceIdent := ~/\/[^\n]*>
 
-a := ~<\n?[aA]>
-c := ~<\n?[cC]>
-g := ~<\n?[gG]>
-t := ~<\n?[tT]>
+a := ~/\n?[aA]/
+c := ~/\n?[cC]/
+g := ~/\n?[gG]/
+t := ~/\n?[tT]/
 
 singleSeq :=
     (

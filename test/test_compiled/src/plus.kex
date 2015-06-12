@@ -8,4 +8,4 @@
 // OUT:a
 program
 
-program := ( (~<a>+ "a" | ~<a>* "b") <\n> ) *
+program := ( (~/a/+ "a" | ~/a/* "b") /\n/ ) *

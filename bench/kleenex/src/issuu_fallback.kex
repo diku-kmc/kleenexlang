@@ -10,66 +10,66 @@
    - it would be practical to be able to suppress a variable reference as well.
    - introduce "pure expressions", named REs that do not have any effects at all
    - Macros: TODO
-     p(x1, x2) := <"> x1 <"> x2
+     p(x1, x2) := /"/ x1 /"/ x2
 */
 objects
 
-objects := object <\n> objects
-         | object ~<\n?>
+objects := object /\n/ objects
+         | object ~/\n?/
 
-object := ~<\{> sep keyValPairs ~<}>
+object := ~/\{/ sep keyValPairs ~/}/
 
-keyValPairs := keyVal ~<,> keyValPairs
+keyValPairs := keyVal ~/,/ keyValPairs
              | keyVal
 
 sep := "\n"
 nl := "\n"
 
-keyVal := ~<"ts":> "Timestamp=" someNumber sep
-        | ~<"visitor_uuid":> "vistor-id: " ~<"> hash16 ~<"> sep
-        | ~( <"visitor_source":> <"> visitorSource <"> )
-        | ~<"visitor_device":> ( ~("From a browser" ~<"browser">)
-                               | "From a mobile phone" ~<"android"> sep)
-        | ~( <"visitor_useragent":> someString )
-        | ~( <"visitor_ip":> <"> hash16 <"> )
-        | ~<"visitor_country":> "Country:" ~<"> <[A-Z]{2}> ~<"> sep
-        | ~( <"visitor_referrer":> <"> hash16 <"> )
-        | ~( <"env_type":> <"> envType <"> )
-        | ~<"env_doc_id":> "Document ID: " someString sep
-        | ~( <"event_type":> <"> eventType <"> )
-        | ~( <"subject_type":> <"> subjectType <"> )
-        | ~<"subject_doc_id":> "Subject doc. ID" someString sep
-        | ~( <"subject_page":> someNumber)
-        | ~<"cause_type":> "Cause type: " ~<"> causeType ~<"> sep
-        | ~( <"env_ranking":> someNumber )
-        | ~( <"event_readtime":> someNumber )
-        | ~( <"visitor_username":> (<"> hash16 <"> | <null>) )
-        | ~( <"env_adid":> <"> hash16 <"> )
-        | ~( <"env_ranking":> someNumber )
-        | ~<"event_service":> "Name of service: " ~<"> serviceName ~<">
-        | ~( <"event_readtime":> someNumber )
-        | ~( <"event_index":> someNumber )
-        | ~( <"subject_infoboxid":> someString )
-        | ~( <"subject_url":> someString )
-        | ~( <"subject_link_position":> someString )
-        | ~( <"cause_position":> someNumber )
-        | ~( <"cause_adid":> <"> hash16 <">)
-        | ~( <"cause_embedid":> someNumber ) /* undocumented */
-        | ~( <"cause_token":> someString ) /* undocumented */
-        | ~( <"env_build":> someString )
-        | ~( <"env_name":> someString )
-        | ~( <"env_component":> someString )
-        | "Unknown key/Val: " someString ~<:> "/" (someString | someNumber) sep
+keyVal := ~/"ts":/ "Timestamp=" someNumber sep
+        | ~/"visitor_uuid":/ "vistor-id: " ~/"/ hash16 ~/"/ sep
+        | ~( /"visitor_source":/ /"/ visitorSource /"/ )
+        | ~/"visitor_device":/ ( ~("From a browser" ~/"browser"/)
+                               | "From a mobile phone" ~/"android"/ sep)
+        | ~( /"visitor_useragent":/ someString )
+        | ~( /"visitor_ip":/ /"/ hash16 /"/ )
+        | ~/"visitor_country":/ "Country:" ~/"/ /[A-Z]{2}/ ~/"/ sep
+        | ~( /"visitor_referrer":/ /"/ hash16 /"/ )
+        | ~( /"env_type":/ /"/ envType /"/ )
+        | ~/"env_doc_id":/ "Document ID: " someString sep
+        | ~( /"event_type":/ /"/ eventType /"/ )
+        | ~( /"subject_type":/ /"/ subjectType /"/ )
+        | ~/"subject_doc_id":/ "Subject doc. ID" someString sep
+        | ~( /"subject_page":/ someNumber)
+        | ~/"cause_type":/ "Cause type: " ~/"/ causeType ~/"/ sep
+        | ~( /"env_ranking":/ someNumber )
+        | ~( /"event_readtime":/ someNumber )
+        | ~( /"visitor_username":/ (/"/ hash16 /"/ | /null/) )
+        | ~( /"env_adid":/ /"/ hash16 /"/ )
+        | ~( /"env_ranking":/ someNumber )
+        | ~/"event_service":/ "Name of service: " ~/"/ serviceName ~/"/
+        | ~( /"event_readtime":/ someNumber )
+        | ~( /"event_index":/ someNumber )
+        | ~( /"subject_infoboxid":/ someString )
+        | ~( /"subject_url":/ someString )
+        | ~( /"subject_link_position":/ someString )
+        | ~( /"cause_position":/ someNumber )
+        | ~( /"cause_adid":/ /"/ hash16 /"/)
+        | ~( /"cause_embedid":/ someNumber ) /* undocumented */
+        | ~( /"cause_token":/ someString ) /* undocumented */
+        | ~( /"env_build":/ someString )
+        | ~( /"env_name":/ someString )
+        | ~( /"env_component":/ someString )
+        | "Unknown key/Val: " someString ~/:\/ "/" (someString | someNumber) sep
 
-hash16 := <[a-f0-9]{16}>
-someString := ~<"> <([^"])*> ~<">
-//someString := ~<"> <(\\"|[^"])*> ~<">
-someNumber := <-?[0-9]+>
+hash16 := /[a-f0-9]{16}/
+someString := ~/"\/ \/([^"])*\/ ~\/"/
+//someString := ~/"\/ /(\\"|[^"])*\/ ~\/"/
+someNumber := /-?[0-9]+/
 
-eventType  := <impression|click|read|download|share|pageread|pagereadtime|continuation_load>
-causeType  := <impression|page|ad|related|archive>
-envType    := <reader|stream|website>
-visitorSource := <external|internal>
-visitorDevice := <browser|android>
-subjectType := <doc|infobox|link>
-serviceName := <email|facebook|twitter|google|tumblr|linkedin>
+eventType  := /impression|click|read|download|share|pageread|pagereadtime|continuation_load/
+causeType  := /impression|page|ad|related|archive/
+envType    := /reader|stream|website/
+visitorSource := /external|internal/
+visitorDevice := /browser|android/
+subjectType := /doc|infobox|link/
+serviceName := /email|facebook|twitter|google|tumblr|linkedin/

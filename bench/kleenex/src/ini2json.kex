@@ -5,45 +5,45 @@ stripini >> ini2json
 /* Strips the comments */
 stripini := comment stripini
           | blank   stripini
-          | <[^\n]*\n> stripini
+          | /[^\n]*\n/ stripini
           | comment
           | blank
-          | <[^\n]*\n>
+          | /[^\n]*\n/
 
-comment := skipWs ~<;[^\n]*>
+comment := skipWs ~/;[^\n]*/
 
-blank := skipWs ~<\n>
+blank := skipWs ~/\n/
 
-skipWs := ~<[ \t]*>
+skipWs := ~/[ \t]*/
 
 /* Convert the stripped file */
 ini2json := "{\n" sections "}\n"
 
-sections := section "," <\n> sections
-          | section "\n" ~<\n?>
+sections := section "," /\n/ sections
+          | section "\n" ~/\n?/
 
-section := ind "\"" header ~<\n> "\": {\n" keyvalues ind "}"
+section := ind "\"" header ~/\n/ "\": {\n" keyvalues ind "}"
          | ind "\"" header "\": {\n" ind "}"
 
-header := skipWs ~<\[> <[^\n\]]*> ~<]> skipWs
+header := skipWs ~/\[/ /[^\n\]]*/ ~/]/ skipWs
 
-keyvalue := ind ind key ": " ~<=> value
+keyvalue := ind ind key ": " ~/=/ value
 
-keyvalues := keyvalue "," <\n> keyvalues
+keyvalues := keyvalue "," /\n/ keyvalues
            | keyvalue "\n"
 
-key := skipWs "\"" <[^; \t=\[\n]*> "\"" skipWs
+key := skipWs "\"" /[^; \t=\[\n]*/ "\"" skipWs
 
-value := skipWs <"[^\n]*"> skipWs
+value := skipWs /"[^\n]*"/ skipWs
        | skipWs "\"" escapedValue "\"" skipWs
 
 escapedValue := ""
               | escapedChar escapedValue
 
-escapedChar := ~<\\> "\\\\"
-             | ~<"> "\\\""
-             | <[^\n]>
+escapedChar := ~/\\/ "\\\\"
+             | ~/"/ "\\\""
+             | /[^\n]/
 
-skipWs := ~<[ \t]*>
+skipWs := ~/[ \t]*/
 
 ind := "    "

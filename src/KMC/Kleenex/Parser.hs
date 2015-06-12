@@ -172,7 +172,7 @@ kleenexPrimTerm = skipAround elms
       elms = choice [re, identifier, constant]
       constant   = Constant . encodeString <$> kleenexConstant
                    <?> "Constant"
-      re         = RE  <$> between (char '<') (char '>') regexP
+      re         = RE  <$> between (char '/') (char '/') regexP
                    <?> "RE"
       identifier = Var <$> try (kleenexIdentifier <* notFollowedBy kleenexBecomesToken)
                    <?> "Var"
@@ -182,7 +182,7 @@ encodeString = encodeUtf8 . T.pack
 
 regexP :: KleenexParser Regex
 regexP = snd <$> (withHPState $
-                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!<>" })
+                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!/" })
 
 parseKleenex :: String -- ^ Input string
              -> Either String ([Identifier], Kleenex) 

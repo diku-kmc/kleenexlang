@@ -2,7 +2,7 @@
 // Leaves all newlines in place.
 x
 
-x := "b" ~<a> x
-   | "a" ~<b> x
-   | <\n> x
+x := "b" ~/a/ x
+   | "a" ~/b/ x
+   | /\n/ x
    | ""

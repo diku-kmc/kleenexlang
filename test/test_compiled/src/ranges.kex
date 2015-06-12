@@ -17,11 +17,11 @@
 
 go
 
-go := test <\n> go
-    | test <\n>
+go := test /\n/ go
+    | test /\n/
 
 test := (as1 | as2 | as3)
 
-as1 := ~<a{5}>
-as2 := ~<a{6,}>
-as3 := <a{0,4}>
+as1 := ~/a{5}/
+as2 := ~/a{6,}/
+as3 := /a{0,4}/

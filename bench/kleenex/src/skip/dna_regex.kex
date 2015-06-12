@@ -28,16 +28,16 @@
       Y ::= (c|t)
 */
 
-fasta := sequenceIdent ~<\n> sequence ~<\n> fasta
-       | sequenceIdent ~<\n> sequence ~<\n?>
+fasta := sequenceIdent ~/\n/ sequence ~/\n/ fasta
+       | sequenceIdent ~/\n/ sequence ~/\n?/
 
 /* for now we ignore the sequence separation */
-sequenceIdent := ~<\>[^\n]*>
+sequenceIdent := ~/\>[^\n]*/
 
-a := ~<\n?[aAdDhHmMnNrRvVwW]>
-c := ~<\n?[cCbBhHmMnNsSvVyY]>
-g := ~<\n?[gGbBdDkKnNrRsSvV]>
-t := ~<\n?[tTbBdDhHkKnNwWyY]>
+a := ~/\n?[aAdDhHmMnNrRvVwW]/
+c := ~/\n?[cCbBhHmMnNsSvVyY]/
+g := ~/\n?[gGbBdDkKnNrRsSvV]/
+t := ~/\n?[tTbBdDhHkKnNwWyY]/
 
 singleSeq :=
     (

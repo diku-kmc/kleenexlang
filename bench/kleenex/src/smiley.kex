@@ -5,12 +5,12 @@ program := "Vær så god: " smileyMessage
          | ~message
 
 smileyMessage := smiley message
-               | <.> smileyMessage
+               | /./ smileyMessage
 
 message := smiley message
-         | <.> message
+         | /./ message
          | ""
 
-smiley := ~<:-?\)> "☺"
-        | ~<:-?\(> "☹"
-        | ~<:-?O>  "😲"
+smiley := ~/:-?\)/ "☺"
+        | ~/:-?\(/ "☹"
+        | ~/:-?O/  "😲"

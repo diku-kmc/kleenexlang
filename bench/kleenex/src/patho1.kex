@@ -1,8 +1,8 @@
 // Pathological case for SST
 evil
 
-evil := x flip_a <\n?>
-      | y flipUp_b <\n?>
+evil := x flip_a /\n?/
+      | y flipUp_b /\n?/
 
 x := flip x
    | ""
@@ -11,9 +11,9 @@ y := flipUp y
    | ""
 
 flip := flip_a | flip_b
-flip_a := ~<a> "b"
-flip_b := ~<b> "a"
+flip_a := ~/a/ "b"
+flip_b := ~/b/ "a"
 
 flipUp := flipUp_a | flipUp_b
-flipUp_a := ~<a> "B"
-flipUp_b := ~<b> "A"
+flipUp_a := ~/a/ "B"
+flipUp_b := ~/b/ "A"

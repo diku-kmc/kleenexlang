@@ -5,13 +5,13 @@
 */
 csvProj2
 
-csvProj2 := rowOdd <\n> csvProj2
-          | rowOdd <\n?>
+csvProj2 := rowOdd /\n/ csvProj2
+          | rowOdd /\n?/
 
-rowOdd := ~col ~<,> rowEven
+rowOdd := ~col ~/,/ rowEven
         | ~col
 
-rowEven := col <,> rowOdd
+rowEven := col /,/ rowOdd
          | col
 
-col := <[^,\n]*>
+col := /[^,\n]*/

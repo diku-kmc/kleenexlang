@@ -1,4 +1,4 @@
-/* Acts as a simple webserver! 
+/* Acts as a simple webserver!
    Try catting a GET request into it.
 
    Doesn't work directly with netcat, due to netcat keeping stdin open,
@@ -6,21 +6,21 @@
 webserver
 
 webserver :=
-      get ws domain ~</> ws httpver nl headers nl frontpage
+      get ws domain ~/\// ws httpver nl headers nl frontpage
     | notfound
 
-get := ~<GET>
+get := ~/GET/
 
-domain := ~<(http://[^/]*)?>
+domain := ~/(http:\/\/[^\/]*)?/
 
-ws := ~<[ ]+>
+ws := ~/[ ]+/
 
-nl := ~<.?\n>
+nl := ~/.?\n/
 onl := "\n"
 
-httpver := ~<HTTP/1.[01]>
+httpver := ~/HTTP\/1.[01]/
 
-header := ~<[^:\n]+:[ ]*[^\n]+> nl
+header := ~/[^:\n]+:[ ]*[^\n]+/ nl
 
 headers := header headers
          | header
@@ -33,4 +33,4 @@ frontpage := "200 OK" onl
 
 notfound := "404 Not Found" onl
             "Content-Length: 0" onl
-            onl ~<.*>
+            onl ~/.*/

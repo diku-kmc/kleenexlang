@@ -7,19 +7,19 @@ jsonProj1
 jsonProj1 := block ws jsonProj1
            | block ws
 
-block := <\{> ws keyVals ws <}>
+block := /\{/ ws keyVals ws /}/
 
-keyVals := anonymized <,> ws keyVals
-         | ws generalKey ws <:> ws generalVal <,> ws keyVals
+keyVals := anonymized /,/ ws keyVals
+         | ws generalKey ws /:/ ws generalVal /,/ ws keyVals
          | anonymized
-         | ws generalKey ws <:> ws generalVal
+         | ws generalKey ws /:/ ws generalVal
 
-anonymized := <"last_name"> ws <:> ws "\"ANONYMIZED\"" ~stringVal
+anonymized := /"last_name"/ ws /:/ ws "\"ANONYMIZED\"" ~stringVal
 
-generalKey := <"> <[^ \n"]*> <">
+generalKey := /"/ /[^ \n"]*/ /"/
 generalVal := stringVal | numVal
 
-stringVal  := <"[^"]*">
-numVal := <[0-9]+>
+stringVal  := /"[^"]*"/
+numVal := /[0-9]+/
 
-ws := <[ \n]*>
+ws := /[ \n]*/
