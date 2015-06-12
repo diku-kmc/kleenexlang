@@ -121,10 +121,7 @@ bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
 void buf_resize(buffer_t *buf, size_t shift)
 {
   size_t new_size = buf->size << shift;
-  buffer_unit_t *data2 = calloc(new_size, 1);
-  memcpy(data2, buf->data, buf->size);
-  free(buf->data);
-  buf->data = data2;
+  buf->data = realloc(buf->data, new_size);
   buf->size = new_size;
 }
 

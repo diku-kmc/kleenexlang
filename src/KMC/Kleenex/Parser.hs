@@ -68,7 +68,7 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
                  | Plus KleenexTerm
                  | Question KleenexTerm
                  | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
-                 | Action KleenexAction
+                 | Action KleenexAction KleenexTerm
                  | One
   deriving (Eq, Ord, Show)
 
@@ -101,7 +101,7 @@ parens = between (char '(') (char ')')
 
 -- | Identifiers are only allowed to start with lower-case characters.
 kleenexIdentifier :: KleenexParser Identifier
-kleenexIdentifier = Identifier <$> 
+kleenexIdentifier = Identifier <$>
                   ((:) <$> legalStartChar <*> many legalChar)
                   <?> "identifier"
     where
@@ -162,7 +162,10 @@ kleenexTerm = skipAround kleenexExpr
       kleenexExpr = buildExpressionParser table $ skipAround (kleenexPrimTerm <|> parens kleenexTerm)
       schar = skipAround . char
       table = [
-          [ Prefix (schar '~' >> return Ignore <?> "Ignored") ],
+          [ Prefix (schar '~' >> return Ignore <?> "Ignored"),
+            Prefix (do ident <- try $ many lower
+                       schar '@'
+                       return $ (\term -> Action (Inl $ PushOut ident) term `Seq` Action (Inl PopOut) One)) ],
           [ Postfix (schar '*' >> return Star <?> "Star"),
             Postfix (schar '?' >> return Question <?> "Question"),
             Postfix (schar '+' >> return Plus <?> "Plus") ],
@@ -180,11 +183,11 @@ kleenexPrimTerm = skipAround elms
                    <?> "RE"
       identifier = Var <$> try (kleenexIdentifier <* notFollowedBy kleenexBecomesToken)
                    <?> "Var"
-      action     = Action <$> between (char '[') (char ']') actionP <*> One
+      action     = Action <$> between (char '[') (char ']') actionP <*> (return One)
                    <?> "Action"
       output     = do ident <- skipAround (char '!' *> kleenexIdentifier)
                       let buf = fromIdent ident
-                      return $ Action $ Inl $ RegUpdate $ M.singleton "outbuf" [VarA "outbuf", VarA buf]
+                      return $ Action (Inl $ RegUpdate $ M.singleton "outbuf" [VarA "outbuf", VarA buf]) One
                    <?> "OutputTerm"
 
 encodeString :: String -> ByteString

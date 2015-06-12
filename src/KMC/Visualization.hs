@@ -73,8 +73,10 @@ instance Pretty KleenexOutTerm where
     pretty (Inr (Const [])) = "SKIP"
     pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
 
-instance Pretty ActionFunc where
+instance (Show var) => Pretty (ActionFunc var) where
     pretty (ParseBitsFunc _) = "BITS!"
+    pretty (PushOutFunc v)   = "outbuf=" ++ show v
+    pretty (PopOutFunc)    = "output=default"
 
 fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]

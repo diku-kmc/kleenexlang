@@ -35,7 +35,7 @@ data SimpleMu = SMVar Nat
               | SMWrite ByteString
               | SMRegex Regex
               | SMIgnore SimpleMu
-              | SMAction KleenexAction
+              | SMAction KleenexAction SimpleMu
               | SMAccept
   deriving (Eq, Ord)
 
@@ -84,7 +84,7 @@ getStack _ _            = Nothing
 -- The given identifier is treated as the top-level bound variable,
 -- i.e., it becomes the first mu.
 kleenexToSimpleMu :: H.Identifier -> H.Kleenex -> SimpleMu
-kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ go [initVar] (fromJust $ M.lookup initVar mp)
+kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ evalState (go [initVar] (fromJust $ M.lookup initVar mp)) 0
     where
       mp :: M.Map H.Identifier H.KleenexTerm
       mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
@@ -103,21 +103,21 @@ kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ go [initVar] (fromJust $ 
                   Nothing -> error $ "Name not found: " ++ show name
                   Just t  -> fmap SMLoop $ go (name : vars) t
             Just p  -> return $ SMVar p
-      go vars (H.Sum l r)    = do gol <- go vars l
-                                  gor <- go vars r
-                                  return $ SMAlt gol gor
-      go vars (H.Seq l r)    = do gol <- go vars l
-                                  gor <- go vars r
-                                  return $ SMSeq gol gor
-      go vars (H.Star e)     = do i <- nextIdent
-                                  fmap SMLoop $ go (i : vars) $ H.Sum (H.Seq e $ H.Var i) H.One
-      go vars (H.Plus e)     = go vars $ H.Seq e $ H.Star e
-      go vars (H.Question e) = do goe <- go vars e
-                                  return $ SMAlt goe SMAccept
-      go _    H.One          = return $ SMAccept
-      go vars (H.Ignore e)   = fmap SMIgnore $ go vars e
-      go _    (H.RE re)      = return $ SMRegex re
-      go _ (H.Action a)      = return $ SMAction a
+      go vars (H.Sum l r)     = do gol <- go vars l
+                                   gor <- go vars r
+                                   return $ SMAlt gol gor
+      go vars (H.Seq l r)     = do gol <- go vars l
+                                   gor <- go vars r
+                                   return $ SMSeq gol gor
+      go vars (H.Star e)      = do i <- nextIdent
+                                   fmap SMLoop $ go (i : vars) $ H.Sum (H.Seq e $ H.Var i) H.One
+      go vars (H.Plus e)      = go vars $ H.Seq e $ H.Star e
+      go vars (H.Question e)  = do goe <- go vars e
+                                   return $ SMAlt goe SMAccept
+      go _    H.One           = return $ SMAccept
+      go vars (H.Ignore e)    = fmap SMIgnore $ go vars e
+      go _    (H.RE re)       = return $ SMRegex re
+      go vars (H.Action a e)   = fmap (SMAction a) $ go vars e
 
 -- | A simple mu term is converted to a "real" mu term by converting the
 -- de Bruijn-indexed variables to Haskell variables, and encoding the mu
@@ -138,8 +138,8 @@ simpleMuToMuTerm st ign sm =
                       then regexToMuTerm (out []) re
                       else regexToMuTerm copyInput re
       SMIgnore sm' -> simpleMuToMuTerm st True sm'
-      SMAction a   -> Accept
-      SMAccept     -> Accept
+      SMAction a e -> Accept
+      SMAccept -> Accept
 
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
 -- expressed in Kleenex.
@@ -214,7 +214,7 @@ simpleMuToActionMuTerm st ign sm =
                       then regexToActionMuTerm nop re
                       else regexToActionMuTerm parseBitsAction re
       SMIgnore sm' -> simpleMuToActionMuTerm st True sm'
-      SMAction a   -> Action a Accept
+      SMAction a e -> Action a $ simpleMuToActionMuTerm st ign e
       SMAccept     -> Accept
 
 regexToActionMuTerm  :: (RangeSet Word8 -> KleenexAction) -> Regex -> KleenexActionMu a

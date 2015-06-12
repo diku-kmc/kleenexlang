@@ -236,8 +236,8 @@ transducerToProgram :: MainOptions
 transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
                     (DetTransducers ssts) = do
   timeCompile <- getCurrentTime
-  let progs  = map compileAutomaton ssts
-  let aprogs = map compileAutomaton assts
+  let optimizeTables = if optElimIdTables compileOpts then elimIdTables else id
+  let progs  = map (optimizeTables . compileAutomaton) ssts
   let envInfo = intercalate "\\n" [ "Options:"
                                   , prettyOptions mainOpts compileOpts
                                   , ""
