@@ -164,7 +164,7 @@ compileRegisterUpdate rup =
 compileTransitions :: (Ord st, Ord var, Ord pred, Ord func, Ord delta
                       ,Rng func ~ [delta], PredicateListToExpr pred) =>
                       Int
-                   -> KVTree pred (RegisterUpdate var func, st) -- ^ Transitions
+                   -> KVTree pred (EdgeAction var func, st) -- ^ Transitions
                    -> EnvReader st var func delta (Block delta)
 compileTransitions i (BranchT action tests) = do
   testBlock <- forM tests $ \(ps, ts') ->
@@ -174,15 +174,22 @@ compileTransitions i (BranchT action tests) = do
                    block]
   actionBlock <- case action of
                    Nothing -> return []
-                   Just (upd, st') -> do
+                   Just (Inl upd, st') -> do
                                bid <- (M.! st') <$> asks smap
                                block <- compileRegisterUpdate upd
                                return $ block ++ [ConsumeI i, GotoI bid]
+                   Just (Inr (PushOut var), st') -> do
+                               bid <- (M.! st') <$> asks smap
+                               bufid <- (M.! var) <$> asks bmap
+                               return [ChangeOut bufid, ConsumeI 1, GotoI bid]
+                   Just (Inr PopOut, st') -> do
+                               bid <- (M.! st') <$> asks smap
+                               return [RestoreOut, ConsumeI 1, GotoI bid]
   return $ concat testBlock ++ actionBlock
 
 compileState :: (Ord st, Ord var, Ord pred, Ord func, Ord delta
                 ,Rng func ~ [delta], PredicateListToExpr pred) =>
-                [([pred], RegisterUpdate var func, st)] -- ^ Transitions
+                [([pred], EdgeAction var func, st)] -- ^ Transitions
              -> Maybe (UpdateString var [delta])        -- ^ Final action
              -> EnvReader st var func delta (Block delta)
 compileState trans fin = do
@@ -204,12 +211,12 @@ compileState trans fin = do
   return $ assignments ++ transitions ++ [FailI]
 
 constants :: (Ord delta, Rng func ~ [delta]) =>
-             [(st, pred, RegisterUpdate var func, st)]
+             [(st, pred, EdgeAction var func, st)]
           -> [UpdateString var [delta]]
           -> S.Set [delta]
 constants trans fins = S.union tconsts fconsts
     where tconsts = S.fromList $ do
-                      (_, _, ru, _) <- trans
+                      (_, _, Inl ru, _) <- trans
                       usf <- M.elems ru
                       ConstA c <- usf
                       return c
@@ -281,7 +288,7 @@ compileAutomaton sst =
     -- update string function in every transition.
     allFunctions =
       S.toList $ S.unions
-        [ S.fromList (usFunctions us) | (_, upd, _) <- concat $ M.elems $ sstE sst
+        [ S.fromList (usFunctions us) | (_, Inl upd, _) <- concat $ M.elems $ sstE sst
                                       , us <- M.elems upd ]
 
     funcRel :: [(func, TableId, Table delta)]

@@ -373,7 +373,7 @@ kp_test15 = "Sanity check #3" <@>
     let p = [strQ|p
 p := (/a/* | /b/? | ~/c/+)*+?
 |]
-        e = HP.Kleenex [
+        e = HP.Kleenex [HP.mkIdent "p" ] [
             HP.HA (HP.mkIdent "p",
                 HP.Question $ HP.Plus $ HP.Star $
                     HP.Sum (HP.Star $ HP.RE (R.Chr 'a')) $

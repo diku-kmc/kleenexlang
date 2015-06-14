@@ -8,6 +8,7 @@ import           Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import           Control.Monad.Identity (Identity)
 import           Data.Word
 import           Data.ByteString (ByteString, unpack)
+import           Data.Hashable
 import qualified Data.Text as T
 import qualified Data.Map as M
 import           Data.Text.Encoding (encodeUtf8)
@@ -16,7 +17,7 @@ import           Text.Parsec.Prim (runParser)
 import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
 import           KMC.Kleenex.Action
-import           KMC.SymbolicSST (Atom(..))
+import           KMC.SymbolicSST (Atom(..), ActionExpr(..))
 import           KMC.OutputTerm ((:+:)(..))
 import           KMC.Syntax.Config
 import           KMC.Syntax.External (Regex, unparse)
@@ -144,7 +145,7 @@ skipped1 = ignore $ many1 (choice [ws, comment])
 
 comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
     where
-      singleLine = char '/' >> manyTill anyChar (ignore newline <|> eof)
+      singleLine = (try $ char '/') >> manyTill anyChar (ignore newline <|> eof)
       multiLine  = char '*' >> manyTill anyChar (try $ string "*/")
 
 parsePipeline :: KleenexParser [Identifier]
@@ -163,9 +164,9 @@ kleenexTerm = skipAround kleenexExpr
       schar = skipAround . char
       table = [
           [ Prefix (schar '~' >> return Ignore <?> "Ignored"),
-            Prefix (do ident <- try $ many lower
-                       schar '@'
-                       return $ (\term -> Action (Inl $ PushOut ident) term `Seq` Action (Inl PopOut) One)) ],
+            Prefix (try $ do ident <- many lower
+                             char '@'
+                             return $ (\term -> Action (Inl $ PushOut (hash ident)) term `Seq` Action (Inl PopOut) One)) ],
           [ Postfix (schar '*' >> return Star <?> "Star"),
             Postfix (schar '?' >> return Question <?> "Question"),
             Postfix (schar '+' >> return Plus <?> "Plus") ],
@@ -187,7 +188,7 @@ kleenexPrimTerm = skipAround elms
                    <?> "Action"
       output     = do ident <- skipAround (char '!' *> kleenexIdentifier)
                       let buf = fromIdent ident
-                      return $ Action (Inl $ RegUpdate $ M.singleton "outbuf" [VarA "outbuf", VarA buf]) One
+                      return $ Action (Inl $ RegUpdate 0 [VarA 0, VarA (hash buf)]) One
                    <?> "OutputTerm"
 
 encodeString :: String -> ByteString
@@ -202,9 +203,9 @@ actionP = do
     ident <- kleenexIdentifier
     skipAround $ string "<-"
     actions <- choice [reg, const] `sepEndBy1` skipped
-    return $ Inl . RegUpdate $ M.insert (fromIdent ident) actions M.empty
+    return $ Inl $ RegUpdate (hash $ fromIdent ident) actions
         where
-            reg = VarA . fromIdent <$> kleenexIdentifier
+            reg = VarA . hash . fromIdent <$> kleenexIdentifier
             const = ConstA . unpack . encodeString <$> kleenexConstant
 
 parseKleenex :: String -- ^ Input string

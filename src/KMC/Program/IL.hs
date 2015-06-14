@@ -54,6 +54,8 @@ data Instr delta =
   | GotoI      BlockId                  -- ^ goto b
   | NextI      Int Int (Block delta)    -- ^ if (!getChars(min,max)) { ... }
   | ConsumeI   Int                      -- ^ next += i
+  | ChangeOut  BufferId                 -- ^ change the output buffer to buf
+  | RestoreOut                          -- ^ pop to the previous output buffer
   deriving (Eq, Ord, Show)
 
 type Block delta = [Instr delta]

@@ -20,7 +20,6 @@ import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size)
 import           KMC.Syntax.External (Regex (..), unparse)
-import           KMC.SymbolicSST (RegisterUpdate(..))
 import           KMC.Theories (top, indexOf)
 
 toChar :: (Enum a, Bounded a) => [a] -> Char

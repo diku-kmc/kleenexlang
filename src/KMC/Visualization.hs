@@ -68,15 +68,30 @@ instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate var func) where
   pretty m = "[" ++ intercalate "\\l," [ pretty v ++ ":=" ++ pretty f | (v,f) <- M.toList m ] ++ "]"
 
+instance (Bounded a, Enum a) => Pretty (Const x [a]) where
+    pretty (Const []) = "SKIP"
+    pretty (Const ws) = "\"" ++ map toChar [ws] ++ "\""
+    
+
 instance Pretty KleenexOutTerm where
     pretty (Inl (InList _)) = "COPY"
-    pretty (Inr (Const [])) = "SKIP"
-    pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
+    pretty (Inr x)          = pretty x
 
-instance (Show var) => Pretty (ActionFunc var) where
-    pretty (ParseBitsFunc _) = "BITS!"
-    pretty (PushOutFunc v)   = "outbuf=" ++ show v
-    pretty (PopOutFunc)    = "output=default"
+instance (Pretty var) => Pretty (ActionExpr var) where
+    pretty (ParseBits _)   = "BITS!"
+    pretty (RegUpdate var atoms) = pretty var ++ ":=" ++ pretty atoms
+    pretty (PushOut v)     = "push outbuf " ++ pretty v
+    pretty (PopOut)        = "pop outbuf"
+    pretty (OutputConst c) = pretty $ Const c
+
+instance (Pretty a, Pretty var) => Pretty (a :+: ActionExpr var) where
+  pretty (Inl x) = "(" ++ pretty x ++ ")"
+  pretty (Inr y) = pretty y
+
+instance (Pretty var, Pretty b) => Pretty (ActionExpr var :+: b) where
+  pretty (Inl x) = "(" ++ pretty x ++ ")"
+  pretty (Inr y) = pretty y
+
 
 fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]

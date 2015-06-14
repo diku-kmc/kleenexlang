@@ -315,6 +315,8 @@ prettyInstr buftype tbltype prog instr phase =
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
                           rbrace
     ConsumeI i         -> text "consume" <> parens (int i) <> semi
+    ChangeOut bid      -> text "pushoutbuf" <> parens (buf bid) <> semi
+    RestoreOut         -> text "popoutbuf()" <> semi
 
 appendSpan :: BufferId -> TableId -> Int -> Block delta -> Maybe (Int, Block delta)
 appendSpan bid tid i is =

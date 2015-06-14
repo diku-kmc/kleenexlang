@@ -16,8 +16,8 @@ cabal-version:       >=1.10
 executable repg
   default-extensions: TemplateHaskell
   main-is:             Main.hs
-  -- other-modules:       
-  -- other-extensions:    
+  -- other-modules:
+  -- other-extensions:
   build-depends:       MissingH >= 1.3
                      , base >=4.6
                      , bytestring >= 0.10.0.2
@@ -26,6 +26,7 @@ executable repg
                      -- Broken with free-4.12 and free-4.12.1
                      , free >= 4.9 && < 4.12
                      , graphviz >= 2999.17.0.2
+                     , hashable >= 1.2.3.1
                      , kmc-regexps-syntax
                      , mtl >= 2.2.1
                      , options >= 1.2.1.1

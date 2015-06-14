@@ -14,6 +14,7 @@
 #define OUTBUFFER_SIZE       (16*1024)
 #define INBUFFER_SIZE        (16*1024)
 #define INITIAL_BUFFER_SIZE  (4096*8)
+#define OUTBUFFER_STACK_SIZE (1024)
 
 #ifdef FLAG_NOINLINE
 #define INLINE static
@@ -51,12 +52,48 @@ typedef struct {
 
 unsigned char *next;
 buffer_t outbuf;
+buffer_t *outbuf_ptr;
 size_t count = 0;
 
 unsigned char inbuf[INBUFFER_SIZE*2];
 size_t in_size = 0;
 int in_cursor = 0;
 #define avail (in_size - in_cursor)
+
+// Output buffer stack
+
+typedef struct {
+  buffer_t **data;
+  size_t capacity;
+  size_t size;
+} buf_stack;
+
+buf_stack outbuf_stack;
+
+void pushoutbuf(buffer_t *buf) {
+  if (outbuf_stack.size == outbuf_stack.capacity) {
+    outbuf_stack.capacity *= 2;
+    outbuf_stack.data = realloc(outbuf_stack.data, outbuf_stack.capacity*sizeof(buffer_t *));
+  }
+  outbuf_stack.data[outbuf_stack.size++] = outbuf_ptr;
+  outbuf_ptr = buf;
+}
+
+void popoutbuf() {
+  if (outbuf_stack.size <= 0) {
+    fprintf(stderr, "Error: Tried popping an empty buffer stack");
+    exit(1);
+  }
+  outbuf_ptr = outbuf_stack.data[--outbuf_stack.size];
+}
+
+void init_outbuf_stack()
+{
+  outbuf_ptr = &outbuf;
+  outbuf_stack.size = 0;
+  outbuf_stack.capacity = OUTBUFFER_STACK_SIZE;
+  outbuf_stack.data = malloc(OUTBUFFER_STACK_SIZE*sizeof(buffer_t *));
+}
 
 // Program interface
 
@@ -121,7 +158,10 @@ bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
 void buf_resize(buffer_t *buf, size_t shift)
 {
   size_t new_size = buf->size << shift;
-  buf->data = realloc(buf->data, new_size);
+  buffer_unit_t *data2 = calloc(new_size, 1);
+  memcpy(data2, buf->data, buf->size);
+  free(buf->data);
+  buf->data = data2;
   buf->size = new_size;
 }
 
@@ -174,9 +214,12 @@ void destroy_buffer(buffer_t *buf)
 INLINE
 void outputconst(buffer_unit_t w, int bits)
 {
-  if (buf_writeconst(&outbuf, w, bits))
+  if (buf_writeconst(outbuf_ptr, w, bits))
   {
-    buf_flush(&outbuf);
+    if (outbuf_stack.size == 0)
+    {
+      buf_flush(outbuf_ptr);
+    }
   }
 }
 
@@ -189,7 +232,7 @@ void appendarray(buffer_t *dst, const buffer_unit_t *arr, int bits)
     size_t shift = 1;
     while (total_bits >= ((dst->size << shift) - 1) * BUFFER_UNIT_BITS * BUFFER_UNIT_SIZE)
     {
-      shift++;  
+      shift++;
     }
     buf_resize(dst, shift);
   }
@@ -203,7 +246,7 @@ void append(buffer_t *buf, buffer_unit_t w, int bits)
   if (buf_writeconst(buf, w, bits))
   {
     buf_resize(buf, 1);
-  }  
+  }
 }
 
 INLINE
@@ -288,6 +331,11 @@ void flush_outbuf()
   {
     outputconst(0, BUFFER_UNIT_BITS);
   }
+  if (outbuf_stack.size > 0)
+  {
+    fprintf(stderr, "Error: buffer stack ended non-empty\n");
+    exit(1);
+  }
   buf_flush(&outbuf);
 }
 
@@ -296,6 +344,7 @@ void init_outbuf()
   outbuf.size = OUTBUFFER_SIZE + BUFFER_UNIT_SIZE;
   outbuf.data = malloc(outbuf.size);
   reset(&outbuf);
+  init_outbuf_stack();
 }
 
 void run(int phase)
