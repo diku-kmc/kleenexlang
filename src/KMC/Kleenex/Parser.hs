@@ -188,7 +188,7 @@ kleenexPrimTerm = skipAround elms
                    <?> "Action"
       output     = do ident <- skipAround (char '!' *> kleenexIdentifier)
                       let buf = fromIdent ident
-                      return $ Action (Inl $ RegUpdate 0 [VarA 0, VarA (hash buf)]) One
+                      return $ Action (Inl $ RegUpdate 0 [VarA 0, VarA (hash buf)]) (Action (Inl $ RegUpdate (hash buf) []) One)
                    <?> "OutputTerm"
 
 encodeString :: String -> ByteString

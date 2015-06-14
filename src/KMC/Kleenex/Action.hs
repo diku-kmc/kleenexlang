@@ -56,7 +56,7 @@ actionConstruct qf (RW p f e) = do
 actionConstruct qf (W d e) = do
   q' <- actionConstruct qf e
   q <- fresh
-  addEdge q (Right d) q'
+  addEdge q (Left (bFalse, Inr $ Const d)) q'
   return q
 actionConstruct qf (Action a e) = do
   q' <- actionConstruct qf e

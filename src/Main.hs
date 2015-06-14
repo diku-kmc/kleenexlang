@@ -363,4 +363,4 @@ buildActionSSTs mainOpts args = do
   kleenexSrc <- readFile arg
   return $ case parseKleenex kleenexSrc of
     Left e   -> error e
-    Right ih -> DetTransducers $ map (fst . optimize 3 . genActionSST) (kleenexToActionMuTerm ih)
+    Right ih -> DetTransducers $ map (genActionSST) (kleenexToActionMuTerm ih)

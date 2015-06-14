@@ -82,7 +82,7 @@ simpleMuToBitcodeMuTerm st sm =
       SMAlt l r    -> (W [bFalse] $ simpleMuToBitcodeMuTerm st l) `Alt`
                         (W [bTrue] $ simpleMuToBitcodeMuTerm st r)
       SMSeq l r    -> (simpleMuToBitcodeMuTerm st l) `Seq` (simpleMuToBitcodeMuTerm st r)
-      SMWrite _    -> Accept
+      SMWrite _    -> W [bFalse] Accept
       SMRegex re   -> fromRegex re
       SMIgnore sm' -> simpleMuToBitcodeMuTerm st sm'
       SMAction a e -> W [bFalse] $ simpleMuToBitcodeMuTerm st e
