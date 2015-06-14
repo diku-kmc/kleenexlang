@@ -98,7 +98,7 @@ void buf_flush(buffer_t *buf)
 // Write first 'bits' of 'w' to 'buf', starting from the MOST significant bit.
 // Precondition: Remaining bits of 'w' must be zero.
 INLINE
-bool buf_writeconst(buffer_t *buf, buffer_unit_t w, int bits)
+bool buf_writeconst(buffer_t *buf, buffer_unit_t w, size_t bits)
 {
   size_t word_index = buf->bitpos / BUFFER_UNIT_BITS;
   size_t offset = buf->bitpos % BUFFER_UNIT_BITS;
@@ -129,7 +129,7 @@ void buf_resize(buffer_t *buf, size_t shift)
 }
 
 INLINE
-void buf_writearray(buffer_t *dst, const buffer_unit_t *arr, int bits)
+void buf_writearray(buffer_t *dst, const buffer_unit_t *arr, size_t bits)
 {
   if (dst->bitpos % BUFFER_UNIT_BITS == 0)
   {
@@ -175,7 +175,7 @@ void destroy_buffer(buffer_t *buf)
 }
 
 INLINE
-void outputconst(buffer_unit_t w, int bits)
+void outputconst(buffer_unit_t w, size_t bits)
 {
   if (buf_writeconst(&outbuf, w, bits))
   {
@@ -184,7 +184,7 @@ void outputconst(buffer_unit_t w, int bits)
 }
 
 INLINE
-void appendarray(buffer_t *dst, const buffer_unit_t *arr, int bits)
+void appendarray(buffer_t *dst, const buffer_unit_t *arr, size_t bits)
 {
   size_t total_bits = dst->bitpos + bits;
   if (total_bits >= (dst->size - 1) * BUFFER_UNIT_BITS * BUFFER_UNIT_SIZE)
@@ -192,7 +192,7 @@ void appendarray(buffer_t *dst, const buffer_unit_t *arr, int bits)
     size_t shift = 1;
     while (total_bits >= ((dst->size << shift) - 1) * BUFFER_UNIT_BITS * BUFFER_UNIT_SIZE)
     {
-      shift++;  
+      shift++;
     }
     buf_resize(dst, shift);
   }
@@ -201,12 +201,12 @@ void appendarray(buffer_t *dst, const buffer_unit_t *arr, int bits)
 }
 
 INLINE
-void append(buffer_t *buf, buffer_unit_t w, int bits)
+void append(buffer_t *buf, buffer_unit_t w, size_t bits)
 {
   if (buf_writeconst(buf, w, bits))
   {
     buf_resize(buf, 1);
-  }  
+  }
 }
 
 INLINE
@@ -216,7 +216,7 @@ void concat(buffer_t *dst, buffer_t *src)
 }
 
 INLINE
-void outputarray(const buffer_unit_t *arr, int bits)
+void outputarray(const buffer_unit_t *arr, size_t bits)
 {
   int word_count = bits / BUFFER_UNIT_BITS;
   // Write completed words
