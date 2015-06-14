@@ -166,7 +166,7 @@ kleenexTerm = skipAround kleenexExpr
           [ Prefix (schar '~' >> return Ignore <?> "Ignored"),
             Prefix (try $ do ident <- many lower
                              char '@'
-                             return $ (\term -> Action (Inl $ PushOut (hash ident)) term `Seq` Action (Inl PopOut) One)) ],
+                             return $ (\term -> Action (PushOut (hash ident)) term `Seq` Action PopOut One)) ],
           [ Postfix (schar '*' >> return Star <?> "Star"),
             Postfix (schar '?' >> return Question <?> "Question"),
             Postfix (schar '+' >> return Plus <?> "Plus") ],
@@ -188,7 +188,7 @@ kleenexPrimTerm = skipAround elms
                    <?> "Action"
       output     = do ident <- skipAround (char '!' *> kleenexIdentifier)
                       let buf = fromIdent ident
-                      return $ Action (Inl $ RegUpdate 0 [VarA 0, VarA (hash buf)]) (Action (Inl $ RegUpdate (hash buf) []) One)
+                      return $ Action (RegUpdate 0 [VarA 0, VarA (hash buf)]) (Action (RegUpdate (hash buf) []) One)
                    <?> "OutputTerm"
 
 encodeString :: String -> ByteString
@@ -203,7 +203,7 @@ actionP = do
     ident <- kleenexIdentifier
     skipAround $ string "<-"
     actions <- choice [reg, const] `sepEndBy1` skipped
-    return $ Inl $ RegUpdate (hash $ fromIdent ident) actions
+    return $ RegUpdate (hash $ fromIdent ident) actions
         where
             reg = VarA . hash . fromIdent <$> kleenexIdentifier
             const = ConstA . unpack . encodeString <$> kleenexConstant

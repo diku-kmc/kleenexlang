@@ -28,7 +28,7 @@ import KMC.Theories
 import KMC.OutputTerm
 import Debug.Trace
 
-type KleenexAction = (S.ActionExpr Int) :+: (Const Word8 [Word8])
+type KleenexAction = S.ActionExpr Int
 type KleenexActionMu a = Mu BitInputTerm KleenexAction a
 
 type BitInputTerm = RS.RangeSet Word8
@@ -38,11 +38,11 @@ matchVal = RS.singleton minBound
 
 -- | The term that copies the input char to output.
 parseBitsAction :: RS.RangeSet Word8 -> KleenexAction
-parseBitsAction rs = Inl $ S.ParseBits $ rs
+parseBitsAction rs = S.ParseBits $ rs
 
 -- | The term that outputs nothing.
 nop :: a -> KleenexAction
-nop = const (Inr $ Const [])
+nop = const (S.OutputConst [])
 
 actionConstruct :: (Enum st, Ord st, Monoid (Rng KleenexAction))
              => st -> Mu BitInputTerm KleenexAction st -> Construct st BitInputTerm KleenexAction st
@@ -56,7 +56,7 @@ actionConstruct qf (RW p f e) = do
 actionConstruct qf (W d e) = do
   q' <- actionConstruct qf e
   q <- fresh
-  addEdge q (Left (bFalse, Inr $ Const d)) q'
+  addEdge q (Left (bFalse, S.OutputConst d)) q'
   return q
 actionConstruct qf (Action a e) = do
   q' <- actionConstruct qf e
@@ -67,8 +67,8 @@ actionConstruct qf (Alt e1 e2) = do
   q1 <- actionConstruct qf e1
   q2 <- actionConstruct qf e2
   q <- fresh
-  addEdge q (Left (bFalse, Inr $ Const [])) q1
-  addEdge q (Left (bTrue, Inr $ Const [])) q2
+  addEdge q (Left (bFalse, S.OutputConst [])) q1
+  addEdge q (Left (bTrue, S.OutputConst [])) q2
   return q
 actionConstruct qf Accept = return qf
 actionConstruct qf (Seq e1 e2) = do
@@ -104,16 +104,8 @@ genActionSST mu = sst
                                         let e' = [ ([p], convert a, st') | (p, a, st') <- e]
                                         return (st, e') 
                 final = M.fromList $ map (\s -> (s, [Left 0])) $  S.toList $ fstF fst
-                convert (Inl (S.RegUpdate var atoms)) = Inl $ M.singleton var (map fixup atoms)
-                convert (Inl (S.ParseBits rs)) = Inl $ M.singleton 0 [S.VarA 0, S.FuncA (Inl $ S.ParseBits rs) 0]
-                convert (Inl (S.PushOut var)) = Inr $ S.PushOut var
-                convert (Inl S.PopOut)        = Inr S.PopOut
-                convert (Inr (Const c)) = Inl $ M.singleton 0 [S.VarA 0, S.FuncA (Inl $ S.OutputConst c) 0]
-
-                -- This construction is kinda dumb, but the inherent constraints
-                -- in the SST makes this a necessity.
-                fixup :: S.Atom var (S.ActionExpr var) 
-                      -> S.Atom var (S.ActionExpr var :+: Const Word8 [Word8])
-                fixup (S.FuncA f i) = S.FuncA (Inl f) i
-                fixup (S.ConstA c) = (S.ConstA c)
-                fixup (S.VarA var) = (S.VarA var)
+                convert (S.RegUpdate var atoms) = Inl $ M.singleton var atoms
+                convert (S.ParseBits rs)        = Inl $ M.singleton 0 [S.VarA 0, S.FuncA (S.ParseBits rs) 0]
+                convert (S.PushOut var)         = Inr $ S.PushOut var
+                convert (S.PopOut)              = Inr S.PopOut
+                convert (S.OutputConst c)       = Inl $ M.singleton 0 [S.VarA 0, S.FuncA (S.OutputConst c) 0]
