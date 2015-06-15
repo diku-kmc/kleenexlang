@@ -152,6 +152,20 @@ data DetTransducers where
                       ,Dom f ~ Word8, Rng f ~ [delta]) =>
                       [SST Int (RangeSet Word8) f Int] -> DetTransducers
 
+
+data Transducer sigma delta where
+  Transducer :: (Function f, Ord f, Pretty f, Ord delta
+                ,Enum sigma, Bounded sigma, Dom f ~ sigma, Rng f ~ [delta])
+                => SST Int (RangeSet sigma) f Int -> Transducer sigma delta
+
+data DetTransducers' sigma delta where
+  One :: Transducer sigma delta -> DetTransducers' sigma delta
+  More :: Transducer sigma gamma -> DetTransducers' gamma delta -> DetTransducers' sigma delta
+
+dtconcat :: DetTransducers' sigma delta -> DetTransducers' delta gamma -> DetTransducers' sigma gamma
+dtconcat (One t1) ys = More t1 ys
+dtconcat (More t1 xs) ys = More t1 (dtconcat xs ys)
+
 transducerSize :: Transducers -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
 
