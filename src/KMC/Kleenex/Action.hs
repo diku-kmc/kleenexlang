@@ -108,4 +108,4 @@ genActionSST mu = sst
                 convert (S.ParseBits rs)        = Inl $ M.singleton 0 [S.VarA 0, S.FuncA (S.ParseBits rs) 0]
                 convert (S.PushOut var)         = Inr $ S.PushOut var
                 convert (S.PopOut)              = Inr S.PopOut
-                convert (S.OutputConst c)       = Inl $ M.singleton 0 [S.VarA 0, S.FuncA (S.OutputConst c) 0]
+                convert (S.OutputConst c)       = Inl $ M.singleton 0 [S.VarA 0, S.ConstA c]
