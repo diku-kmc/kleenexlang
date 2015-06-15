@@ -46,7 +46,6 @@ data MainOptions =
     , optLookahead        :: Bool
     , optExpressionArg    :: Bool
     , optActionEnabled    :: Bool
-    , optActionOnly       :: Bool
     }
 
 data CompileOptions =
@@ -65,19 +64,21 @@ data VisualizeOptions =
    , optVisOut   :: Maybe FilePath
    }
 
-data VisStage = VisFST | VisSST
+data VisStage = VisFST | VisSST | VisASST
 
 visStageOptionType :: OptionType VisStage
 visStageOptionType =
-  optionType "fst|sst"
+  optionType "fst|sst|asst"
              VisFST
              (\s -> case s of
-                      "fst" -> Right VisFST
-                      "sst" -> Right VisSST
+                      "fst"  -> Right VisFST
+                      "sst"  -> Right VisSST
+                      "asst" -> Right VisASST
                       _ -> Left $ "\"" ++ s ++ "\" is not a valid automaton type")
              (\t -> case t of
-                      VisFST -> "fst"
-                      VisSST -> "sst")
+                      VisFST  -> "fst"
+                      VisSST  -> "sst"
+                      VisASST -> "asst")
 
 ctypeOptionType :: OptionType CType
 ctypeOptionType =
@@ -103,8 +104,7 @@ instance Options MainOptions where
       <*> simpleOption "func" False "Functionalize FST before SST construction"
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
-      <*> simpleOption "act" False "Enable actions in the language"
-      <*> simpleOption "ao" False "Only create action SST"
+      <*> simpleOption "act" True "Enable actions in the language"
 
 instance Options CompileOptions where
     defineOptions =
@@ -140,39 +140,25 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
 
 -- | Existential type representing transducers that can be determinized,
 -- compiled and pretty-printed.
-data Transducers where
+data Transducers delta where
     Transducers :: (Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta], Pretty f, Pretty delta
                    ,Ord delta, Enum delta, Bounded delta)
-                   => [FST Int (RangeSet Word8) f] -> Transducers
+                   => [FST Int (RangeSet Word8) f] -> Transducers delta
 
 -- | Existential type representing determinized transducers that can be compiled.
-data DetTransducers where
+data DetTransducers delta where
     DetTransducers :: (Function f, Ord f, Pretty f
                       ,Ord delta, Enum delta, Bounded delta, Pretty delta
                       ,Dom f ~ Word8, Rng f ~ [delta]) =>
-                      [SST Int (RangeSet Word8) f Int] -> DetTransducers
+                      [SST Int (RangeSet Word8) f Int] -> DetTransducers delta
 
-
-data Transducer sigma delta where
-  Transducer :: (Function f, Ord f, Pretty f, Ord delta
-                ,Enum sigma, Bounded sigma, Dom f ~ sigma, Rng f ~ [delta])
-                => SST Int (RangeSet sigma) f Int -> Transducer sigma delta
-
-data DetTransducers' sigma delta where
-  One :: Transducer sigma delta -> DetTransducers' sigma delta
-  More :: Transducer sigma gamma -> DetTransducers' gamma delta -> DetTransducers' sigma delta
-
-dtconcat :: DetTransducers' sigma delta -> DetTransducers' delta gamma -> DetTransducers' sigma gamma
-dtconcat (One t1) ys = More t1 ys
-dtconcat (More t1 xs) ys = More t1 (dtconcat xs ys)
-
-transducerSize :: Transducers -> Int
+transducerSize :: Transducers delta -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
 
-transducerSizeTrans :: Transducers -> Int
+transducerSizeTrans :: Transducers delta -> Int
 transducerSizeTrans (Transducers fsts) = sum $ map(length . FST.edgesToList . FST.fstE) fsts
 
-functionalizeTransducers :: Transducers -> Transducers
+functionalizeTransducers :: Transducers delta -> Transducers delta
 functionalizeTransducers (Transducers fsts) =
   Transducers $ map (FST.trim . FST.enumerateStates . functionalize) fsts
 
@@ -188,14 +174,14 @@ getCompileFlavor args =
                                                     , "Expects one of '.kex', '.re', or '.rx'."
                                                     ]
 
-buildTransducers :: MainOptions -> [String] -> IO (Transducers, String, String, NominalDiffTime)
+buildTransducers :: MainOptions -> [String] -> IO (Transducers Word8, String, String, NominalDiffTime)
 buildTransducers mainOpts args = do
   let [arg] = args
   let flav = getCompileFlavor args
   timeFSTgen <- getCurrentTime
   (fsts', srcName, src) <-
     if optExpressionArg mainOpts || flav == CompilingRegex then do
-      (reSrcName, reSrc) <-
+      {- (reSrcName, reSrc) <-
         if optExpressionArg mainOpts then
             return ("<CLI>", arg)
         else do
@@ -208,7 +194,9 @@ buildTransducers mainOpts args = do
         Right (_, re) -> do
           let reMu = fromRegex re :: BitcodeMu Word8 Bool a
           let fst = fromMu reMu
-          return (Transducers [fst], reSrcName, reSrc)
+          return (Transducers [fst], reSrcName, reSrc) -}
+        hPutStrLn stderr $ "Support for bitcode generation temporarily disabled. Sorry."
+        exitWith $ ExitFailure 2
     else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
            let fsts = if optActionEnabled mainOpts
@@ -224,7 +212,7 @@ buildTransducers mainOpts args = do
   timeFSTgen' <- getCurrentTime
   return (fsts'', srcName, md5s (Str src), diffUTCTime timeFSTgen' timeFSTgen)
 
-compileTransducers :: MainOptions -> Transducers -> IO (DetTransducers, NominalDiffTime, NominalDiffTime)
+compileTransducers :: MainOptions -> Transducers delta -> IO (DetTransducers delta, NominalDiffTime, NominalDiffTime)
 compileTransducers mainOpts (Transducers fsts') = do
   timeSSTgen <- getCurrentTime
   let ssts = map (\fst' -> enumerateVariables $ enumerateStates $
@@ -245,13 +233,18 @@ transducerToProgram :: MainOptions
                     -> Bool
                     -> String
                     -> String
-                    -> DetTransducers
+                    -> DetTransducers delta
+                    -> DetTransducers delta
                     -> IO (ExitCode, NominalDiffTime)
 transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
-                    (DetTransducers ssts) = do
+                    (DetTransducers ssts) (DetTransducers assts) = do
   timeCompile <- getCurrentTime
   let optimizeTables = if optElimIdTables compileOpts then elimIdTables else id
   let progs  = map (optimizeTables . compileAutomaton) ssts
+  let aprogs = map (optimizeTables . compileAutomaton) assts
+  let progs' = if optActionEnabled mainOpts
+               then concat $ zipWith (\p a -> [p,a]) progs aprogs
+               else progs
   let envInfo = intercalate "\\n" [ "Options:"
                                   , prettyOptions mainOpts compileOpts
                                   , ""
@@ -263,7 +256,7 @@ transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
   ret <- compileProgram (optWordSize compileOpts)
                         (optOptimizeLevelCC compileOpts)
                         (optQuiet mainOpts)
-                        progs
+                        progs'
                         (Just envInfo)
                         (optAltCompiler compileOpts)
                         (optOutFile compileOpts)
@@ -271,10 +264,6 @@ transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
                         useWordAlignment
   timeCompile' <- getCurrentTime
   return (ret, diffUTCTime timeCompile' timeCompile)
-    where
-      zipLists (a:as) (b:bs) = a : b : zipLists as bs
-      zipLists _      _      = []
-
 
 checkArgs :: [String] -> IO ()
 checkArgs args = do
@@ -295,14 +284,11 @@ compile mainOpts compileOpts args = do
   (ssts, sstGenDuration, sstOptDuration) <- compileTransducers mainOpts transducers
 
   assts <- buildActionSSTs mainOpts args
-  let ssts' = if optActionOnly mainOpts
-              then assts
-              else ssts
 
   let useWordAlignment = getCompileFlavor args == CompilingKleenex
   (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
                                                 useWordAlignment srcName
-                                                srcMd5 ssts'
+                                                srcMd5 ssts assts
   when (not $ optQuiet mainOpts) $ do
     let fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
                 in replicate (8 - length s) ' ' ++ s
@@ -322,13 +308,13 @@ visualize mainOpts visOpts args = do
   checkArgs args
   (Transducers (fst':rest), _, _, _) <- buildTransducers mainOpts args
   when (not $ null rest) $ hPutStrLn stderr "WARNING: Multiple stages, only the first is visualized"
-  dg <- if optActionOnly mainOpts
-        then do (DetTransducers (sst:_))  <- buildActionSSTs mainOpts args
-                return $ sstToDot sst
-        else case optVisStage visOpts of
+  dg <- case optVisStage visOpts of
           VisFST -> return $ fstToDot fst'
           VisSST -> do
             (DetTransducers (sst:_),_,_) <- compileTransducers mainOpts (Transducers [fst'])
+            return $ sstToDot sst
+          VisASST -> do
+            (DetTransducers (sst:_))  <- buildActionSSTs mainOpts args
             return $ sstToDot sst
   case optVisOut visOpts of
     Nothing -> do
@@ -371,7 +357,7 @@ bytecodeFstFromKleenex str =
     Left e -> error e
     Right ih -> map fromMu (kleenexToBytecodeMuTerm ih)
 
-buildActionSSTs :: MainOptions -> [String] -> IO DetTransducers
+buildActionSSTs :: MainOptions -> [String] -> IO (DetTransducers Word8)
 buildActionSSTs mainOpts args = do
   let [arg] = args
   kleenexSrc <- readFile arg
