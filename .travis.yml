@@ -29,6 +29,7 @@ before_install:
   - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
   - cabal sandbox init
   - cabal sandbox add-source regexps-syntax
+  - cabal update
   - cabal get graphviz-2999.17.0.2
   - patch -p0 < graphviz-compat.patch
   - cabal sandbox add-source graphviz-2999.17.0.2
