@@ -27,11 +27,11 @@ import           KMC.Theories
 class Pretty a where
   pretty :: a -> String
 
-instance Pretty (NullFun a) where
+instance Pretty (NullFun a b) where
   pretty NullFun = [chr 949]
   -- Unicode point 949 is 'GREEK SMALL LETTER EPSILON'
 
-instance (Pretty f) => Pretty (f :+: (NullFun a)) where
+instance (Pretty f) => Pretty (f :+: (NullFun a b)) where
     pretty (Inl x)       = pretty x
     pretty (Inr NullFun) = pretty NullFun
 

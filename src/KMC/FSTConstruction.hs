@@ -2,11 +2,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE QuasiQuotes #-}
-module KMC.FSTConstruction
-(Mu(..)
-,fromMu
-)
-where
+module KMC.FSTConstruction ( Mu(..)
+                           , fromMu
+                           , fromMuWithAcceptor
+                           ) where
 
 import           Control.Monad.State
 import           Data.Monoid (Monoid, mempty)
@@ -56,7 +55,7 @@ addStates fst = do
       where
         skipN x = foldr (const succ) x [1 .. S.size (fstS fst) - 1]
 
-addNullEdges :: FST st pred (NullFun a) -> Construct st pred (func :+: (NullFun a)) ()
+addNullEdges :: FST st pred (NullFun a b) -> Construct st pred (func :+: (NullFun a b)) ()
 addNullEdges fst = modify $ \s -> s {
                      edges = edges s ++ map chg (edgesToList (fstE fst))
                    }
@@ -69,7 +68,7 @@ addEdge q lbl q' = modify $ \s -> s { edges = (q, lbl, q'):edges s }
 
 
 construct' :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-           => Pos -> st -> Mu pred func st -> Construct st pred (func :+: (NullFun a)) st
+           => Pos -> st -> Mu pred func st -> Construct st pred (func :+: (NullFun a b)) st
 construct' _ _ (Var q) = return q
 construct' curPos qf (Loop e) = mfix (construct (L:curPos) qf . e)
 construct' curPos qf (RW p f e) = do
@@ -97,7 +96,7 @@ construct' curPos qf (Seq e1 e2) = do
 
 
 construct :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-          => Pos -> st -> Mu pred func st -> Construct st pred (func :+: (NullFun a)) st
+          => Pos -> st -> Mu pred func st -> Construct st pred (func :+: (NullFun a b)) st
 construct curPos qf e = do
   ms <- gets marks
   if curPos `S.member` ms then
@@ -116,7 +115,7 @@ construct curPos qf e = do
 
 fromMuWithAcceptor :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
                    => Marked
-                   -> Mu pred func st -> FST st pred (func :+: (NullFun a))
+                   -> Mu pred func st -> FST st pred (func :+: (NullFun a b))
 fromMuWithAcceptor ms e =
   let (qin, cs) = runState (construct [] (toEnum 0) e)
                            (ConstructState { edges     = []
@@ -132,7 +131,7 @@ fromMuWithAcceptor ms e =
 
             
 fromMu :: (Predicate pred, Enum st, Ord st, Monoid (Rng func)) =>
-          Mu pred func st -> FST st pred (func :+: (NullFun a))
+          Mu pred func st -> FST st pred (func :+: (NullFun a b))
 fromMu = fromMuWithAcceptor S.empty
 
 ------------------------------------------------------------
@@ -162,18 +161,18 @@ sm1 = either (error "sm1") head $ testSimple s1
 mu2 = either (error "mu2") head $ testKleenex s2
 
       
-f1 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8))
+f1 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
 f1 = fromMu (fst mu1)
 
-g1 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8))
+g1 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
 g1 = fromMuWithAcceptor (snd mu1) (fst mu1)
 
-f2 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8))
+f2 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
 f2 = fromMu (fst mu2)
-g2 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8))
+g2 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
 g2 = fromMuWithAcceptor (snd mu2) (fst mu2)
 
 
-viz :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8))
+viz :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
     -> FilePath -> IO ()
 viz = mkVizToFile fstToDot

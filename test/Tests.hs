@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Tests(tests) where
@@ -76,7 +77,7 @@ regressionTests =
 
 unsound_lookahead :: IO TS.Result
 unsound_lookahead =
-  let fst' = fromMu la_mu :: FST Int (RangeSet Int) (Const Int [Int])
+  let fst' = fromMu la_mu :: FST Int (RangeSet Int) (Const Int [Int] :+: (NullFun Int [Int]))
       sst1 = sstFromFST fst' True
       sst2 = sstFromFST fst' False
   in if flattenStream (SST.run sst1 [0,1]) == flattenStream (SST.run sst2 [0,1]) then
@@ -131,7 +132,7 @@ kleenexIdTest prog str =
     case H.testKleenex prog of
       Left err -> return $ TS.Fail err
       Right m  ->
-          let ssts = map (flip sstFromFST True) ((map fromMu m) :: [FST Int (RangeSet Word8) H.KleenexOutTerm])
+          let ssts = map (flip sstFromFST True) ((map (fromMu . fst) m) :: [FST Int (RangeSet Word8) (H.KleenexOutTerm :+: (NullFun Word8 [Word8]))])
               out  = foldl (\acc sst -> SST.flattenStream $ SST.run sst acc) inp ssts
           in if inp == out
              then return TS.Pass

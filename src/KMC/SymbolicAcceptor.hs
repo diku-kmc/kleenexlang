@@ -149,7 +149,7 @@ enumerateDFAStates :: (Ord pred, Ord a, Enum a, Ord st)
                    => DFA st pred -> DFA a pred
 enumerateDFAStates = enumerateDFAStatesFrom (toEnum 0)
     
-dfaAsFST :: (Enum st, Ord st) => DFA st pred -> FST st pred (NullFun a)
+dfaAsFST :: (Enum st, Ord st) => DFA st pred -> FST st pred (NullFun a b)
 dfaAsFST (DFA dfa) = 
     FST { fstS = accS dfa
         , fstE = edgeSet 

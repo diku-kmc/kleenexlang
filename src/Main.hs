@@ -35,6 +35,7 @@ import           KMC.Syntax.Config
 import           KMC.Syntax.Parser
 import           KMC.Theories
 import           KMC.Visualization
+import           KMC.OutputTerm
 
 data MainOptions =
     MainOptions
@@ -136,15 +137,17 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
 -- compiled and pretty-printed.
 data Transducers where
     Transducers :: (Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta], Pretty f, Pretty delta
-                   ,Ord delta, Enum delta, Bounded delta)
-                   => [FST Int (RangeSet Word8) f] -> Transducers
+                   ,Ord delta, Enum delta, Bounded delta
+                   ,Dom f ~ a, Rng f ~ b)
+                   => [FST Int (RangeSet Word8) (f :+: (NullFun a b))] -> Transducers
 
 -- | Existential type representing determinized transducers that can be compiled.
 data DetTransducers where
     DetTransducers :: (Function f, Ord f, Pretty f
                       ,Ord delta, Enum delta, Bounded delta, Pretty delta
-                      ,Dom f ~ Word8, Rng f ~ [delta]) =>
-                      [SST Int (RangeSet Word8) f Int] -> DetTransducers
+                      ,Dom f ~ Word8, Rng f ~ [delta]
+                      ,Dom f ~ a, Rng f ~ b) =>
+                      [SST Int (RangeSet Word8) (f :+: (NullFun a b)) Int] -> DetTransducers
 
 transducerSize :: Transducers -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
@@ -323,9 +326,9 @@ main = runSubcommand
        , subcommand "visualize" visualize
        ]
 
-fstFromKleenex :: String -> [FST Int (RangeSet Word8) KleenexOutTerm]
+fstFromKleenex :: String -> [FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))]
 fstFromKleenex str =
   case parseKleenex str of
     Left e -> error e
-    Right ih -> map fromMu (kleenexToMuTerm ih)
+    Right ih -> map (\(t,m) -> fromMuWithAcceptor m t) $ kleenexToMuTerm ih
 

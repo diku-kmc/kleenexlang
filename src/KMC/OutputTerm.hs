@@ -17,13 +17,13 @@ data Enumerator e dom rng = Enumerator e deriving (Eq, Ord, Show)
 data Join f rng = Join [f] deriving (Eq, Ord, Show)
 data Const dom rng = Const rng deriving (Eq, Ord, Show)
 data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
-data NullFun a = NullFun deriving (Eq, Ord, Show)
+data NullFun a b = NullFun deriving (Eq, Ord, Show)
 
-instance Function (NullFun a) where
-    type Dom (NullFun a) = a
-    type Rng (NullFun a) = [a]
-    eval NullFun _ = []
-    isConst NullFun = Just []
+instance (Monoid b) => Function (NullFun a b) where
+    type Dom (NullFun a b) = a
+    type Rng (NullFun a b) = b
+    eval NullFun _ = mempty
+    isConst NullFun = Just mempty
     inDom _ _ = True
 
 instance Function (Ident a) where
