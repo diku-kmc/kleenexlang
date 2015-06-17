@@ -97,6 +97,13 @@ class PartialOrder a where
   eq :: a -> a -> Bool
   eq x y = lte x y && lte y x
 
+{----------------------------------------------------------------------}
+{- Predicate (convenience)                                            -}
+{----------------------------------------------------------------------}
+           
+-- | Convenience class: a predicate must always be an instance of `Ord`,
+-- `Boolean`, and `PartialOrder`.
+class (Ord pred, Boolean pred, PartialOrder pred) => Predicate pred where
 
 {----------------------------------------------------------------------}
 {- Instances                                                          -}
@@ -120,6 +127,8 @@ instance (Ord a, Enum a, Bounded a) => Enumerable (RangeSet a) a where
 instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
     lte = RS.isSubsetOf
     eq = (==)
+
+instance (Ord a, Enum a, Bounded a) => Predicate (RangeSet a) where 
 
 data Prefix a = Prefix [a] deriving (Eq, Ord, Show)
 
