@@ -28,7 +28,6 @@ module KMC.SymbolicSST
 ,flattenStream
 )
 where
-
 import           Control.Applicative
 
 import qualified Data.Map.Strict as M
@@ -93,12 +92,12 @@ data SST st pred func var =
   }
 
 -- | Output variables. The minimal variable is the designated output variable.
-sstV :: (Ord var) => SST st pred func var -> S.Set var
+sstV :: (Ord var, Show var) => SST st pred func var -> S.Set var
 sstV sst = S.unions $ [ M.keysSet upd | (_,_,Inl upd,_) <- edgesToList $ sstE sst ]
                    ++ [ S.singleton var | (_,_,Inr (PushOut var),_) <- edgesToList $ sstE sst ]
 
 -- | Get the designated output variable of an SST.
-sstOut :: (Ord var) => SST st pred func var -> var
+sstOut :: (Ord var, Show var) => SST st pred func var -> var
 sstOut = S.findMin . sstV
 
 deriving instance (Show var, Show func, Show (Rng func)) => Show (Atom var func)
@@ -264,7 +263,7 @@ applyAbstractValuationUS rho = normalizeUpdateString . map subst
                      | otherwise = Left v
       subst a = a
 
-updateAbstractEnvironment :: (Ord st, Ord var, Eq delta
+updateAbstractEnvironment :: (Ord st, Ord var, Eq delta, Show var
                              ,Function func, Rng func ~ [delta]) =>
                              Bool
                           -> SST st pred func var
@@ -285,13 +284,12 @@ updateAbstractEnvironment weak sst states gamma =
     updates = M.mapMaybeWithKey updateOldRho $ M.fromListWith lubAbstractValuation $ do
       r <- S.toList states
       let rho_r = maybe M.empty id (M.lookup r gamma)
-      -- This is safe, as these SST's dont have actions
-      (_, Inl kappa, s) <- eForwardLookup (sstE sst) r
+      (_, Inl kappa, s) <- eForwardLookup (sstE sst) r -- This is safe, as these SST's dont have actions
       return (s, rho_r `updateRho` kappa)
 
     updateRho = if weak then updateAbstractValuationWeak else updateAbstractValuation
 
-abstractInterpretation :: (Ord st, Ord var, Eq delta
+abstractInterpretation :: (Ord st, Ord var, Eq delta, Show var
                           ,Function func, Rng func ~ [delta]) =>
                           Bool
                        -> SST st pred func var
@@ -304,7 +302,8 @@ abstractInterpretation weak sst = go (sstS sst)
       go states gamma i = let (gamma', states') = updateAbstractEnvironment weak sst states gamma
                           in go states' gamma' (i+1)
 
-applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta]) =>
+applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta]
+                            ,Show var) =>
                             AbstractEnvironment st var delta
                          -> SST st pred func var
                          -> SST st pred func var
@@ -327,7 +326,7 @@ applyAbstractEnvironment gamma sst =
       let rho = maybe M.empty id (M.lookup q gamma)
       in normalizeUpdateString $ applyAbstractValuationUS rho us
 
-optimize :: (Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta]) =>
+optimize :: (Eq delta, Ord st, Ord var, Function func, Rng func ~ [delta], Show var) =>
             Int
          -> SST st pred func var
          -> (SST st pred func var, Int)
@@ -349,7 +348,7 @@ enumerateStates sst =
       states = M.fromList (zip (S.toList (sstS sst)) [(0::Int)..])
       aux q = states M.! q
 
-enumerateVariables :: forall var st pred func. (Ord var, Ord st) => SST st pred func var -> SST st pred func Int
+enumerateVariables :: forall var st pred func. (Ord var, Ord st, Show var) => SST st pred func var -> SST st pred func Int
 enumerateVariables sst =
   SST
   { sstS = sstS sst
@@ -391,7 +390,7 @@ valuate s (Left v:xs) = maybe (error "valuate: Variable not in valuation") id (M
 
 run :: forall var st pred func delta.
         (Ord var, Ord st, SetLike pred (Dom func),
-        Function func, Rng func ~ [delta])
+        Function func, Rng func ~ [delta], Show var)
     => SST st pred func var
     -> [Dom func]
     -> Stream [delta]

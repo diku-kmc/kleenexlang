@@ -253,13 +253,13 @@ elimIdTables prog = prog { progTables = rest
       instrElim tids ins@(AppendTblI bid tid i) =
           if tid `elem` tids
           then AppendSymI bid i
-          else ins 
+          else ins
       instrElim _ ins = ins
 
 compileAutomaton :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta
     , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
-    , PredicateListToExpr pred, Show (Dom func)) =>
+    , PredicateListToExpr pred, Show (Dom func), Show var) =>
     SST st pred func var
     -> Program delta
 compileAutomaton sst =
@@ -278,10 +278,10 @@ compileAutomaton sst =
                    | (st, blck) <- M.toList (smap env) ]
   }
   where
-    env = Env { bmap = M.fromList $ zip (S.toList $ sstV sst) (map BufferId [0..])
+    env = Env { bmap = M.fromList $ zip (S.elems $ sstV sst) (map BufferId [0..])
               , tmap = M.fromList [ (func, tid) | (func, tid, _) <- funcRel ]
-              , smap = M.fromList $ zip (S.toList $ sstS sst) (map BlockId [0..])
-              , cmap = M.fromList $ zip (S.toList consts) (map ConstId [0..])
+              , smap = M.fromList $ zip (S.elems $ sstS sst) (map BlockId [0..])
+              , cmap = M.fromList $ zip (S.elems consts) (map ConstId [0..])
               , outvar = sstOut sst
               }
     -- List of all functions occurring in the SST, obtained by visiting every
