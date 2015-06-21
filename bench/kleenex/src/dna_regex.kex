@@ -59,4 +59,4 @@ seq8b := (t (a|c|g) t a c c c t [a <- a "1"] | /type 8: / !a | /./)*
 seq9  := (a g g g t a a (c|g|t) [a <- a "1"] | /type 9: / !a | /./)*
 seq9b := ((a|c|g) t t a c c c t [a <- a "1"] | /type 9: / !a | /./)*
 
-cleanup := ~(a|g|c|t)* ~/\n/ /.*/
+cleanup := ~/[^[]*/ /.*/
