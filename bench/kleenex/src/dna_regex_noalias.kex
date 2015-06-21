@@ -13,20 +13,20 @@
 
    Output is given as an un-delimited sequence of these ID numbers.
 */
-fasta
+filter >> fasta
 
-fasta := sequenceIdent ~/\n/ sequence ~/\n/ fasta
-       | sequenceIdent ~/\n/ sequence ~/\n?/
+fasta := sequence*
+filter := (sequenceIdent | ~/\n/ | /./)*
 
 /* for now we ignore the sequence separation */
-sequenceIdent := ~/\/[^\n]*>
+sequenceIdent := ~/>[^\n]*/
 
-a := ~/\n?[aA]/
-c := ~/\n?[cC]/
-g := ~/\n?[gG]/
-t := ~/\n?[tT]/
+a := ~/[aA]/
+c := ~/[cC]/
+g := ~/[gG]/
+t := ~/[tT]/
 
-singleSeq :=
+sequence :=
     (
       "1" (a g g g t a a a | t t t a c c t) |
       "2" ((c|g|t) g g g t a a a | t t t a c c c (a|c|g)) |
@@ -39,7 +39,4 @@ singleSeq :=
       "9" (a g g g t a a (c|g|t) | (a|c|g) t t a c c c t) |
       (a|c|g|t)
     )
-
-sequence := singleSeq sequence
-          | singleSeq
 

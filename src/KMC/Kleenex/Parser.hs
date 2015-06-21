@@ -198,7 +198,7 @@ encodeString = encodeUtf8 . T.pack
 
 regexP :: KleenexParser Regex
 regexP = snd <$> (withHPState $
-                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!/" })
+                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!/", rep_freespacing = False })
 
 actionP :: KleenexParser (KleenexAction)
 actionP = do
