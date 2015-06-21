@@ -71,6 +71,7 @@ test-suite test-repg
                      , containers >= 0.5.0.0
                      , free >= 4.9
                      , graphviz >= 2999.17.0.2
+                     , hashable >= 1.2.3.1
                      , kmc-regexps-syntax
                      , mtl >= 2.2.1
                      , parsec >= 3.1.8
