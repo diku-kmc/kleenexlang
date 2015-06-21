@@ -41,7 +41,7 @@ g := ~/[gGbBdDkKnNrRsSvV]/
 t := ~/[tTbBdDhHkKnNwWyY]/
 
 seq1  := (a g g g t a a a [a <- a "1"] | /type 1: / !a | /./)*
-seq1b := (t t t a c c t   [a <- a "1"] | /type 1: / !a | /./)*
+seq1b := (t t t a c c c t [a <- a "1"] | /type 1: / !a | /./)*
 seq2  := ((c|g|t) g g g t a a a [a <- a "1"] | /type 2: / !a | /./)*
 seq2b := (t t t a c c c (a|c|g) [a <- a "1"] | /type 2: / !a | /./)*
 seq3  := (a (a|c|t) g g t a a a [a <- a "1"] | /type 3: / !a | /./)*

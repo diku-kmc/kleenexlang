@@ -40,7 +40,7 @@ c := ~/[cC]/
 g := ~/[gG]/
 t := ~/[tT]/
 
-seq1  := ((a g g g t a a a | t t t a c c t) [a <- a "1"] | /type 1: / !a | /./)*
+seq1  := ((a g g g t a a a | t t t a c c c t) [a <- a "1"] | /type 1: / !a | /./)*
 seq2  := (((c|g|t) g g g t a a a | t t t a c c c (a|c|g)) [a <- a "1"] | /type 2: / !a | /./)*
 seq3  := ((a (a|c|t) g g t a a a | t t t a c c (a|g|t) t) [a <- a "1"] | /type 3: / !a | /./)*
 seq4  := ((a g (a|c|t) g t a a a | t t t a c (a|g|t) c t) [a <- a "1"] | /type 4: / !a | /./)*
