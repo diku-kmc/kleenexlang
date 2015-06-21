@@ -4,12 +4,12 @@ module KMC.SSTConstruction where
 
 import           Control.Monad.State
 import           Data.Maybe (isJust)
-import           Data.Monoid
 import qualified Data.Set as S
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
 import           KMC.Theories
 import           KMC.TreeWriter
+import           KMC.Util.List (lcpMany1, linv')
 
 data Var = Var [Int]
   deriving (Eq, Ord, Show)
@@ -27,7 +27,7 @@ instance PartialOrder Var where
 -- | The closure monad models a computation consisting of concurrent threads
 -- with shared state executed in round-robin
 type Closure st w = TreeWriterT w (State (S.Set st))
-type PathTree w a = Maybe (Tree w a)
+type PathTree w a = [Tree w a]
 
 visit :: (Ord st) => st -> Closure st w st
 visit st = do { vis <- get;
@@ -39,16 +39,26 @@ visit st = do { vis <- get;
 -- | Resume a closure computation
 resume :: Tree w a -> Closure st w a
 resume (Tip w x) = tell w >> return x
-resume (Fork w t1 t2) = tell w >> plus (resume t1) (resume t2)
+resume (Fork w ts) = tell w >> branch (map resume ts)
 
 -- | Resume a possibly failing closure computation
 resume' :: PathTree w a -> Closure st w a
-resume' = maybe zero resume
+resume' [] = zero
+resume' [t] = resume t
+resume' _ = error "invalid path tree"
 
--- | Interpret a closure computation as a path tree.
-runClosure :: (Monoid w) => Closure st w a -> PathTree w a
-runClosure x = evalState (evalTreeWriterT x) S.empty
+-- | Reduce a tree by removing longest common prefixes
+reduce :: (Eq a) => Tree [a] b -> Tree [a] b
+reduce (Tip w b)   = Tip w b
+reduce (Fork w ts) =
+  Fork (w ++ p) $ [ t { tOutput = linv' p (tOutput t) } | t <- ts' ]
+  where
+    ts' = map reduce ts
+    p   = lcpMany1 (map tOutput ts')
 
+-- | Interpret a closure computation as a path tree and reduce the result.
+runClosure :: (Eq gamma) => Closure st [gamma] a -> PathTree [gamma] a
+runClosure x = reduce <$> evalState (evalTreeWriterT x) S.empty
 
 {------------------------------------------------------------------------------}
 {-- Computing path trees --}
@@ -61,12 +71,10 @@ genclosure :: (Ord st, Monoid w)
 genclosure fst' inj q =
   case fstEvalEpsilonEdges fst' q of
     [] -> return q
-    [(out, q')] ->
-        tell (inj out) >> visit q' >> genclosure fst' inj q'
-    [(out1, q1'), (out2, q2')] ->
-       plus (tell (inj out1) >> visit q1' >> genclosure fst' inj q1')
-            (tell (inj out2) >> visit q2' >> genclosure fst' inj q2')
-    _ -> error "Computing closures for FSTs with epsilon-fanout greater than two is not supported yet"
+    qs -> branch $
+            map (\(out, q') -> tell (inj out)
+                               >> visit q'
+                               >> genclosure fst' inj q') qs
 
 -- | Non-deterministically follow all non-input transitions.
 closure :: (Ord st)
@@ -97,7 +105,7 @@ kill :: (Ord st) => S.Set st -> st -> Closure st (UpdateStringFunc var func) st
 kill kills q | S.member q kills = zero
              | otherwise = return q
 
-closureAbstractTree :: (Ord a) =>
+closureAbstractTree :: (Eq var, Eq (Rng func), Ord a) =>
                        FST a pred func
                     -> PathTree var a
                     -> PathTree (UpdateString var (Rng func)) a
@@ -105,22 +113,22 @@ closureAbstractTree fst' tr =
   let tr' = fmap (mapOutput (return . Left)) tr
   in runClosure (resume' tr' >>= closure fst')
 
-closureTree :: (Ord st) =>
+closureTree :: (Eq var, Eq (Rng func), Ord st) =>
                FST st pred func
             -> PathTree (UpdateString var (Rng func)) st
             -> PathTree (UpdateString var (Rng func)) st
 closureTree fst' tr = runClosure (resume' tr >>= closure fst')
 
-closureTreeFunc :: (Ord st) =>
+closureTreeFunc :: (Eq var, Eq func, Eq (Rng func), Ord st) =>
                FST st pred func
             -> PathTree (UpdateStringFunc var func) st
             -> PathTree (UpdateStringFunc var func) st
 closureTreeFunc fst' tr = runClosure (resume' tr >>= closureFunc fst')
 
-eofTree :: (Ord a, Monoid w) => FST a pred func -> PathTree w a -> PathTree w a
+eofTree :: (Ord a, Eq gamma) => FST a pred func -> PathTree [gamma] a -> PathTree [gamma] a
 eofTree fst' tr = runClosure (resume' tr >>= eof fst')
 
-consumeTree :: (PartialOrder pred, Ord st)
+consumeTree :: (Eq func, Eq var, Eq (Rng func), PartialOrder pred, Ord st)
             => FST st pred func
             -> pred
             -> Int
@@ -128,7 +136,7 @@ consumeTree :: (PartialOrder pred, Ord st)
             -> PathTree (UpdateStringFunc var func) st
 consumeTree fst' p i tr = runClosure (resume' tr >>= consume fst' p i)
 
-killTree :: (Ord st) =>
+killTree :: (Ord st, Eq var, Eq func, Eq (Rng func)) =>
             S.Set st -> PathTree (UpdateStringFunc var func) st
                      -> PathTree (UpdateStringFunc var func) st
 killTree kills tr = runClosure (resume' tr >>= kill kills)
@@ -141,17 +149,18 @@ abstract :: Tree (UpdateStringFunc Var func) a
 abstract t = go [] t
   where
   go v (Tip w a) = ([(Var v, w)], Tip (Var v) a)
-  go v (Fork w t1 t2) =
-    let (m1', t1') = go (0:v) t1
-        (m2', t2') = go (1:v) t2
-    in ((Var v, w):(m1' ++ m2'), Fork (Var v) t1' t2')
+  go v (Fork w ts) =
+    let (ms, ts') = unzip [ go (m:v) t' | (m, t') <- zip [0..] ts ]
+    in ((Var v, w):concat ms, Fork (Var v) ts')
 
 abstract' :: PathTree (UpdateStringFunc Var func) a
             -> ([(Var, UpdateStringFunc Var func)], PathTree Var a)
-abstract' Nothing = ([], Nothing)
-abstract' (Just t) = let (m', t') = abstract t in (m', Just t')
+abstract' [] = ([], [])
+abstract' [t] = let (m', t') = abstract t in (m', [t'])
+abstract' _ = error "invalid path tree"
 
-unabstract :: PathTree (UpdateString var (Rng func)) a -> PathTree (UpdateStringFunc var func) a
+unabstract :: PathTree (UpdateString var (Rng func)) a
+           -> PathTree (UpdateStringFunc var func) a
 unabstract = fmap (mapOutput (constUpdateStringFunc))
 
 {------------------------------------------------------------------------------}
@@ -179,7 +188,7 @@ specialize ts =
 {------------------------------------------------------------------------------}
 {-- SST construction from FST --}
 
-consumeTreeMany :: (PartialOrder pred, Ord st) =>
+consumeTreeMany :: (PartialOrder pred, Ord st, Eq var, Eq func, Eq (Rng func)) =>
                    FST st pred func
                 -> [pred]
                 -> PathTree (UpdateStringFunc var func) st
@@ -189,13 +198,13 @@ consumeTreeMany fst' = go 0
       go _ [] tr = tr
       go i (p:ps) tr = go (i+1) ps (closureTreeFunc fst' (consumeTree fst' p i (closureTreeFunc fst' tr)))
 
-sstFromFST :: (Ord a, Ord pred, PartialOrder pred, Function func,
+sstFromFST :: (Ord a, Eq delta, Eq func, Ord pred, PartialOrder pred, Function func,
                Enumerable pred (Dom func), Rng func ~ [delta]) =>
-              FST a pred func -> Bool -> SST (Maybe (Tree Var a)) pred func Var
+              FST a pred func -> Bool -> SST (PathTree Var a) pred func Var
 sstFromFST fst' singletonMode =
   construct initialState (specialize transitions) outputs
   where
-    initialState           = Just (Tip (Var []) (fstI fst'))
+    initialState           = [Tip (Var []) (fstI fst')]
     (transitions, outputs) = saturate (S.singleton initialState) S.empty [] []
 
     saturate ws states trans outs
@@ -205,12 +214,12 @@ sstFromFST fst' singletonMode =
       | (t, ws') <- S.deleteFindMin ws =
         let tcl  = closureAbstractTree fst' t
             tcl' = unabstract tcl
-            os   = [ (t, w) | Just (Tip w _) <- [eofTree fst' tcl] ]
+            os   = [ (t, w) | Tip w _ <- eofTree fst' tcl ]
 
-            ts   = do (ps, kills) <- prefixTests fst' singletonMode (tflat' tcl')
+            ts   = do (ps, kills) <- prefixTests fst' singletonMode (concatMap tflat tcl')
                       guard $ not $ null ps
                       let (kappa, t'') = abstract' $ consumeTreeMany fst' ps $ killTree kills tcl'
-                      guard (isJust t'')
+                      guard (not $ null t'')
                       return (t, ps, kappa, t'')
             wl'  = S.fromList [ newt | (_,_,_,newt) <- ts ]
         in saturate (S.union ws' wl') (S.insert t states) (ts ++ trans) (os ++ outs)

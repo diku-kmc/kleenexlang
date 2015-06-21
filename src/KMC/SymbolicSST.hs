@@ -57,6 +57,7 @@ sstV sst = S.unions [ M.keysSet upd | (_,_,upd,_) <- edgesToList $ sstE sst ]
 sstOut :: (Ord var) => SST st pred func var -> var
 sstOut = S.findMin . sstV
 
+deriving instance (Eq var, Eq func, Eq (Rng func)) => Eq (Atom var func)
 deriving instance (Show var, Show func, Show (Rng func)) => Show (Atom var func)
 deriving instance (Show st, Show pred, Show func, Show var, Show (Rng func))
              => Show (SST st pred func var)
