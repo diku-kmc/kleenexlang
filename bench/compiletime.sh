@@ -4,7 +4,7 @@
 repgc=../dist/build/repg/repg # Location of our compiler
 
 # 'nola' is "no lookahead" and 'la' is "lookahead"
-opt_levels=(0-nola 3-nola 3-la)
+opt_levels=(3-nola) # (0-nola 3-nola 3-la)
 compiler_conf_file="${BASH_SOURCE%/*}/compilers.txt"
 reps=1
 src_dir="kleenex/src"
@@ -32,7 +32,12 @@ function set_compiler_names {
 
 # Args: file name, opt level, C compiler name
 function setname {
-    name="${1}__${2}__${3}"
+    if [ "${4}" = true ]; then
+        dfa="__wDFA"
+    else
+        dfa=""
+    fi
+    name="${1}__${2}__${3}${dfa}"
 }
 function usage {
     echo "usage: $0 [-fh] [-p P] [-t N]"
@@ -40,12 +45,14 @@ function usage {
     echo " -h: print this usage and exit."
     echo " -p P: only compile program P."
     echo " -t N: set timeout to N seconds.  If N==0 there is no timeout."
+    echo " -d: enable DFA optimization"
 }
 
 dryrun=true
+use_dfa=false
 only_do=""
 
-while getopts ":fhp:t:" opt; do
+while getopts ":fdhp:t:" opt; do
   case $opt in
   p)
       echo "# Only doing $OPTARG"
@@ -72,6 +79,10 @@ while getopts ":fhp:t:" opt; do
   h)
       usage
       exit 2
+      ;;
+  d)
+      use_dfa=true
+      echo "# Using DFA optimization"
       ;;
   \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -106,12 +117,17 @@ for opt_la_level in ${opt_levels[@]}; do # for each SST optimization level
             else
                 la_on_off="--la=false"
             fi
+            if [ "$use_dfa" = true ]; then
+                dfa_on_off="--dfa=true"
+            else
+                dfa_on_off="--dfa=false"
+            fi
 
-            setname $n $opt_la_level $cc_name
+            setname $n $opt_la_level $cc_name $use_dfa
             
             timingdata="${time_dir}/${name}${compiletime_postfix}"
             binary="${bin_dir}/${name}"
-            precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off --opt $opt_level --cc $cc >> $timingdata"
+            precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off $dfa_on_off --opt $opt_level --cc $cc >> $timingdata"
             if [ "$timeoutcmd" == "" ]; then
                 cmd=$precmd
             else

@@ -52,6 +52,7 @@ type KleenexOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
 instance Pretty KleenexOutTerm where
     pretty l = case l of
                  Inl (InList _) -> "COPY"
+                 Inr (Const []) -> "\"\""
                  Inr (Const ws) -> "\"" ++ map toChar [ws] ++ "\""
     
 

@@ -133,6 +133,7 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
                      [ "SST optimization level:  " ++ show (optOptimizeSST mainOpts)
                      , "Word size:               " ++ show (optWordSize compileOpts)
                      , "Identity tables removed: " ++ show (optElimIdTables compileOpts)
+                     , "DFA optimization:        " ++ show (optConstructDFA mainOpts)
                      ]
 
 -- | Existential type representing transducers that can be determinized,

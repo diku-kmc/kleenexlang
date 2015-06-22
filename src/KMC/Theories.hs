@@ -98,7 +98,7 @@ class PartialOrder a where
   eq x y = lte x y && lte y x
 
 {----------------------------------------------------------------------}
-{- Predicate (convenience)                                            -}
+{- Various nice shorthands.                                           -}
 {----------------------------------------------------------------------}
            
 -- | Convenience class: a predicate must always be an instance of `Ord`,
@@ -129,7 +129,7 @@ instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
     eq = (==)
 
 instance (Ord a, Enum a, Bounded a) => Predicate (RangeSet a) where 
-
+    
 data Prefix a = Prefix [a] deriving (Eq, Ord, Show)
 
 instance (Eq a) => PartialOrder (Prefix a) where

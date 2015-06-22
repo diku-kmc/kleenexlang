@@ -107,3 +107,4 @@ coarsestPredicateSet (NFA nfa) qs = coarsestPartition ps
     ps = S.toList $ S.fromList
          [ p | q <- qs
              , (p, _) <- maybe [] S.toList (M.lookup q (nfaForward $ accE nfa)) ]
+
