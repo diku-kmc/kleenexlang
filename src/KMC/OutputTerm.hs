@@ -19,12 +19,14 @@ data Const dom rng = Const rng deriving (Eq, Ord, Show)
 data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
 data NullFun a b = NullFun deriving (Eq, Ord, Show)
 
+type WithNull f = f :+: (NullFun (Dom f) (Rng f))
+
 instance (Monoid b) => Function (NullFun a b) where
     type Dom (NullFun a b) = a
     type Rng (NullFun a b) = b
-    eval NullFun _ = mempty
+    eval NullFun _  = mempty
     isConst NullFun = Just mempty
-    inDom _ _ = True
+    inDom _ NullFun = True
 
 instance Function (Ident a) where
   type Dom (Ident a) = a

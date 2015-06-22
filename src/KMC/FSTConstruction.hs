@@ -4,7 +4,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module KMC.FSTConstruction ( Mu(..)
                            , fromMu
-                           , fromMuWithAcceptor
+                           , fromMuWithDFA
                            ) where
 
 import           Control.Monad.State
@@ -55,20 +55,23 @@ addStates fst = do
       where
         skipN x = foldr (const succ) x [1 .. S.size (fstS fst) - 1]
 
-addNullEdges :: FST st pred (NullFun a b) -> Construct st pred (func :+: (NullFun a b)) ()
+addNullEdges :: FST st pred (NullFun a b)
+             -> Construct st pred (func :+: (NullFun a b)) ()
 addNullEdges fst = modify $ \s -> s {
                      edges = edges s ++ map chg (edgesToList (fstE fst))
                    }
     where
       chg (q, Left (p, f), q') = (q, Left (p, Inr f), q')
---      chg (q, r, q')     = (q, r, q')
+--      chg (q, r, q')     = (q, r, q') -- case never happens
 
-addEdge :: st -> Either (pred, func) (Rng func) -> st -> Construct st pred func ()
+addEdge :: st -> Either (pred, func) (Rng func) -> st
+        -> Construct st pred func ()
 addEdge q lbl q' = modify $ \s -> s { edges = (q, lbl, q'):edges s }
 
 
 construct' :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-           => Pos -> st -> Mu pred func st -> Construct st pred (func :+: (NullFun a b)) st
+           => Pos -> st -> Mu pred func st
+           -> Construct st pred (func :+: (NullFun a b)) st
 construct' _ _ (Var q) = return q
 construct' curPos qf (Loop e) = mfix (construct (L:curPos) qf . e)
 construct' curPos qf (RW p f e) = do
@@ -96,27 +99,48 @@ construct' curPos qf (Seq e1 e2) = do
 
 
 construct :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-          => Pos -> st -> Mu pred func st -> Construct st pred (func :+: (NullFun a b)) st
+          => Pos -> st -> Mu pred func st
+          -> Construct st pred (func :+: (NullFun a b)) st
 construct curPos qf e = do
   ms <- gets marks
   if curPos `S.member` ms then
       do
         q <- fresh
-        let dfaFST = dfaAsFST $ enumerateDFAStatesFrom q $ minimizeDFA $ dfaFromMu e
+        let dfaFST = dfaAsFST $ enumerateDFAStatesFrom q $
+                     minimizeDFA $ dfaFromMu e
+        -- Add all the "null edges" from the DFA
         addNullEdges dfaFST
-        mapM_ (\q' -> addEdge q' (Right mempty) qf) (S.toList $ fstF dfaFST)
-        -- Jump the state counter forward to avoid name clashes.
+        -- Connect the final states of the DFA to the current final state.
+        connectTo (S.toList (fstF dfaFST)) qf
+        -- Add the states and increment the state counter to avoid clashes.
         addStates dfaFST
-        q' <- fresh
-        addEdge q' (Right mempty) (fstI dfaFST)
-        return q'
+        -- The new final state is the initial state of the DFA.
+        return (fstI dfaFST)
   else
       construct' curPos qf e
 
-fromMuWithAcceptor :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-                   => Marked
-                   -> Mu pred func st -> FST st pred (func :+: (NullFun a b))
-fromMuWithAcceptor ms e =
+connectTo :: (Monoid (Rng func)) => [st] -> st -> Construct st pred func ()
+connectTo states to = mapM_ (\from -> addEdge from (Right mempty) to) states
+                 
+replaceFinalStatesWith :: (Ord st) => FST st pred func -> st -> FST st pred func
+replaceFinalStatesWith fst qNew =
+    FST { fstS = S.map replace $ fstS fst
+        , fstE = edgesFromList $ map replaceEdge $ edgesToList $ fstE fst
+        , fstI = fstI fst
+        , fstF = S.singleton qNew
+        }
+    where
+      replace q = if q `S.member` (fstF fst) then qNew else q
+      replaceEdge (q, p, q') = (replace q, p, replace q')
+
+
+-- | Constructs an FST from the given mu-term but uses a DFA construction on
+-- all subterms at the positions in the given `Marked` set.  If the set is
+-- empty a normal FST will be produced.
+fromMuWithDFA :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
+              => Marked
+              -> Mu pred func st -> FST st pred (func :+: (NullFun a b))
+fromMuWithDFA ms e =
   let (qin, cs) = runState (construct [] (toEnum 0) e)
                            (ConstructState { edges     = []
                                            , nextState = toEnum 1
@@ -132,7 +156,7 @@ fromMuWithAcceptor ms e =
             
 fromMu :: (Predicate pred, Enum st, Ord st, Monoid (Rng func)) =>
           Mu pred func st -> FST st pred (func :+: (NullFun a b))
-fromMu = fromMuWithAcceptor S.empty
+fromMu = fromMuWithDFA S.empty
 
 ------------------------------------------------------------
 ------------------------------------------------------------
@@ -141,15 +165,20 @@ fromMu = fromMuWithAcceptor S.empty
 s1 :: String
 s1 =  [strQ|x
        x := (~aaa | aa)*
-       aaa := <aaa> "bcd"
-       aa := <aa> "de"
+       aaa := /aaa/ "bcd"
+       aa := /aa/ "de"
        |]
 
 s2 :: String
 s2 = [strQ|x
 x := ~(l r)
-l := <(a|b)*> "AB"
-r := <(c|d)*> "CD"
+l := /(a|b)*/ "AB"
+r := /(c|d)*/ "CD"
+|]
+
+s3 :: String
+s3 = [strQ|x
+x := /a/ ~/b/ /c/
 |]
 
 mu1 :: (KleenexMu a, Marked)
@@ -159,20 +188,26 @@ sm1 :: (SimpleMu, Marked)
 sm1 = either (error "sm1") head $ testSimple s1
 
 mu2 = either (error "mu2") head $ testKleenex s2
-
+mu3 = either (error "mu3") head $ testKleenex s3
       
-f1 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
+f1 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
 f1 = fromMu (fst mu1)
 
-g1 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
-g1 = fromMuWithAcceptor (snd mu1) (fst mu1)
+g1 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
+g1 = fromMuWithDFA (snd mu1) (fst mu1)
 
-f2 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
+f2 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
 f2 = fromMu (fst mu2)
-g2 :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
-g2 = fromMuWithAcceptor (snd mu2) (fst mu2)
+g2 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
+g2 = fromMuWithDFA (snd mu2) (fst mu2)
 
+f3 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
+f3 = fromMu (fst mu3)
+g3 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
+g3 = fromMuWithDFA (snd mu3) (fst mu3)
 
-viz :: FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))
+          
+
+viz :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
     -> FilePath -> IO ()
 viz = mkVizToFile fstToDot

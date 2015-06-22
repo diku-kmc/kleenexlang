@@ -162,6 +162,6 @@ dfaAsFST (DFA dfa) =
       edgeSet =
           OrderedEdgeSet { eForward  = toMap [ (q, [(p, NullFun, q')]) | (q, p, q') <- edges ]
                          , eBackward = toMap [ (q', [(p, NullFun, q)]) | (q, p, q') <- edges ]
-                         , eForwardEpsilon = M.empty
+                         , eForwardEpsilon  = M.empty
                          , eBackwardEpsilon = M.empty
                          }

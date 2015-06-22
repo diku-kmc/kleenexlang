@@ -137,7 +137,8 @@ fstAbstractEvalEdgesAny aut = abstractEvalEdgesAny (fstE aut)
 isChoiceState :: (Ord st) => FST st pred func -> st -> Bool
 isChoiceState fst' q =
   case (M.member q (eForward . fstE $ fst'), M.member q (eForwardEpsilon . fstE $ fst')) of
-    (True, True) -> error "Inconsistent FST - a state is both a choice and symbol state"
+    (True, True) -> True
+  --error "Inconsistent FST - a state is both a choice and symbol state"
     (_, b) -> b
 
 coarsestPredicateSet :: (Boolean pred

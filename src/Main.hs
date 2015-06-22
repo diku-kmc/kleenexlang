@@ -44,6 +44,7 @@ data MainOptions =
     , optPreFunctionalize :: Bool
     , optLookahead        :: Bool
     , optExpressionArg    :: Bool
+    , optConstructDFA     :: Bool -- ^ Enable DFA optimization
     }
 
 data CompileOptions =
@@ -100,6 +101,7 @@ instance Options MainOptions where
       <*> simpleOption "func" False "Functionalize FST before SST construction"
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
+      <*> simpleOption "dfa" False "Treat ignored Kleenex-subterms as DFAs"
 
 instance Options CompileOptions where
     defineOptions =
@@ -136,18 +138,20 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
 -- | Existential type representing transducers that can be determinized,
 -- compiled and pretty-printed.
 data Transducers where
-    Transducers :: (Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta], Pretty f, Pretty delta
-                   ,Ord delta, Enum delta, Bounded delta
-                   ,Dom f ~ a, Rng f ~ b)
-                   => [FST Int (RangeSet Word8) (f :+: (NullFun a b))] -> Transducers
+    Transducers :: ( Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta]
+                   , Pretty f, Pretty delta, Ord delta, Enum delta
+                   , Bounded delta
+                   )
+                   => [FST Int (RangeSet Word8) (WithNull f)] -> Transducers
 
 -- | Existential type representing determinized transducers that can be compiled.
 data DetTransducers where
-    DetTransducers :: (Function f, Ord f, Pretty f
-                      ,Ord delta, Enum delta, Bounded delta, Pretty delta
-                      ,Dom f ~ Word8, Rng f ~ [delta]
-                      ,Dom f ~ a, Rng f ~ b) =>
-                      [SST Int (RangeSet Word8) (f :+: (NullFun a b)) Int] -> DetTransducers
+    DetTransducers :: ( Function f, Ord f, Pretty f, Dom f ~ Word8
+                      , Rng f ~ [delta], Ord delta, Enum delta
+                      , Bounded delta, Pretty delta
+                      )
+                     =>
+                     [SST Int (RangeSet Word8) (WithNull f) Int] -> DetTransducers
 
 transducerSize :: Transducers -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
@@ -193,7 +197,7 @@ buildTransducers mainOpts args = do
           return (Transducers [fst], reSrcName, reSrc)
     else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
-           let fsts = fstFromKleenex kleenexSrc
+           let fsts = fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
            return (Transducers fsts, arg, kleenexSrc)
          else do
            hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
@@ -326,9 +330,14 @@ main = runSubcommand
        , subcommand "visualize" visualize
        ]
 
-fstFromKleenex :: String -> [FST Int (RangeSet Word8) (KleenexOutTerm :+: (NullFun Word8 [Word8]))]
-fstFromKleenex str =
-  case parseKleenex str of
-    Left e -> error e
-    Right ih -> map (\(t,m) -> fromMuWithAcceptor m t) $ kleenexToMuTerm ih
+fstFromKleenex :: Bool -> String -> [FST Int (RangeSet Word8) (WithNull KleenexOutTerm)]
+fstFromKleenex constructDFA str =
+    case parseKleenex str of
+         Left e -> error e
+         Right ih -> map construct $ kleenexToMuTerm ih
+  where
+    construct (t, m) = if constructDFA then
+                           fromMuWithDFA m t
+                       else
+                           fromMu t
 

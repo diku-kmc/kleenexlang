@@ -158,12 +158,16 @@ kleenexTerm = skipAround kleenexExpr
       kleenexExpr = buildExpressionParser table $ skipAround (kleenexPrimTerm <|> parens kleenexTerm)
       schar = skipAround . char
       table = [
-          [ Prefix (schar '~' >> return Ignore <?> "Ignored") ],
-          [ Postfix (schar '*' >> return Star <?> "Star"),
-            Postfix (schar '?' >> return Question <?> "Question"),
-            Postfix (schar '+' >> return Plus <?> "Plus") ],
-          [ Infix (skipped >> notFollowedBy (char '|') >> return Seq) AssocRight ],
-          [ Infix (schar '|' >> return Sum) AssocRight ]
+          [ Prefix  (schar '~' >> return Ignore <?> "Ignored")
+          ],
+          [ Postfix (schar '*' >> return Star <?> "Star")
+          , Postfix (schar '?' >> return Question <?> "Question")
+          , Postfix (schar '+' >> return Plus <?> "Plus")
+          ],
+          [ Infix   (skipped >> notFollowedBy (char '|') >> return Seq) AssocRight
+          ],
+          [ Infix   (schar '|' >> return Sum) AssocRight
+          ]
         ]
 
 kleenexPrimTerm :: KleenexParser KleenexTerm

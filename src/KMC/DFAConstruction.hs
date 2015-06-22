@@ -13,7 +13,8 @@ import           KMC.Expression
 import           KMC.Util.Set (joinSets, occurs)
 
 
-dfaFromMu :: (Predicate pred, Enum st, Ord st) => Mu pred f st -> DFA (S.Set st) pred
+dfaFromMu :: (Predicate pred, Enum st, Ord st)
+          => Mu pred f st -> DFA (S.Set st) pred
 dfaFromMu = nfaToDFA . nfaFromMu
 
 data DFAConstructState st pred =
@@ -102,7 +103,7 @@ epsilonClosures (NFA nfa) = joinSets . S.map epsClos
 coarsestPredicateSet :: (Predicate pred, Ord st)
                      => NFA st pred -> [st] -> [pred]
 coarsestPredicateSet (NFA nfa) qs = coarsestPartition ps
-  where
+    where
     ps = S.toList $ S.fromList
          [ p | q <- qs
              , (p, _) <- maybe [] S.toList (M.lookup q (nfaForward $ accE nfa)) ]
