@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
-
 module KMC.Kleenex.Parser where
 
 import           Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
@@ -17,7 +16,6 @@ import           KMC.Syntax.Config
 import           KMC.Syntax.External (Regex, unparse)
 import           KMC.Syntax.Parser (anchoredRegexP)
 import           KMC.Util.List (foldr1ifEmpty)
-    
     
 -- | Change the type of a state in a parser.  
 changeState :: forall m s u v a . (Functor m, Monad m)
@@ -160,15 +158,22 @@ kleenexTerm = skipAround kleenexExpr
       table = [
           [ Prefix  (schar '~' >> return Ignore <?> "Ignored")
           ],
-          [ Postfix (schar '*' >> return Star <?> "Star")
-          , Postfix (schar '?' >> return Question <?> "Question")
-          , Postfix (schar '+' >> return Plus <?> "Plus")
+          -- Use the postfix function below to allow multiple stacked postfix
+          -- operators without the need for parentheses around all subterms.
+          [ postfix $ choice [ (schar '*' >> return Star <?> "Star")
+                             , (schar '?' >> return Question <?> "Question")
+                             , (schar '+' >> return Plus <?> "Plus")
+                             ]
           ],
           [ Infix   (skipped >> notFollowedBy (char '|') >> return Seq) AssocRight
           ],
           [ Infix   (schar '|' >> return Sum) AssocRight
           ]
         ]
+
+-- | Combine postfix operators and allow sequences (e.g., /a/*+?)
+postfix :: KleenexParser (a -> a) -> Operator Char HPState a
+postfix p = Postfix . chainl1 p $ return (flip (.))
 
 kleenexPrimTerm :: KleenexParser KleenexTerm
 kleenexPrimTerm = skipAround elms
@@ -223,3 +228,4 @@ parseTest' p input
 
 pf = parseTest (kleenex <* eof)
 pf' = parseTest' (kleenex <* eof)
+

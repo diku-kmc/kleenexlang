@@ -45,6 +45,10 @@ kleenexParserTests =
                       , run kp_test15
                       , run kp_sanity4
                       ]
+    , simpleGroup True "Postfix operator stacking"
+                      [ run kp_postfix1
+                      , run kp_postfix2
+                      ]
     , simpleGroup True "Find locations of suppressed subterms"
                   [ run kp_test16
                   , run kp_test17
@@ -234,6 +238,33 @@ p := "a"|]
 p := "a"|]
     in assertOutputsEqual pa pb
 
+kp_postfix1 :: (TestName, IO TS.Result)
+kp_postfix1 = "Stack postfix operators #1" <@>
+    let pa = [strQ|p
+p := /a/*+?**++??
+|]
+        pb = [strQ|p
+p := ((((((((/a/*)+)?)*)*)+)+)?)?
+|]
+    in assertOutputsEqual pa pb
+
+kp_postfix2 :: (TestName, IO TS.Result)
+kp_postfix2 = "Stack postfix operators #2" <@>
+    let pa = [strQ|p
+p := x*+?**++??
+x := /a/
+|]
+        pb = [strQ|p
+p := ((((((((x*)+)?)*)*)+)+)?)?
+x := /a/
+|]
+    in assertOutputsEqual pa pb
+
+       
+-------------------------------------------------------------------------------
+-- Some "sanity checks"; ensure that the parser produces the given ASTs.
+-------------------------------------------------------------------------------
+
 kp_test13 :: (TestName, IO TS.Result)
 kp_test13 = "Sanity check #1" <@>
     let p = [strQ|p
@@ -260,7 +291,7 @@ q:= /B/ "B" p
 kp_test15 :: (TestName, IO TS.Result)
 kp_test15 = "Sanity check #3" <@>
     let p = [strQ|p
-p := (/a/* | /b/? | ~/c/+)*+?
+p := (((/a/* | /b/? | ~/c/+)*)+)?
 |]
         e = HP.Kleenex [
             HP.HA (HP.mkIdent "p",
@@ -273,7 +304,7 @@ p := (/a/* | /b/? | ~/c/+)*+?
     in assertProgramIs p e
 
 kp_sanity4 :: (TestName, IO TS.Result)
-kp_sanity4 = "Top-level suppression operator" <@>
+kp_sanity4 = "Sanity check #4" <@>
              let p = [strQ|x
                            x := ~(/a/*)
                     |]
