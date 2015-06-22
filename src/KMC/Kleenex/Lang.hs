@@ -44,25 +44,10 @@ data SimpleMu = SMVar Nat
 nat2int :: Nat -> Int
 nat2int Z = 0
 nat2int (S n) = 1 + nat2int n
--- instance Show SimpleMu where
---     show (SMVar n) = show (nat2int n)
---     show (SMLoop e) = "μ.(" ++ show e ++ ")"
---     show (SMAlt l r) = "(" ++ show l ++ ")+(" ++ show r ++ ")"
---     show (SMSeq l r) = show l ++ show r
---     show (SMWrite s) = show s
---     show (SMRegex r) = "<" ++ unparse r ++ ">"
---     show (SMIgnore s) = "skip:[" ++ show s ++ "]"
---     show SMAccept = "1"
 
 -- | Mu-terms created from Kleenex programs either output the identity on
 -- the input character, injected into a list, or the output a constant list
 -- of characters.
---type KleenexOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
--- instance Pretty KleenexOutTerm where
---     pretty (Inl (InList _)) = "COPY"
---     pretty (Inr (Const [])) = "SKIP"
---     pretty (Inr (Const ws)) = "\"" ++ map toChar [ws] ++ "\""
-
 type KleenexOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
 instance Pretty KleenexOutTerm where
     pretty l = case l of
@@ -138,25 +123,36 @@ kleenexToSimpleMu initVar (H.Kleenex ass) =
       go _    (H.RE re)      = return $ SMRegex re
 
 
--- mark :: Pos -> State Marked ()
--- mark pos = trace ("Marking " ++ show pos) $  modify (S.insert pos)
-
--- Work on the first-order representation.
+-- | Find the locations of subterms that are suppressed.
+-- It infers the "most general location" like so:
+--      (a) E = ~l ~r     --> E' = ~(l r)
+--      (b) E = ~l | ~r   --> E' = ~(l | r)
+--      (c) E = (~e)*     --> E' = ~(e*)
 findSuppressedSubterms :: SimpleMu -> Marked
 findSuppressedSubterms = go [] S.empty
     where
+      addIfBoth cp marks =
+          if (L:cp) `S.member` marks && (R:cp) `S.member` marks
+          then S.insert cp marks
+          else marks
       go cp marked sm =
           case sm of
-            SMLoop e   -> go (L:cp) marked e
-            SMAlt l r  -> (go (L:cp) marked l) `S.union` (go (R:cp) marked r)
-            SMSeq l r  -> (go (L:cp) marked l) `S.union` (go (R:cp) marked r)
-            SMIgnore e -> go cp (S.insert cp marked) e
+            SMLoop e   ->
+                let marks = go (L:cp) marked e
+                in if (L:cp) `S.member` marks
+                   then S.insert cp marks
+                   else marks
+            SMAlt l r  ->
+                addIfBoth cp $ (go (L:cp) marked l) `S.union` (go (R:cp) marked r)
+            SMSeq l r  ->
+                addIfBoth cp $ (go (L:cp) marked l) `S.union` (go (R:cp) marked r)
+            SMIgnore e -> S.insert cp marked
             SMAccept   -> marked
             SMVar _    -> marked
             SMWrite _  -> marked
             SMRegex _  -> marked
-            
-                    
+
+
 
 -- | A simple mu term is converted to a "real" mu term by converting the
 -- de Bruijn-indexed variables to Haskell variables, and encoding the mu
@@ -183,7 +179,6 @@ simpleMuToMuTerm' st ign sm =
 
 simpleMuToMuTerm :: SimpleMu -> KleenexMu a
 simpleMuToMuTerm sm = simpleMuToMuTerm' [] False sm
-
                       
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
 -- expressed in Kleenex.
@@ -259,4 +254,12 @@ testSimple s = either Left (Right . g) (H.parseKleenex s)
 -- x := a | ~b
 -- a := <a>
 -- b := ~<b>
+-- |]
+
+-- s1 = [strQ|x
+-- x := ((~a b) | (~c ~d))
+-- a := /a/
+-- b := /b/
+-- c := /c/
+-- d := /d/
 -- |]
