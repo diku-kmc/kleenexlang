@@ -31,6 +31,7 @@ dfaOptimizationTests =
     [ simpleGroup True "DFA optimization correctness"
                   [ run test'dfa1
                   , run test'dfa2
+                  , run test'dfa3
                   ]
     ]
     where
