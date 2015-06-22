@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module KMC.TreeWriter
        (Tree(..)
        ,TreeWriterT
@@ -9,13 +12,15 @@ module KMC.TreeWriter
        ,zero
        ,tell
        ,tflat
-       ,evalTreeWriterT
-       ,evalTreeWriter
+       ,runTreeWriterT
+       ,runTreeWriter
        )
 where
 
-import Control.Monad.Trans.Free.Church
+import Control.Monad.Trans
 import Control.Monad.Identity
+import Control.Monad.State
+import Data.Maybe (catMaybes)
 
 data Tree w a = Tip { tOutput :: w, tValue :: a }
               | Fork { tOutput :: w
@@ -26,6 +31,11 @@ instance Functor (Tree w) where
   fmap f (Tip w x) = Tip w (f x)
   fmap f (Fork w xs) = Fork w (map (fmap f) xs)
 
+newtype TreeWriterT w m a = TreeWriterT { runTreeWriterT :: m (Maybe (Tree w a)) }
+  deriving (Functor)
+
+type TreeWriter w a = TreeWriterT w Identity a
+
 mapOutput :: (w -> w') -> Tree w a -> Tree w' a
 mapOutput f (Tip w a) = Tip (f w) a
 mapOutput f (Fork w xs) = Fork (f w) (map (mapOutput f) xs)
@@ -34,36 +44,65 @@ tprepend :: (Monoid w) => w -> Tree w a -> Tree w a
 tprepend w (Tip w' x) = Tip (mappend w w') x
 tprepend w (Fork w' xs) = Fork (mappend w w') xs
 
-data T w a = Out w a
-           | Sum [a]
-  deriving (Functor)
+zero :: Monad m => TreeWriterT w m a
+zero = TreeWriterT $ return Nothing
 
-type TreeWriterT w m = FT (T w) m
-type TreeWriter w = TreeWriterT w Identity
+tell :: Monad m => w -> TreeWriterT w m ()
+tell w = TreeWriterT $ return $ Just $ Tip w ()
 
-branch :: MonadFree (T w) m => [m a] -> m a
-branch xs = wrap (Sum xs)
+branch :: (Monad m, Monoid w) => [TreeWriterT w m a] -> TreeWriterT w m a
+branch ts = TreeWriterT $ do
+  ts' <- mapM runTreeWriterT ts
+  case catMaybes ts' of
+   [] -> return Nothing
+   [t] -> return (Just t)
+   ts'' -> return (Just (Fork mempty ts''))
 
-zero :: MonadFree (T w) m => m a
-zero = wrap (Sum [])
+{------------------------------------------------------------------------------}
+{-- Evaluation --}
 
-tell :: MonadFree (T w) m => w -> m ()
-tell w = wrap (Out w (return ()))
+returnTreeWriterT :: (Monoid w, Monad m) => a -> TreeWriterT w m a
+returnTreeWriterT a = TreeWriterT $ return (Just $ Tip mempty a)
 
-evalTreeWriterT :: (Monad m, Monoid w) => TreeWriterT w m a -> m [Tree w a]
-evalTreeWriterT twt = runFT twt (\a -> return [Tip mempty a]) ev
+joinTreeWriterT :: (Monoid w, Monad m) => TreeWriterT w m (TreeWriterT w m a) -> TreeWriterT w m a
+joinTreeWriterT (TreeWriterT twt) = TreeWriterT $ do
+  y <- twt
+  case y of
+   Nothing -> return Nothing
+   Just t -> flatten t
   where
-    ev :: (Monoid w, Monad m) => T w (m [Tree w a]) -> m [Tree w a]
-    ev (Out w y) = map (tprepend w) <$> y
-    ev (Sum ys) = do
-      ts <- sequence ys
-      case concat ts of
-       [] -> return []
-       [x] -> return [x]
-       xs -> return [Fork mempty xs]
+    flatten (Tip w (TreeWriterT x)) = do
+      mx <- x
+      case mx of
+       Nothing -> return Nothing
+       Just t -> return $ Just (tprepend w t)
+    flatten (Fork w ys) = do
+      ts <- catMaybes <$> mapM flatten ys
+      case ts of
+       [] -> return Nothing
+       [t] -> return $ Just (tprepend w t)
+       ts' -> return $ Just (Fork w ts')
 
-evalTreeWriter :: Monoid w => TreeWriter w a -> [Tree w a]
-evalTreeWriter = runIdentity . evalTreeWriterT
+runTreeWriter :: Monoid w => TreeWriterT w Identity a -> Maybe (Tree w a)
+runTreeWriter = runIdentity . runTreeWriterT
+
+{------------------------------------------------------------------------------}
+{-- Instances --}
+
+instance (Monoid w, Monad m) => Applicative (TreeWriterT w m) where
+  pure = returnTreeWriterT
+  t1 <*> t2 = joinTreeWriterT (fmap (\f -> fmap f t2) t1)
+
+instance (Monoid w, Monad m) => Monad (TreeWriterT w m) where
+  return = returnTreeWriterT
+  x >>= f = joinTreeWriterT $ fmap f x
+
+instance (Monoid w) => MonadTrans (TreeWriterT w) where
+  lift x = TreeWriterT $ x >>= \a -> return (Just (Tip mempty a))
+
+instance (Monoid w, Monad (TreeWriterT w m), MonadState s m) => MonadState s (TreeWriterT w m) where
+  get = lift get
+  put = lift . put
 
 {------------------------------------------------------------------------------}
 {-- Operations on trees --}

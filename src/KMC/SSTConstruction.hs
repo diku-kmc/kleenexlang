@@ -3,7 +3,7 @@
 module KMC.SSTConstruction where
 
 import           Control.Monad.State
-import           Data.Maybe (isJust)
+import           Data.Maybe (maybeToList)
 import qualified Data.Set as S
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
@@ -27,9 +27,9 @@ instance PartialOrder Var where
 -- | The closure monad models a computation consisting of concurrent threads
 -- with shared state executed in round-robin
 type Closure st w = TreeWriterT w (State (S.Set st))
-type PathTree w a = [Tree w a]
+type PathTree w a = Maybe (Tree w a)
 
-visit :: (Ord st) => st -> Closure st w st
+visit :: (Monoid w, Ord st) => st -> Closure st w st
 visit st = do { vis <- get;
                 when (S.member st vis) zero;
                 modify (S.insert st);
@@ -37,15 +37,14 @@ visit st = do { vis <- get;
               }
 
 -- | Resume a closure computation
-resume :: Tree w a -> Closure st w a
+resume :: (Monoid w) => Tree w a -> Closure st w a
 resume (Tip w x) = tell w >> return x
 resume (Fork w ts) = tell w >> branch (map resume ts)
 
 -- | Resume a possibly failing closure computation
-resume' :: PathTree w a -> Closure st w a
-resume' [] = zero
-resume' [t] = resume t
-resume' _ = error "invalid path tree"
+resume' :: Monoid w => PathTree w a -> Closure st w a
+resume' Nothing = zero
+resume' (Just t) = resume t
 
 -- | Reduce a tree by removing longest common prefixes
 reduce :: (Eq a) => Tree [a] b -> Tree [a] b
@@ -58,7 +57,7 @@ reduce (Fork w ts) =
 
 -- | Interpret a closure computation as a path tree and reduce the result.
 runClosure :: (Eq gamma) => Closure st [gamma] a -> PathTree [gamma] a
-runClosure x = reduce <$> evalState (evalTreeWriterT x) S.empty
+runClosure x = reduce <$> evalState (runTreeWriterT x) S.empty
 
 {------------------------------------------------------------------------------}
 {-- Computing path trees --}
@@ -97,7 +96,7 @@ consume fst' p i q =
     [(f, q')] -> tell [FuncA f i] >> visit q'
     _ -> error "Stepping for FSTs with read-fanout greater than one is not supported yet"
 
-eof :: (Ord st) => FST st pred func -> st -> Closure st w st
+eof :: (Monoid w, Ord st) => FST st pred func -> st -> Closure st w st
 eof fst' q | S.member q (fstF fst') = visit q
            | otherwise = zero
 
@@ -155,9 +154,8 @@ abstract t = go [] t
 
 abstract' :: PathTree (UpdateStringFunc Var func) a
             -> ([(Var, UpdateStringFunc Var func)], PathTree Var a)
-abstract' [] = ([], [])
-abstract' [t] = let (m', t') = abstract t in (m', [t'])
-abstract' _ = error "invalid path tree"
+abstract' Nothing = ([], Nothing)
+abstract' (Just t) = let (m', t') = abstract t in (m', Just t')
 
 unabstract :: PathTree (UpdateString var (Rng func)) a
            -> PathTree (UpdateStringFunc var func) a
@@ -204,7 +202,7 @@ sstFromFST :: (Ord a, Eq delta, Eq func, Ord pred, PartialOrder pred, Function f
 sstFromFST fst' singletonMode =
   construct initialState (specialize transitions) outputs
   where
-    initialState           = [Tip (Var []) (fstI fst')]
+    initialState           = Just (Tip (Var []) (fstI fst'))
     (transitions, outputs) = saturate (S.singleton initialState) S.empty [] []
 
     saturate ws states trans outs
@@ -214,8 +212,7 @@ sstFromFST fst' singletonMode =
       | (t, ws') <- S.deleteFindMin ws =
         let tcl  = closureAbstractTree fst' t
             tcl' = unabstract tcl
-            os   = [ (t, w) | Tip w _ <- eofTree fst' tcl ]
-
+            os   = [ (t, w) | Tip w _ <- maybeToList $ eofTree fst' tcl ]
             ts   = do (ps, kills) <- prefixTests fst' singletonMode (concatMap tflat tcl')
                       guard $ not $ null ps
                       let (kappa, t'') = abstract' $ consumeTreeMany fst' ps $ killTree kills tcl'
