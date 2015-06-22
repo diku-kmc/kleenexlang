@@ -1,4 +1,4 @@
-module KMC.DFAConstruction (dfaFromMu, minimizeDFA, nfaToDFA) where
+module KMC.DFAConstruction (dfaFromMu, minimizeDFA, nfaToDFA, mergeEdges) where
 
 import           Control.Monad.State
 import qualified Data.Map as M
@@ -45,6 +45,26 @@ minimizeDFA :: (Predicate pred, Ord st)
             => DFA st pred -> DFA Int pred
 minimizeDFA = enumerateDFAStates . nfaToDFA . reverseDFA . nfaToDFA . reverseDFA
 
+
+-- | Merge all edges between the same states in the DFA by OR'ing their
+-- predicates together.
+mergeEdges :: (Predicate pred, Ord st)
+           => DFA st pred -> DFA st pred
+mergeEdges (DFA dfa) = DFA $ dfa { accE = dfaEdgesFromList $ merge gathered
+                                 }
+    where
+      edges = dfaEdgesToList $ accE dfa
+      merge = map (\(q, ps, q') -> (q, mergePreds ps, q'))
+      gathered = [ (q, ps, q') | (q, q') <- connected
+                               , let ps = preds $ filter (isBetween q q') edges
+                              ]
+      preds = map (\(_,p,_) -> p)
+      isBetween q q' (st1, _, st2) = q == st1 && q' == st2
+      connected = S.toList $ S.fromList [ (q, q') | (q, _, q') <- edges ]
+
+mergePreds :: (Predicate pred) => [pred] -> pred
+mergePreds []    = bot
+mergePreds preds = foldr1 disj preds
 
 addState :: (Ord st) => st -> DFAConstruct st pred ()
 addState q = modify (\s -> s { states = q `S.insert` (states s) })

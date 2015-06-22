@@ -107,7 +107,7 @@ construct curPos qf e = do
   if curPos `S.member` ms then
       do
         q <- fresh
-        let dfaFST = dfaAsFST $ enumerateDFAStatesFrom q $
+        let dfaFST = dfaAsFST $ enumerateDFAStatesFrom q $ mergeEdges $
                      minimizeDFA $ dfaFromMu e
         -- Add all the "null edges" from the DFA
         addNullEdges dfaFST
@@ -123,18 +123,6 @@ construct curPos qf e = do
 connectTo :: (Monoid (Rng func)) => [st] -> st -> Construct st pred func ()
 connectTo states to = mapM_ (\from -> addEdge from (Right mempty) to) states
                  
-replaceFinalStatesWith :: (Ord st) => FST st pred func -> st -> FST st pred func
-replaceFinalStatesWith fst qNew =
-    FST { fstS = S.map replace $ fstS fst
-        , fstE = edgesFromList $ map replaceEdge $ edgesToList $ fstE fst
-        , fstI = fstI fst
-        , fstF = S.singleton qNew
-        }
-    where
-      replace q = if q `S.member` (fstF fst) then qNew else q
-      replaceEdge (q, p, q') = (replace q, p, replace q')
-
-
 -- | Constructs an FST from the given mu-term but uses a DFA construction on
 -- all subterms at the positions in the given `Marked` set.  If the set is
 -- empty a normal FST will be produced.
