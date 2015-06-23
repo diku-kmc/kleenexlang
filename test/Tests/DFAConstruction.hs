@@ -44,6 +44,7 @@ dfaOptimizationTests =
                   [ run test'dfa4
                   , run test'dfa5
                   , run test'dfa6
+                  , run test'dfa7
                   ]
     ]
     where

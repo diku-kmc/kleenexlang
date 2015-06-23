@@ -11,8 +11,6 @@ import           KMC.SymbolicSST
 import           KMC.Theories
 import           KMC.TreeWriter
 
-import qualified Data.Map as M
-
 data Var = Var [Int]
   deriving (Eq, Ord, Show)
 
@@ -55,9 +53,6 @@ runClosure x = evalState (evalTreeWriterT x) S.empty
 {------------------------------------------------------------------------------}
 {-- Computing path trees --}
 
-hasTransFrom :: (Ord st) => FST st pred func -> st -> Bool
-hasTransFrom fst' q = M.member q (eForward $ fstE fst')
-
 genclosure :: (Ord st, Monoid w)
            => FST st pred func
            -> (Rng func -> w)
@@ -67,15 +62,7 @@ genclosure fst' inj q =
   case fstEvalEpsilonEdges fst' q of
     [] -> return q
     [(out, q')] ->
-        if hasTransFrom fst' q then
-            -- Special case arises if the FST has been constructed with the DFA
-            -- optimization turned on: a state may have both an epsilon transition
-            -- and a predicate transition.  Non-deterministically choose between
-            -- following the epsilon-transition and staying put.
-            plus (tell (inj out) >> visit q' >> genclosure fst' inj q')
-                 (return q)
-        else
-            tell (inj out) >> visit q' >> genclosure fst' inj q'
+        tell (inj out) >> visit q' >> genclosure fst' inj q'
     [(out1, q1'), (out2, q2')] ->
        plus (tell (inj out1) >> visit q1' >> genclosure fst' inj q1')
             (tell (inj out2) >> visit q2' >> genclosure fst' inj q2')
