@@ -3,7 +3,7 @@
 module KMC.SSTConstruction where
 
 import           Control.Monad.State
-import           Data.Maybe (maybeToList)
+import           Data.Maybe (maybeToList, isJust)
 import qualified Data.Set as S
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
@@ -216,7 +216,7 @@ sstFromFST fst' singletonMode =
             ts   = do (ps, kills) <- prefixTests fst' singletonMode (concatMap tflat $ maybeToList tcl')
                       guard $ not $ null ps
                       let (kappa, t'') = abstract' $ consumeTreeMany fst' ps $ killTree kills tcl'
-                      guard (not $ null t'')
+                      guard (not $ isJust t'')
                       return (t, ps, kappa, t'')
             wl'  = S.fromList [ newt | (_,_,_,newt) <- ts ]
         in saturate (S.union ws' wl') (S.insert t states) (ts ++ trans) (os ++ outs)
