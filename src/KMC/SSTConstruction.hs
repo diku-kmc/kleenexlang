@@ -213,7 +213,7 @@ sstFromFST fst' singletonMode =
         let tcl  = closureAbstractTree fst' t
             tcl' = unabstract tcl
             os   = [ (t, w) | Tip w _ <- maybeToList $ eofTree fst' tcl ]
-            ts   = do (ps, kills) <- prefixTests fst' singletonMode (concatMap tflat tcl')
+            ts   = do (ps, kills) <- prefixTests fst' singletonMode (concatMap tflat $ maybeToList tcl')
                       guard $ not $ null ps
                       let (kappa, t'') = abstract' $ consumeTreeMany fst' ps $ killTree kills tcl'
                       guard (not $ null t'')
