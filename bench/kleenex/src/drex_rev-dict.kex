@@ -1,0 +1,7 @@
+/*
+Implements "reverse" from http://www.cis.upenn.edu/~lorisdan/papers/popl15drex.pdf
+
+Reverse a semi-colon seperated dictionary.
+*/
+
+main := (a@/[^;]*;/ c@(!a !b) b@(!c))* !b

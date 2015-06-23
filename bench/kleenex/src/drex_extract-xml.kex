@@ -1,0 +1,9 @@
+/*
+Implements "get_tags" from http://www.cis.upenn.edu/~lorisdan/papers/popl15drex.pdf
+
+Concatenate all XML tags, while ignoring things in between.
+*/
+
+main := (tag | ~/./)*
+
+tag := /<[^>]*>/

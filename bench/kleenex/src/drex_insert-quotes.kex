@@ -1,0 +1,11 @@
+/*
+Implements "insert_quotes" from http://www.cis.upenn.edu/~lorisdan/papers/popl15drex.pdf
+
+Quote all alphabetic substrings.
+*/
+
+
+main := ("\"" word "\"" | /./)*
+
+
+word := /[a-zA-Z]+/

@@ -1,0 +1,8 @@
+/*
+Implements "delete_comm" from http://www.cis.upenn.edu/~lorisdan/papers/popl15drex.pdf
+
+Removes all lines starting with "//".
+*/
+
+main := (~/\/\// ~line | line)*
+line := /[^\n]*\n/
