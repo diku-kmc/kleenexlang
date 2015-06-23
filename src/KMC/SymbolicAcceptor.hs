@@ -149,14 +149,12 @@ enumerateDFAStates :: (Ord pred, Ord a, Enum a, Ord st)
                    => DFA st pred -> DFA a pred
 enumerateDFAStates = enumerateDFAStatesFrom (toEnum 0)
 
--- The accepted language of a DFA is prefix free iff there are no
+-- | The accepted language of a DFA is prefix free iff there are no
 -- accepting states with outgoing transitions.
 isDFAPrefixFree :: (Ord st) => DFA st pred -> Bool
-isDFAPrefixFree (DFA dfa) = all (not . hasOutgoing) (S.toList $ accF dfa)
+isDFAPrefixFree (DFA dfa) = all hasNoOutgoing (S.toList $ accF dfa)
     where
-      hasOutgoing q = case M.lookup q $ dfaForward (accE dfa) of
-                        Just _  -> True
-                        Nothing -> False
+      hasNoOutgoing q = not $ M.member q $ dfaForward (accE dfa)
     
 dfaAsFST :: (Enum st, Ord st) => DFA st pred -> FST st pred (NullFun a b)
 dfaAsFST (DFA dfa) = 
