@@ -45,6 +45,7 @@ dfaOptimizationTests =
                   , run test'dfa5
                   , run test'dfa6
                   , run test'dfa7
+                  , run test'dfa8
                   ]
     ]
     where
@@ -187,10 +188,17 @@ y := /[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*@(?:[a-z0
 -- In general it is unsound to construct language acceptors and insert them
 -- into the FST.  
 test'dfa7 :: (TestName, IO TS.Result)
-test'dfa7 = "Soundness" <@>
+test'dfa7 = "Soundness #1" <@>
             let p = [strQ|x
 x := /a/ ~/(b*)??/ /b?/
 |]
             in
               assertOutputsEqual p ["ab", "abb"]
 
+test'dfa8 :: (TestName, IO TS.Result)
+test'dfa8 = "Soundness #2" <@>
+            let p = [strQ|x
+x := /a/ ~/(b|bb|b*)??/ /b?/
+|]
+            in
+              assertOutputsEqual p ["a", "ab", "abb", "abbb"]

@@ -4,6 +4,8 @@ module KMC.SSTConstruction where
 
 import           Control.Monad.State
 import           Data.Maybe (maybeToList, isJust)
+import           Data.Monoid
+import           Data.Functor ((<$>))
 import qualified Data.Set as S
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST

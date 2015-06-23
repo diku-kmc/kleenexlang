@@ -20,7 +20,9 @@ where
 import Control.Monad.Trans
 import Control.Monad.Identity
 import Control.Monad.State
+import Control.Applicative
 import Data.Maybe (catMaybes)
+import Data.Monoid
 
 data Tree w a = Tip { tOutput :: w, tValue :: a }
               | Fork { tOutput :: w
@@ -64,7 +66,7 @@ branch ts = TreeWriterT $ do
 returnTreeWriterT :: (Monoid w, Monad m) => a -> TreeWriterT w m a
 returnTreeWriterT a = TreeWriterT $ return (Just $ Tip mempty a)
 
-joinTreeWriterT :: (Monoid w, Monad m) => TreeWriterT w m (TreeWriterT w m a) -> TreeWriterT w m a
+joinTreeWriterT :: (Monoid w, Monad m, Functor m) => TreeWriterT w m (TreeWriterT w m a) -> TreeWriterT w m a
 joinTreeWriterT (TreeWriterT twt) = TreeWriterT $ do
   y <- twt
   case y of
@@ -89,11 +91,11 @@ runTreeWriter = runIdentity . runTreeWriterT
 {------------------------------------------------------------------------------}
 {-- Instances --}
 
-instance (Monoid w, Monad m) => Applicative (TreeWriterT w m) where
+instance (Monoid w, Monad m, Functor m) => Applicative (TreeWriterT w m) where
   pure = returnTreeWriterT
   t1 <*> t2 = joinTreeWriterT (fmap (\f -> fmap f t2) t1)
 
-instance (Monoid w, Monad m) => Monad (TreeWriterT w m) where
+instance (Monoid w, Monad m, Functor m) => Monad (TreeWriterT w m) where
   return = returnTreeWriterT
   x >>= f = joinTreeWriterT $ fmap f x
 

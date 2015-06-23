@@ -1,5 +1,7 @@
 module KMC.Util.List where
 
+import Data.Functor ((<$>))
+    
 lcp :: (Eq a) => Maybe [a] -> Maybe [a] -> Maybe [a]
 lcp Nothing y = y
 lcp x Nothing = x
