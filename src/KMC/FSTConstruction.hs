@@ -172,7 +172,7 @@ x := /a/ ~/b/ /c/
 
 s4 :: String
 s4 = [strQ|x
-x := ~(/def*/)?
+x := ~(/def*/?)
 y := /end/
 |]
 
@@ -216,5 +216,5 @@ viz = mkVizToFile fstToDot
 
 vizSST :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
        -> FilePath -> IO ()
-vizSST f p = let s = sstFromFST f True
+vizSST f p = let s = sstFromFST f False
              in mkVizToFile sstToDot s p

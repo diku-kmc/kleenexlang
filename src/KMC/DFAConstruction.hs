@@ -11,7 +11,7 @@ import           KMC.NFAConstruction (nfa1,nfa2,nfaFromMu)
 import           KMC.Theories
 import           KMC.Expression
 import           KMC.Util.Set (joinSets, occurs)
-
+import           KMC.Util.List (foldr1ifEmpty)
 
 dfaFromMu :: (Predicate pred, Enum st, Ord st)
           => Mu pred f st -> DFA (S.Set st) pred
@@ -22,17 +22,6 @@ data DFAConstructState st pred =
                       , states :: S.Set st
                       }
 type DFAConstruct st pred = State (DFAConstructState st pred)
-
--- m1 :: DFA Int (RangeSet Word8)
--- m1 = minimizeDFA (nfaToDFA nfa1)
--- m2 :: DFA Int (RangeSet Word8)
--- m2 = minimizeDFA (nfaToDFA nfa2)
-
--- n1 :: DFA Int (RangeSet Word8)
--- n1 = enumerateDFAStates $ nfaToDFA nfa1
-
--- r1 :: DFA (S.Set Int) (RangeSet Word8)
--- r1 =  nfaToDFA $ reverseDFA n1
 
 -- | Brzozowski's minimization algorithm:
 --   1) reverse DFA D0 to get NFA N0 for reverse L
@@ -50,8 +39,7 @@ minimizeDFA = enumerateDFAStates . nfaToDFA . reverseDFA . nfaToDFA . reverseDFA
 -- predicates together.
 mergeEdges :: (Predicate pred, Ord st)
            => DFA st pred -> DFA st pred
-mergeEdges (DFA dfa) = DFA $ dfa { accE = dfaEdgesFromList $ merge gathered
-                                 }
+mergeEdges (DFA dfa) = DFA $ dfa { accE = dfaEdgesFromList $ merge gathered }
     where
       edges = dfaEdgesToList $ accE dfa
       merge = map (\(q, ps, q') -> (q, mergePreds ps, q'))
@@ -63,8 +51,7 @@ mergeEdges (DFA dfa) = DFA $ dfa { accE = dfaEdgesFromList $ merge gathered
       connected = S.toList $ S.fromList [ (q, q') | (q, _, q') <- edges ]
 
 mergePreds :: (Predicate pred) => [pred] -> pred
-mergePreds []    = bot
-mergePreds preds = foldr1 disj preds
+mergePreds = foldr1ifEmpty disj bot
 
 addState :: (Ord st) => st -> DFAConstruct st pred ()
 addState q = modify (\s -> s { states = q `S.insert` (states s) })
