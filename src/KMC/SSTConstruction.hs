@@ -218,7 +218,7 @@ sstFromFST fst' singletonMode =
             ts   = do (ps, kills) <- prefixTests fst' singletonMode (concatMap tflat $ maybeToList tcl')
                       guard $ not $ null ps
                       let (kappa, t'') = abstract' $ consumeTreeMany fst' ps $ killTree kills tcl'
-                      guard (not $ isJust t'')
+                      guard (isJust t'')
                       return (t, ps, kappa, t'')
             wl'  = S.fromList [ newt | (_,_,_,newt) <- ts ]
         in saturate (S.union ws' wl') (S.insert t states) (ts ++ trans) (os ++ outs)
