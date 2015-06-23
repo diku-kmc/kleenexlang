@@ -29,8 +29,8 @@ import           Tests.TestUtils
 
 type TestPred = RangeSet Word8
 type TestFunc = WithNull KleenexOutTerm
-type TestFST = FST Int TestPred TestFunc
-type TestSST = SST.SST (Maybe (Tree Var Int)) TestPred TestFunc Var
+type TestFST  = FST Int TestPred TestFunc
+type TestSST  = SST.SST (Maybe (Tree Var Int)) TestPred TestFunc Var
 type W8String = [Word8]
 
 dfaOptimizationTests :: [TS.Test]
@@ -77,8 +77,8 @@ assertOutputsEqual program inputs =
                  TS.Pass
              else
                  TS.Fail $ unlines
-                       [ "FST outputs: " ++ show (map fst o)
-                       , "DFA outputs: " ++ show (map snd o)
+                       [ "FST outputs: " ++ show (map snd o)
+                       , "DFA outputs: " ++ show (map fst o)
                        ]
 
 assertOutputsEqual'SST :: String -> [String] -> IO TS.Result
@@ -182,4 +182,14 @@ y := /[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*@(?:[a-z0
                          , "wrongmailaddress!", "", "", ""
                          , "someone@diku.dk", "[complex]@123.123.123.123"
                          ]
+
+-- In general it is unsound to construct language acceptors and insert them
+-- into the FST.  
+test'dfa7 :: (TestName, IO TS.Result)
+test'dfa7 = "Soundness" <@>
+            let p = [strQ|x
+x := /a/ ~/(b*)??/ /b?/
+|]
+            in
+              assertOutputsEqual p ["ab", "abb"]
 

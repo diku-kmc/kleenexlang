@@ -45,6 +45,13 @@ fresh = do
                    }
   return q
 
+undoFresh :: (Enum st, Ord st) => Construct st pred func ()
+undoFresh = do
+  last <- gets nextState
+  modify $ \s -> s { nextState = pred last
+                   , states    = S.delete last (states s)
+                   }
+
 addStates :: (Enum st, Ord st) => FST st pred a -> Construct st pred func st
 addStates fst = do
   q <- gets nextState
@@ -107,16 +114,22 @@ construct curPos qf e = do
   if curPos `S.member` ms then
       do
         q <- fresh
-        let dfaFST = dfaAsFST $ enumerateDFAStatesFrom q $ mergeEdges $
-                     minimizeDFA $ dfaFromMu e
-        -- Add all the "null edges" from the DFA
-        addNullEdges dfaFST
-        -- Connect the final states of the DFA to the current final state.
-        connectTo (S.toList (fstF dfaFST)) qf
-        -- Add the states and increment the state counter to avoid clashes.
-        addStates dfaFST
-        -- The new final state is the initial state of the DFA.
-        return (fstI dfaFST)
+        let dfa = enumerateDFAStatesFrom q $ mergeEdges $
+                  minimizeDFA $ dfaFromMu e
+        if isDFAPrefixFree dfa then
+            do
+              let dfaFST = dfaAsFST dfa
+              -- Add all the "null edges" from the DFA
+              addNullEdges dfaFST
+              -- Connect the final states of the DFA to the current final state.
+              connectTo (S.toList (fstF dfaFST)) qf
+              -- Add the states and increment the state counter to avoid clashes.
+              addStates dfaFST
+              -- The new final state is the initial state of the DFA.
+              return (fstI dfaFST)
+        else
+            -- Otherwise it is unsound to use the DFA, so don't.
+            undoFresh >> construct' curPos qf e
   else
       construct' curPos qf e
 
