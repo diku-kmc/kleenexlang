@@ -181,7 +181,7 @@ compileTransitions i (BranchT action tests) = do
                    Just (Inr (PushOut var), st') -> do
                                bid <- (M.! st') <$> asks smap
                                bufid <- (M.! var) <$> asks bmap
-                               return [ChangeOut bufid, ConsumeI 1, GotoI bid]
+                               return [ResetI bufid, ChangeOut bufid, ConsumeI 1, GotoI bid]
                    Just (Inr PopOut, st') -> do
                                bid <- (M.! st') <$> asks smap
                                return [RestoreOut, ConsumeI 1, GotoI bid]

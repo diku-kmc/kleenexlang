@@ -151,11 +151,11 @@ comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
       multiLine  = char '*' >> manyTill anyChar (try $ string "*/")
 
 parsePipeline :: KleenexParser [Identifier]
-parsePipeline = kleenexIdentifier `sepBy1` (try $ skipAround (string ">>"))
+parsePipeline = string "start:" *> skipped *> kleenexIdentifier `sepBy1` (try $ skipAround (string ">>"))
 
 kleenex :: KleenexParser (Kleenex)
 kleenex = do
-    idents <- skipped *> parsePipeline
+    idents <- skipped *> (try parsePipeline <|> return [Identifier "main"])
     assignments <- skipped *> (kleenexAssignment `sepEndBy` skipped)
     return $ Kleenex idents assignments
 
@@ -201,14 +201,21 @@ regexP = snd <$> (withHPState $
                   anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!/", rep_freespacing = False })
 
 actionP :: KleenexParser (KleenexAction)
-actionP = do
-    ident <- kleenexIdentifier
-    skipAround $ string "<-"
-    actions <- choice [reg, const] `sepEndBy1` skipped
-    return $ RegUpdate (varToInt $ fromIdent ident) actions
-        where
-            reg = VarA . varToInt . fromIdent <$> kleenexIdentifier
-            const = ConstA . unpack . encodeString <$> kleenexConstant
+actionP = do skipped
+             ident <- kleenexIdentifier
+             let reg = varToInt $ fromIdent ident
+             try (overwrite reg) <|> concat reg
+    where
+        regs = VarA . varToInt . fromIdent <$> kleenexIdentifier
+        const = ConstA . unpack . encodeString <$> kleenexConstant
+        overwrite reg = do
+            skipAround $ string "<-"
+            actions <- choice [regs, const] `sepEndBy1` skipped
+            return $ RegUpdate reg actions
+        concat reg = do
+            skipAround $ string "+="
+            actions <- choice [regs, const] `sepEndBy1` skipped
+            return $ RegUpdate reg (VarA reg : actions)
 
 parseKleenex :: String -- ^ Input string
              -> Either String Kleenex
