@@ -83,8 +83,12 @@ getStack _ _            = Nothing
 -- The given identifier is treated as the top-level bound variable,
 -- i.e., it becomes the first mu.
 kleenexToSimpleMu :: H.Identifier -> H.Kleenex -> SimpleMu
-kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ evalState (go [initVar] (fromJust $ M.lookup initVar mp)) 0
+kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ evalState (go [initVar] (getVar initVar)) 0
     where
+      getVar :: H.Identifier -> H.KleenexTerm
+      getVar var = case M.lookup var mp of
+                      Just term -> term
+                      Nothing   -> error $ "Undefined term: " ++ show var
       mp :: M.Map H.Identifier H.KleenexTerm
       mp = M.fromList (map (\(H.HA (k, v)) -> (k, v)) ass)
 
