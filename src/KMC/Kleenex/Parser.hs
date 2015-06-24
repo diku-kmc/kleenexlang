@@ -6,15 +6,17 @@ module KMC.Kleenex.Parser where
 
 import           Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import           Control.Monad.Identity (Identity)
-import           Data.Word
+import           Data.Char
 import           Data.ByteString (ByteString, unpack)
 import           Data.Hashable
 import qualified Data.Text as T
-import qualified Data.Map as M
 import           Data.Text.Encoding (encodeUtf8)
+import qualified Data.Map as M
+import           Data.Word
 import           Text.Parsec hiding (parseTest)
 import           Text.Parsec.Prim (runParser)
 import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
+import           Numeric (readHex)
 
 import           KMC.Kleenex.Action
 import           KMC.SymbolicSST (Atom(..), ActionExpr(..))
@@ -115,9 +117,12 @@ escapedChar = satisfy (not . mustBeEscaped)
               <|> escaped
     where
       mustBeEscaped c = c `elem` map snd cr
-      escaped = char '\\' >> choice (map escapedChar cr)
+      escaped = char '\\' >> (try $ choice (map escapedChar cr) <|> hexcode)
       escapedChar (code, replacement) = replacement <$ char code
       cr = [('\\', '\\'), ('"', '"'), ('n', '\n'), ('t', '\t')]
+      hexcode = do char 'x'
+                   x <- count 2 hexDigit
+                   return . chr . fst . head . readHex $ x
 
 -- | A "constant" is a string enclosed in quotes.
 kleenexConstant :: KleenexParser String
@@ -198,7 +203,7 @@ encodeString = encodeUtf8 . T.pack
 
 regexP :: KleenexParser Regex
 regexP = snd <$> (withHPState $
-                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "!/", rep_freespacing = False })
+                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "/", rep_freespacing = False })
 
 actionP :: KleenexParser (KleenexAction)
 actionP = do skipped
