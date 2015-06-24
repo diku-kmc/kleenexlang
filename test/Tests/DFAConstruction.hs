@@ -95,7 +95,7 @@ assertOutputsEqual'SST program inputs =
               o = runOn'SST [ wDFA'sing, wDFA'nonsing
                             , noDFA'sing, noDFA'nonsing ]
                             inputs
-          in if S.size (S.fromList o) == 1 then
+          in if all ((== 1) . S.size) (map S.fromList o) then
                  TS.Pass
              else
                  TS.Fail $ unlines
