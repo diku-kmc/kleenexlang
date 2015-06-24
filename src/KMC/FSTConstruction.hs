@@ -116,7 +116,7 @@ construct curPos qf e = do
         q <- fresh
         let dfa = enumerateDFAStatesFrom q $ mergeEdges $
                   minimizeDFA $ dfaFromMu e
-        if allIsSuppressed ms || isDFAPrefixFree dfa then
+        if isDFAPrefixFree dfa then
             do
               let dfaFST = dfaAsFST dfa
               -- Add all the "null edges" from the DFA
@@ -132,9 +132,6 @@ construct curPos qf e = do
             undoFresh >> construct' curPos qf e
   else
       construct' curPos qf e
-
-allIsSuppressed :: Marked -> Bool
-allIsSuppressed = S.member []
 
 connectTo :: (Monoid (Rng func)) => [st] -> st -> Construct st pred func ()
 connectTo states to = mapM_ (\from -> addEdge from (Right mempty) to) states
@@ -157,8 +154,7 @@ fromMuWithDFA ms e =
          , fstI = qin
          , fstF = S.singleton (toEnum 0)
          }
-
-            
+    
 fromMu :: (Predicate pred, Enum st, Ord st, Monoid (Rng func)) =>
           Mu pred func st -> FST st pred (func :+: (NullFun a b))
 fromMu = fromMuWithDFA S.empty
@@ -189,7 +185,6 @@ x := /a/ ~/b/ /c/
 s4 :: String
 s4 = [strQ|x
 x := ~(/def*/?)
-y := /end/
 |]
 
 mu1 :: (KleenexMu a, Marked)
