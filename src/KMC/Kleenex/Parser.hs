@@ -61,6 +61,7 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
                | Star KleenexTerm
                | Plus KleenexTerm
                | Question KleenexTerm
+               | Range (Maybe Int) (Maybe Int) KleenexTerm
                | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
                | One
   deriving (Eq, Ord, Show)
@@ -163,6 +164,7 @@ kleenexTerm = skipAround kleenexExpr
           [ postfix $ choice [ (schar '*' >> return Star <?> "Star")
                              , (schar '?' >> return Question <?> "Question")
                              , (schar '+' >> return Plus <?> "Plus")
+                             , range <?> "Range"
                              ]
           ],
           [ Infix   (skipped >> notFollowedBy (char '|') >> return Seq) AssocRight
@@ -170,6 +172,15 @@ kleenexTerm = skipAround kleenexExpr
           [ Infix   (schar '|' >> return Sum) AssocRight
           ]
         ]
+
+      braces = between (schar '{') (schar '}')
+      number = fmap read (many1 digit) <?> "an integer literal"
+      range = braces $ try (do n <- optionMaybe number
+                               schar ','
+                               m <- optionMaybe number
+                               return $ Range n m)
+                   <|> do n <- number
+                          return $ Range (Just n) (Just n)
 
 -- | Combine postfix operators and allow sequences (e.g., /a/*+?)
 postfix :: KleenexParser (a -> a) -> Operator Char HPState a

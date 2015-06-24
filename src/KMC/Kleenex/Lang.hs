@@ -10,7 +10,7 @@ import qualified Data.Set as S
 import           Data.Word (Word8)
 import           Data.ByteString (unpack, ByteString)
 import           Data.Char (chr, ord)
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 
@@ -108,20 +108,27 @@ kleenexToSimpleMu initVar (H.Kleenex ass) =
                   Nothing -> error $ "Name not found: " ++ show name
                   Just t  -> fmap SMLoop $ go (name : vars) t
             Just p  -> return $ SMVar p
-      go vars (H.Sum l r)    = do gol <- go vars l
-                                  gor <- go vars r
-                                  return $ SMAlt gol gor
-      go vars (H.Seq l r)    = do gol <- go vars l
-                                  gor <- go vars r
-                                  return $ SMSeq gol gor
-      go vars (H.Star e)     = do i <- nextIdent
-                                  fmap SMLoop $ go (i : vars) $ H.Sum (H.Seq e $ H.Var i) H.One
-      go vars (H.Plus e)     = go vars $ H.Seq e $ H.Star e
-      go vars (H.Question e) = do goe <- go vars e
-                                  return $ SMAlt goe SMAccept
-      go _    H.One          = return $ SMAccept
-      go vars (H.Ignore e)   = fmap SMIgnore $ go vars e
-      go _    (H.RE re)      = return $ SMRegex re
+      go vars (H.Sum l r)     = do gol <- go vars l
+                                   gor <- go vars r
+                                   return $ SMAlt gol gor
+      go vars (H.Seq l r)     = do gol <- go vars l
+                                   gor <- go vars r
+                                   return $ SMSeq gol gor
+      go vars (H.Star e)      = do i <- nextIdent
+                                   fmap SMLoop $ go (i : vars) $ H.Sum (H.Seq e $ H.Var i) H.One
+      go vars (H.Plus e)      = go vars $ H.Seq e $ H.Star e
+      go vars (H.Question e)  = do goe <- go vars e
+                                   return $ SMAlt goe SMAccept
+      go vars (H.Range l r e) = do goe <- go vars e
+                                   let m = fromMaybe 0 l
+                                   rest <- case r of
+                                              Nothing -> fmap (: []) $ go vars $ H.Star e
+                                              Just n  -> if n < m then error $ "Invalid range: " ++ show m ++ "-" ++ show n
+                                                                  else return $ replicate (n-m) (SMAlt goe SMAccept)
+                                   return $ foldl1 SMSeq $ replicate m goe ++ rest
+      go _    H.One           = return $ SMAccept
+      go vars (H.Ignore e)    = fmap SMIgnore $ go vars e
+      go _    (H.RE re)       = return $ SMRegex re
 
 
 -- | Find the locations of subterms that are suppressed.
