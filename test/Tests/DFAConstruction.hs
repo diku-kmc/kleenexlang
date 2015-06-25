@@ -107,8 +107,8 @@ assertOutputsEqual'SST program inputs =
 
 test'dfa1 :: (TestName, IO TS.Result)
 test'dfa1 = "DFA opt. #1" <@>
-            let p = [strQ|x
-x := (~aaa | aa)*
+            let p = [strQ|
+main := (~aaa | aa)*
 aaa := /aaa/ "bcd"
 aa := /aa/ "de"
     |]
@@ -118,8 +118,8 @@ aa := /aa/ "de"
 
 test'dfa2 :: (TestName, IO TS.Result)
 test'dfa2 = "DFA opt. #2" <@>
-            let p = [strQ|x
-x  := ~(a ba*| ab* b)
+            let p = [strQ|
+main := ~(a ba*| ab* b)
 a  := /a/
 b  := /b/
 ab := /ab/
@@ -133,8 +133,8 @@ ba := /ba/
 
 test'dfa3 :: (TestName, IO TS.Result)
 test'dfa3 = "DFA opt. #3" <@>
-            let p = [strQ|x
-x := (keep | ~drop)*
+            let p = [strQ|
+main := (keep | ~drop)*
 keep := /[abc]/
 drop := /[def]/
 |]
@@ -147,17 +147,15 @@ drop := /[def]/
 
 test'dfa4 :: (TestName, IO TS.Result)
 test'dfa4 = "DFA/SST correctness #1" <@>
-            let p = [strQ|x
-x := ~(/def*/?)
-|]
+            let p = [strQ|main := ~(/def*/?)|]
             in
               assertOutputsEqual'SST p
                   [ "", "de", "def", "deff", "defff"]
 
 test'dfa5 :: (TestName, IO TS.Result)
 test'dfa5 = "DFA/SST correctness #2" <@>
-            let p = [strQ|x
-x := ( y /\n/ | ~fb ~/\n/ ) x
+            let p = [strQ|
+main := ( y /\n/ | ~fb ~/\n/ ) main
    | ( y /\n/ | ~fb ~/\n/)
 fb := /[^\n]*/
 y := /[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/
@@ -171,8 +169,8 @@ y := /[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*@(?:[a-z0
 
 test'dfa6 :: (TestName, IO TS.Result)
 test'dfa6 = "DFA/SST correctness #3" <@>
-            let p = [strQ|e
-e := ~x
+            let p = [strQ|
+main := ~x
 x := ( y /\n/ | ~fb ~/\n/ ) x
    | ( y /\n/ | ~fb ~/\n/)
 fb := /[^\n]*/
@@ -189,16 +187,16 @@ y := /[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)*@(?:[a-z0
 -- into the FST.  
 test'dfa7 :: (TestName, IO TS.Result)
 test'dfa7 = "Soundness #1" <@>
-            let p = [strQ|x
-x := /a/ ~/(b*)??/ /b?/
+            let p = [strQ|
+main := /a/ ~/(b*)??/ /b?/
 |]
             in
               assertOutputsEqual p ["ab", "abb"]
 
 test'dfa8 :: (TestName, IO TS.Result)
 test'dfa8 = "Soundness #2" <@>
-            let p = [strQ|x
-x := /a/ ~/(b|bb|b*)??/ /b?/
+            let p = [strQ|
+main := /a/ ~/(b|bb|b*)??/ /b?/
 |]
             in
               assertOutputsEqual p ["a", "ab", "abb", "abbb"]

@@ -8,27 +8,27 @@ import KMC.SSTConstruction hiding (Var)
 import KMC.FSTConstruction 
 
 s1 :: String
-s1 =  [strQ|x
-       x := (~aaa | aa)*
+s1 =  [strQ|
+       main := (~aaa | aa)*
        aaa := /aaa/ "bcd"
        aa := /aa/ "de"
        |]
 
 s2 :: String
-s2 = [strQ|x
-x := ~(l r)
+s2 = [strQ|
+main := ~(l r)
 l := /(a|b)*/ "AB"
 r := /(c|d)*/ "CD"
 |]
 
 s3 :: String
-s3 = [strQ|x
-x := /a/ ~/b/ /c/
+s3 = [strQ|
+main := /a/ ~/b/ /c/
 |]
 
 s4 :: String
-s4 = [strQ|x
-x := ~(/def*/?)
+s4 = [strQ|
+main := ~(/def*/?)
 |]
 
 mu1 :: (KleenexMu a, Marked)

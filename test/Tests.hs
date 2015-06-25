@@ -75,15 +75,15 @@ encodeChar = BS.unpack . encodeUtf8 . T.singleton
 
 charclass_accept_dash :: IO TS.Result
 charclass_accept_dash = 
-    let prog = [strQ|test
-test := /[a-z-]*/|]
+    let prog = [strQ|
+main := /[a-z-]*/|]
     in kleenexIdTest prog "a-b-c-d---d-f-eerasdfs-"
 
 -- This was a bug in the C generation.  Works in the SST world it seems.
 newline_bug :: IO TS.Result
 newline_bug =
-    let prog = [strQ|test
-test := ( keep "\n" | ~drop ) ~/\n/ test
+    let prog = [strQ|
+main := ( keep "\n" | ~drop ) ~/\n/ main
       | ( keep "\n" | ~drop ) ~/\n/
 keep := /(a|b)+(a|b)(a|b)+/
 drop := /[^\n]*/
@@ -93,7 +93,7 @@ drop := /[^\n]*/
 -- Test that pipelining works
 pipeline :: IO TS.Result
 pipeline =
-    let prog = [strQ|p >> a >> b
+    let prog = [strQ|start: p >> a >> b
 p := ~/abc/ "a"
 a := /./ "b"
 b := /ab/ "c"
