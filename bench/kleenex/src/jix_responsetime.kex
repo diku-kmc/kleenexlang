@@ -6,15 +6,13 @@
 
    Into:
 
-   [03/Mar/2015:00:00:01 +0100]    "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 13265
+   [03/Mar/2015:00:00:01 +0100]    13265   "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 
 */
-log
+main := (logline output nl)*
 
-log := logline nl log
-     | logline nl
-     | logline
+logline := ~ip ~ws ~rfc931 ~ws ~authuser ~ws ts@timestamp ~ws req@request ~ws ~code ~ws ~bytes ~ws ~referer ~ws ~useragent ~ws res@responsetime ~ws ~hostname ~ws ~frontend ~ws ~backend ~ws*
 
-logline := ~ip ~ws ~rfc931 ~ws ~authuser ~ws timestamp ws request ws ~code ~ws ~bytes ~ws ~referer ~ws ~useragent ~ws responsetime ~ws ~hostname ~ws ~frontend ~ws ~backend ~ws
+output := !ts "\t" !res "\t" !req
 
 ip := integer /\./ integer /\./ integer /\./ integer
 
