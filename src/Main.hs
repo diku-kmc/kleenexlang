@@ -225,9 +225,10 @@ compileTransducers mainOpts (Transducers fsts') = do
   timeSSTgen <- getCurrentTime
   let ssts = map (\fst' -> enumerateVariables $ enumerateStates $
                            sstFromFST fst' (not $ optLookahead mainOpts)) fsts'
---  when (not $ optQuiet mainOpts) $ do
---    putStrLn $ "SST states: " ++ show (S.size $ sstS sst)
---    putStrLn $ "SST edges : " ++ show (sum $ map length $ M.elems $ sstE sst)
+  when (not (optQuiet mainOpts)) $ forM_ (zip ssts [(0::Int)..]) $ \(sst, i) -> do
+    putStrLn $ "SST " ++ show i ++ ":"
+    putStrLn $ "  SST states: " ++ show (S.size $ sstS sst)
+    putStrLn $ "  SST edges : " ++ show (sum $ map length $ M.elems $ sstE sst)
   timeSSTgen' <- getCurrentTime
   timeSSTopt <- getCurrentTime
   let (sstopts, i) = unzip $ map (optimize (optOptimizeSST mainOpts)) ssts
