@@ -1,3 +1,1 @@
-test
-
-test := "0" ~/aaaaaaa/ test | "1" ~/aaa/ test | ""
+main := "0" ~/aaaaaaa/ main | "1" ~/aaa/ main | ""

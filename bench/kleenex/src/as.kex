@@ -1,4 +1,4 @@
 // Match and copy a string of as that ends with a single newline.
-as
 
-as := /a*/ /\n/
+
+main := /a*/ /\n/

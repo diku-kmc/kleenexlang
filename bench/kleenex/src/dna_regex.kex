@@ -13,7 +13,7 @@
 
    Output is given in unary representation, counting how many matches each of these patterns has.
 */
-init >> seq1 >> seq1b >> seq2 >> seq2b >> seq3 >> seq3b >> seq4 >> seq4b >> seq5 >> seq5b >> seq6 >> seq6b >> seq7 >> seq7b >> seq8 >> seq8b >> seq9 >> seq9b >> cleanup
+start: init >> seq1 >> seq1b >> seq2 >> seq2b >> seq3 >> seq3b >> seq4 >> seq4b >> seq5 >> seq5b >> seq6 >> seq6b >> seq7 >> seq7b >> seq8 >> seq8b >> seq9 >> seq9b >> cleanup
 
 init := filter addCounts
 

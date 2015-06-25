@@ -1,11 +1,11 @@
 /* CSV project #3
-   Project away every column from a CSV file except number 2 and 5 and 
+   Project away every column from a CSV file except number 2 and 5 and
    insert a tab symbol between them.
    Requires the CSV file to have exactly six columns.  This makes it easy
    to construct a corresponding regexp in RE2 and compare.  RE2 would not
    be able to handle CSV files with arbitrary column counts.
 */
-csvProj3
+start: csvProj3
 
 csvProj3 := row /\n/ csvProj3
           | row /\n?/

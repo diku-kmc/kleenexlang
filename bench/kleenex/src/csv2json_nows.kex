@@ -1,6 +1,6 @@
 /* Convert a CSV format to its JSON-version without superfluous whitespace.
 Uses a comma as separator. */
-csv2json
+start: csv2json
 
 csv2json := "{" row "}" ~/\n/ csv2json
           | "{" row "}" ~/\n/

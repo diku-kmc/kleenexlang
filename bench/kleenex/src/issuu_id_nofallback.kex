@@ -2,7 +2,7 @@
    The input is copied to the output, but it is also validated in the process.
    If an unexpected key is encountered, the program fails.
 */
-objects
+start: objects
 
 objects := object /\n/ objects
          | object /\n?/
@@ -14,7 +14,7 @@ keyValPairs := keyVal /,/ keyValPairs
 
 keyVal := /"ts":/ someNumber
         | /"visitor_uuid":/ /"/ hash16 /"/
-        | /"visitor_source":/ /"/ visitorSource /"/ 
+        | /"visitor_source":/ /"/ visitorSource /"/
         | /"visitor_device":/ /"/ visitorDevice /"/
         | /"visitor_useragent":/ /"/ someString /"/
         | /"visitor_ip":/ /"/ hash16 /"/

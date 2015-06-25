@@ -1,6 +1,4 @@
-del
-
-del := ~emailLines
+main := ~emailLines
 
 emailLines := ( simpleEmail /\n/ | ~fb ~/\n/ ) emailLines
             | ( simpleEmail /\n/ | ~fb ~/\n/)

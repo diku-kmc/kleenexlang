@@ -1,4 +1,4 @@
 // Identity on a and b
-x
+start: x
 
 x := /(a|b)*/ ~/./

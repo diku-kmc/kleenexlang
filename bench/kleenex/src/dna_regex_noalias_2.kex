@@ -13,7 +13,7 @@
 
    Output is given in unary representation, counting how many matches each of these patterns has.
 */
-init >> core1 >> core2 >> core3 >> cleanup
+start: init >> core1 >> core2 >> core3 >> cleanup
 
 init := filter addCounts
 

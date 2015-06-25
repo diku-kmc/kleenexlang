@@ -1,0 +1,3 @@
+sort_ab
+
+sort_ab := (~/a/ [as <- as "a"] | ~/b/ [bs <- bs "b"])* !as !bs

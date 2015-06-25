@@ -6,7 +6,7 @@
 
    Into:
 
-   [03/Mar/2015:00:00:01 +0100]    13265   "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1" 
+   [03/Mar/2015:00:00:01 +0100]    13265   "GET /beacon?uid=CxDoBw-m&tids=l70 HTTP/1.1"
 */
 main := (logline output nl)*
 

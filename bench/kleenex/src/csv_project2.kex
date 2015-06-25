@@ -3,7 +3,7 @@
    Does no checks on the format, except requiring it to have at least one
    column.
 */
-csvProj2
+start: csvProj2
 
 csvProj2 := rowOdd /\n/ csvProj2
           | rowOdd /\n?/

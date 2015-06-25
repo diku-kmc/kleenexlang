@@ -1,5 +1,5 @@
 /* Performs Apache log parsing */
-logfile
+start: logfile
 
 logfile := "[" (loglines | "") "]\n"
 

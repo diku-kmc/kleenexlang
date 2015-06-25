@@ -13,7 +13,7 @@
 
    Output is given as an un-delimited sequence of these ID numbers.
 */
-filter >> fasta
+start: filter >> fasta
 
 fasta := sequence*
 filter := (sequenceIdent | ~/\n/ | /./)*
