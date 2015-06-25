@@ -3,9 +3,7 @@
 
    Doesn't work directly with netcat, due to netcat keeping stdin open,
    waiting for more data, and the output being buffered. */
-webserver
-
-webserver :=
+main :=
       get ws domain ~/\// ws httpver nl headers nl frontpage
     | notfound
 

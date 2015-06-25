@@ -2,10 +2,7 @@
    Project away the key "last_name" from a JSON file.
    Leave everything else intact.
 */
-jsonProj1
-
-jsonProj1 := block ws jsonProj1
-           | block ws
+main := (block ws)*
 
 block := /\{/ ws keyVals ws /}/
 
