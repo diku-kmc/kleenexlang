@@ -135,7 +135,7 @@ function run {
 
 function usage {
     echo "Usage: ${BASH_SOURCE} [-c test_case] [-p program] [-fh] [-w n] [-r n]"
-    echo "  -c TC: only do the programs \"TC\" (comma-separated)"
+    echo "  -p TC: only do the programs \"TC\" (comma-separated)"
     echo "  -i P:  only run the implementations \"P\" (comma-separated)"
     echo "  -d F:  only run programs that read input files in \"F\" (comma-separated)"
     echo "  -f:    force -- actually run the tests instead of printing what to do"

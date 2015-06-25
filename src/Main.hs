@@ -37,6 +37,7 @@ import           KMC.Syntax.Config
 import           KMC.Syntax.Parser
 import           KMC.Theories
 import           KMC.Visualization
+import           KMC.OutputTerm
 
 data MainOptions =
     MainOptions
@@ -46,6 +47,7 @@ data MainOptions =
     , optLookahead        :: Bool
     , optExpressionArg    :: Bool
     , optActionEnabled    :: Bool
+    , optConstructDFA     :: Bool -- ^ Enable DFA optimization
     }
 
 data CompileOptions =
@@ -105,6 +107,7 @@ instance Options MainOptions where
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
       <*> simpleOption "act" True "Enable actions in the language"
+      <*> simpleOption "dfa" False "Treat ignored Kleenex-subterms as DFAs"
 
 instance Options CompileOptions where
     defineOptions =
@@ -136,21 +139,26 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
                      [ "SST optimization level:  " ++ show (optOptimizeSST mainOpts)
                      , "Word size:               " ++ show (optWordSize compileOpts)
                      , "Identity tables removed: " ++ show (optElimIdTables compileOpts)
+                     , "DFA optimization:        " ++ show (optConstructDFA mainOpts)
                      ]
 
 -- | Existential type representing transducers that can be determinized,
 -- compiled and pretty-printed.
 data Transducers delta where
-    Transducers :: (Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta], Pretty f, Pretty delta
-                   ,Ord delta, Enum delta, Bounded delta)
-                   => [FST Int (RangeSet Word8) f] -> Transducers delta
+    Transducers :: ( Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta]
+                   , Pretty f, Pretty delta, Ord delta, Enum delta
+                   , Bounded delta
+                   )
+                   => [FST Int (RangeSet Word8) (WithNull f)] -> Transducers delta
 
 -- | Existential type representing determinized transducers that can be compiled.
 data DetTransducers delta where
-    DetTransducers :: (Function f, Ord f, Pretty f
-                      ,Ord delta, Enum delta, Bounded delta, Pretty delta
-                      ,Dom f ~ Word8, Rng f ~ [delta]) =>
-                      [SST Int (RangeSet Word8) f Int] -> DetTransducers delta
+    DetTransducers :: ( Function f, Ord f, Pretty f, Dom f ~ Word8
+                      , Rng f ~ [delta], Ord delta, Enum delta
+                      , Bounded delta, Pretty delta
+                      )
+                     =>
+                     [SST Int (RangeSet Word8) (WithNull f) Int] -> DetTransducers delta
 
 transducerSize :: Transducers delta -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
@@ -201,7 +209,7 @@ buildTransducers mainOpts args = do
            kleenexSrc <- readFile arg
            let fsts = if optActionEnabled mainOpts
                       then Transducers $ bytecodeFstFromKleenex kleenexSrc
-                      else Transducers $ fstFromKleenex kleenexSrc
+                      else Transducers $ fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
            return (fsts, arg, kleenexSrc)
          else do
            hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
@@ -345,13 +353,18 @@ main = runSubcommand
        , subcommand "visualize" visualize
        ]
 
-fstFromKleenex :: String -> [FST Int (RangeSet Word8) KleenexOutTerm]
-fstFromKleenex str =
-  case parseKleenex str of
-    Left e -> error e
-    Right ih -> map fromMu (kleenexToMuTerm ih)
+fstFromKleenex :: Bool -> String -> [FST Int (RangeSet Word8) (WithNull KleenexOutTerm)]
+fstFromKleenex constructDFA str =
+    case parseKleenex str of
+         Left e -> error e
+         Right ih -> map construct $ kleenexToMuTerm ih
+  where
+    construct (t, m) = if constructDFA then
+                           fromMuWithDFA m t
+                       else
+                           fromMu t
 
-bytecodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (BitOutputTerm Word8 Word8)]
+bytecodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Word8 Word8))]
 bytecodeFstFromKleenex str =
   case parseKleenex str of
     Left e -> error e

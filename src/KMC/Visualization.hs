@@ -23,10 +23,19 @@ import           KMC.RangeSet
 import           KMC.SSTConstruction
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
+import           KMC.SymbolicAcceptor
 import           KMC.Theories
 
 class Pretty a where
   pretty :: a -> String
+
+instance Pretty (NullFun a b) where
+  pretty NullFun = [chr 949]
+  -- Unicode point 949 is 'GREEK SMALL LETTER EPSILON'
+
+instance (Pretty f) => Pretty (f :+: (NullFun a b)) where
+    pretty (Inl x)       = pretty x
+    pretty (Inr NullFun) = pretty NullFun
 
 instance (Eq a, Pretty a) => Pretty (RangeSet a) where
   pretty rs | [(l,h)] <- ranges rs, l == h = pretty l
@@ -48,7 +57,7 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left x) = "(" ++ pretty x ++ ")"
   pretty (Right y) = pretty y
 
-instance Pretty KMC.SSTConstruction.Var where
+instance Pretty Var where
   pretty (KMC.SSTConstruction.Var xs) = "x" ++ concatMap show xs
 
 instance Pretty a => Pretty [a] where
@@ -71,7 +80,6 @@ instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate 
 instance (Bounded a, Enum a) => Pretty (Const x [a]) where
     pretty (Const []) = "SKIP"
     pretty (Const ws) = "\"" ++ map toChar [ws] ++ "\""
-    
 
 instance Pretty KleenexOutTerm where
     pretty (Inl (InList _)) = "COPY"
@@ -99,10 +107,11 @@ fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]
 
 formatNode :: (Ord st) => (st -> Bool) -> (st -> Bool) -> (st, st) -> GA.Attributes
 formatNode isFinal isInitial (q, _) =
-  concat
-  [ [ GA.Shape GA.DoubleCircle | isFinal q ]
-  , [ GA.Shape GA.BoxShape     | isInitial q ]
-  ]
+    case (isInitial q, isFinal q) of
+      (True, True) -> [ GA.Shape GA.DoubleOctagon ]
+      (True, _   ) -> [ GA.Shape GA.BoxShape      ]
+      (_,    True) -> [ GA.Shape GA.DoubleCircle  ]
+      _            -> []
 
 formatFSTEdge :: (Ord st, Pretty pred, Pretty delta, Pretty func)
               => (st, st, Either (pred, func) delta)
@@ -112,7 +121,37 @@ formatFSTEdge (_, _, l) =
     Left (p, f)  -> [ GV.textLabel $ pack (pretty p ++ " / " ++ pretty f) ]
     Right l' -> [ GV.textLabel $ pack ("/ " ++ pretty l') ]
 
-fstToDot :: (Ord st, Pretty pred, Pretty (Rng func), Pretty func) => FST st pred func -> GV.DotGraph st
+dfaToDot :: (Ord st, Pretty pred)
+         => DFA st pred -> GV.DotGraph st
+dfaToDot (DFA dfa) = GV.graphElemsToDot params nodes edges
+    where
+      params = GV.nonClusteredParams
+               { GV.globalAttributes = fstGlobalAttrs
+               , GV.fmtNode = formatNode (\q -> S.member q (accF dfa)) (== unSingle (accI dfa))
+               , GV.fmtEdge = formatDFAEdge
+               }
+      nodes = map (\x -> (x,x)) (S.toList (accS dfa))
+      edges = [ (q, q', p) | (q, p, q') <- dfaEdgesToList (accE dfa) ]
+      formatDFAEdge (_, _, p) = [ GV.textLabel $ pack $ pretty p ]
+
+nfaToDot :: (Ord st, Pretty pred)
+         => NFA st pred -> GV.DotGraph st
+nfaToDot (NFA nfa) = GV.graphElemsToDot params nodes edges
+    where
+      params = GV.nonClusteredParams
+               { GV.globalAttributes = fstGlobalAttrs
+               , GV.fmtNode = formatNode (flip S.member (accF nfa)) (flip S.member (accI nfa))
+               , GV.fmtEdge = formatNFAEdge
+               }
+      nodes = map (\x -> (x,x)) (S.toList (accS nfa))
+      edges = [ (q, q', p) | (q, p, q') <- nfaEdgesToList (accE nfa) ]
+      -- Unicode point 949 is 'GREEK SMALL LETTER EPSILON'
+      formatNFAEdge (_, _, Nothing) = [ GV.textLabel $ pack $ [chr 949] ]
+      formatNFAEdge (_, _, Just p)  = [ GV.textLabel $ pack $ pretty p ]
+
+
+fstToDot :: (Ord st, Pretty pred, Pretty (Rng func), Pretty func)
+         => FST st pred func -> GV.DotGraph st
 fstToDot fst' = GV.graphElemsToDot params nodes edges
     where
       params = GV.nonClusteredParams
@@ -123,7 +162,8 @@ fstToDot fst' = GV.graphElemsToDot params nodes edges
       nodes = map (\x -> (x,x)) (S.toList (fstS fst'))
       edges = [ (q, q', l) | (q, l, q') <- KMC.SymbolicFST.edgesToList (fstE fst') ]
 
-sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st, Pretty (Rng func)) => SST st pred func var -> GV.DotGraph Int
+sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st, Pretty (Rng func))
+         => SST st pred func var -> GV.DotGraph Int
 sstToDot sst = GV.graphElemsToDot params nodes edges
     where
       params = GV.nonClusteredParams

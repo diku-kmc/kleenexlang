@@ -25,7 +25,7 @@ import           Data.List (sort)
 
 -- invariant: The list is always sorted.
 data RangeSet a = RangeSet { ranges :: [(a, a)] }
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show) 
 
 normalize :: (Enum a, Ord a) => RangeSet a -> RangeSet a
 normalize (RangeSet rs) = RangeSet $ go $ filter validRange rs

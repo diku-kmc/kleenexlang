@@ -17,6 +17,16 @@ data Enumerator e dom rng = Enumerator e deriving (Eq, Ord, Show)
 data Join f rng = Join [f] deriving (Eq, Ord, Show)
 data Const dom rng = Const rng deriving (Eq, Ord, Show)
 data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
+data NullFun a b = NullFun deriving (Eq, Ord, Show)
+
+type WithNull f = f :+: (NullFun (Dom f) (Rng f))
+
+instance (Monoid b) => Function (NullFun a b) where
+    type Dom (NullFun a b) = a
+    type Rng (NullFun a b) = b
+    eval NullFun _  = mempty
+    isConst NullFun = Just mempty
+    inDom _ NullFun = True
 
 instance Function (Ident a) where
   type Dom (Ident a) = a
@@ -39,6 +49,7 @@ instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   isConst (Join fs) = mconcat <$> mapM isConst fs
   inDom x (Join fs) = all (inDom x) fs
 
+
 instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :+: g) where
   type Dom (f :+: g) = Dom f
   type Rng (f :+: g) = Rng f
@@ -56,7 +67,7 @@ instance Function (Const dom rng) where
   isConst (Const x) = Just x
   inDom _ _ = True
 
-instance (Enumerable e dom, Enum rng, Bounded rng) => Function (Enumerator e dom rng) where
+instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Function (Enumerator e dom rng) where
   type Dom (Enumerator e dom rng) = dom
   type Rng (Enumerator e dom rng) = [rng]
   eval (Enumerator e) x = codeFixedWidthEnumSized (size e) (indexOf x e)
@@ -65,3 +76,4 @@ instance (Enumerable e dom, Enum rng, Bounded rng) => Function (Enumerator e dom
                            else
                                Nothing
   inDom x (Enumerator e) = member x e
+

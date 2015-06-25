@@ -1,26 +1,31 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-
+{-# LANGUAGE QuasiQuotes #-}
 module KMC.Kleenex.Lang where
 
 import           Control.Monad.State
 import qualified Data.Map as M
+import qualified Data.Set as S
 import           Data.Word (Word8)
 import           Data.ByteString (unpack, ByteString, empty)
 import           Data.Char (chr, ord)
-import           Data.Maybe (fromJust)
+import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 
-import           KMC.Coding (decodeEnum)
-import           KMC.Expression 
+import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
+import           KMC.Expression
 import           KMC.Kleenex.Action
 import qualified KMC.Kleenex.Parser as H
-import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
+import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..), NullFun(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size)
 import           KMC.Syntax.External (Regex (..), unparse)
 import           KMC.Theories (top, indexOf)
+
+-- for test
+import KMC.Util.Heredoc
+import Debug.Trace
 
 toChar :: (Enum a, Bounded a) => [a] -> Char
 toChar = chr . decodeEnum
@@ -36,20 +41,11 @@ data SimpleMu = SMVar Nat
               | SMIgnore SimpleMu
               | SMAction KleenexAction SimpleMu
               | SMAccept
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 nat2int :: Nat -> Int
 nat2int Z = 0
 nat2int (S n) = 1 + nat2int n
-instance Show SimpleMu where
-    show (SMVar n) = show (nat2int n)
-    show (SMLoop e) = "μ.(" ++ show e ++ ")"
-    show (SMAlt l r) = "(" ++ show l ++ ")+(" ++ show r ++ ")"
-    show (SMSeq l r) = show l ++ show r
-    show (SMWrite s) = show s
-    show (SMRegex r) = "<" ++ unparse r ++ ">"
-    show (SMIgnore s) = "skip:[" ++ show s ++ "]"
-    show SMAccept = "1"
 
 -- | Mu-terms created from Kleenex programs either output the identity on
 -- the input character, injected into a list, or the output a constant list
@@ -65,6 +61,10 @@ copyInput = Inl (InList Ident)
 -- | The term that outputs a fixed string (list of Word8).
 out :: [Word8] -> KleenexOutTerm
 out = Inr . Const
+
+-- | The term that throws away the input char.
+skip :: KleenexOutTerm
+skip = out [] --Inr NullFun
 
 -- | Get the index of an element in a list, or Nothing.
 pos :: (Eq a) => a -> [a] -> Maybe Nat
@@ -117,40 +117,86 @@ kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ evalState (go [initVar] (
       go vars (H.Plus e)      = go vars $ H.Seq e $ H.Star e
       go vars (H.Question e)  = do goe <- go vars e
                                    return $ SMAlt goe SMAccept
+      go vars (H.Action a e)   = fmap (SMAction a) $ go vars e
+      go vars (H.Range l r e) = do goe <- go vars e
+                                   let m = fromMaybe 0 l
+                                   rest <- case r of
+                                              Nothing -> fmap (: []) $ go vars $ H.Star e
+                                              Just n  -> if n < m then error $ "Invalid range: " ++ show m ++ "-" ++ show n
+                                                                  else return $ replicate (n-m) (SMAlt goe SMAccept)
+                                   return $ foldl1 SMSeq $ replicate m goe ++ rest
       go _    H.One           = return $ SMAccept
       go vars (H.Ignore e)    = fmap SMIgnore $ go vars e
       go _    (H.RE re)       = return $ SMRegex re
-      go vars (H.Action a e)   = fmap (SMAction a) $ go vars e
+
+
+-- | Find the locations of subterms that are suppressed.
+-- It infers the "most general location" like so:
+--      (a) E = ~l ~r     --> E' = ~(l r)
+--      (b) E = ~l | ~r   --> E' = ~(l | r)
+--      (c) E = (~e)*     --> E' = ~(e*)
+findSuppressedSubterms :: SimpleMu -> Marked
+findSuppressedSubterms = go [] S.empty
+    where
+      addIfBoth cp marks =
+          if (L:cp) `S.member` marks && (R:cp) `S.member` marks
+          then S.insert cp marks
+          else marks
+      go cp marked sm =
+          case sm of
+            SMLoop e   ->
+                let marks = go (L:cp) marked e
+                in if (L:cp) `S.member` marks
+                   then S.insert cp marks
+                   else marks
+            SMAlt l r  ->
+                addIfBoth cp $ (go (L:cp) marked l) `S.union` (go (R:cp) marked r)
+            SMSeq l r  ->
+                addIfBoth cp $ (go (L:cp) marked l) `S.union` (go (R:cp) marked r)
+            SMIgnore e -> S.insert cp marked
+            SMAccept   -> marked
+            SMVar _    -> marked
+            SMWrite _  -> marked
+            SMRegex _  -> marked
+
 
 -- | A simple mu term is converted to a "real" mu term by converting the
 -- de Bruijn-indexed variables to Haskell variables, and encoding the mu
 -- abstractions as Haskell functions.  This function therefore converts
 -- a de Bruijn representation to a HOAS representation.  All embedded
 -- regular expressions are also represented as mu-terms.
-simpleMuToMuTerm :: [KleenexMu a] -> Bool -> SimpleMu -> KleenexMu a
-simpleMuToMuTerm st ign sm =
+simpleMuToMuTerm' :: [KleenexMu a] -> Bool -> SimpleMu -> KleenexMu a
+simpleMuToMuTerm' st ign sm =
     case sm of
       SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
-      SMLoop sm'   -> Loop $ \x -> simpleMuToMuTerm ((Var x) : st) ign sm'
-      SMAlt l r    -> (simpleMuToMuTerm st ign l) `Alt` (simpleMuToMuTerm st ign r)
-      SMSeq l r    -> (simpleMuToMuTerm st ign l) `Seq` (simpleMuToMuTerm st ign r)
+      SMLoop sm'   -> Loop $ \x -> simpleMuToMuTerm' ((Var x) : st) ign sm'
+      SMAlt l r    -> Alt (simpleMuToMuTerm' st ign l)
+                          (simpleMuToMuTerm' st ign r)
+      SMSeq l r    -> Seq (simpleMuToMuTerm' st ign l)
+                          (simpleMuToMuTerm' st ign r)
       SMWrite s    -> if ign
-                      then W [] Accept
+                      then Accept
                       else W (unpack s) Accept
       SMRegex re   -> if ign
-                      then regexToMuTerm (out []) re
+                      then regexToMuTerm skip re
                       else regexToMuTerm copyInput re
-      SMIgnore sm' -> simpleMuToMuTerm st True sm'
+      SMIgnore sm' -> simpleMuToMuTerm' st True sm'
       SMAction a e -> Accept
       SMAccept -> Accept
 
+simpleMuToMuTerm :: SimpleMu -> KleenexMu a
+simpleMuToMuTerm sm = simpleMuToMuTerm' [] False sm
+
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
 -- expressed in Kleenex.
-kleenexToMuTerm :: H.Kleenex -> [KleenexMu a]
-kleenexToMuTerm k@(H.Kleenex is terms) = map (\i -> simpleMuToMuTerm [] False $ kleenexToSimpleMu i k) is
-
 kleenexToActionMuTerm :: H.Kleenex -> [KleenexActionMu a]
 kleenexToActionMuTerm k@(H.Kleenex is terms) = map (\i -> simpleMuToActionMuTerm [] False $ kleenexToSimpleMu i k) is
+
+kleenexToMuTerm :: H.Kleenex -> [(KleenexMu a, Marked)]
+kleenexToMuTerm k@(H.Kleenex is h) = map f is
+    where
+      f i = let sm = kleenexToSimpleMu i k
+            in (simpleMuToMuTerm sm, findSuppressedSubterms sm)
 
 encodeChar :: Char -> [Word8]
 encodeChar = unpack . encodeUtf8 . T.singleton
@@ -194,11 +240,8 @@ regexToMuTerm o re =
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
 
-testKleenex :: String -> Either String ([KleenexMu a])
+testKleenex :: String -> Either String [(KleenexMu a, Marked)]
 testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
-  
-
-
 
 --- Kleenex with actions translation
 
@@ -210,7 +253,7 @@ simpleMuToActionMuTerm st ign sm =
       SMLoop sm'   -> (Loop $ \x -> simpleMuToActionMuTerm ((Var x) : st) ign sm')
       SMAlt l r    -> (simpleMuToActionMuTerm st ign l) `Alt` (simpleMuToActionMuTerm st ign r)
       SMSeq l r    -> (simpleMuToActionMuTerm st ign l) `Seq` (simpleMuToActionMuTerm st ign r)
-      SMWrite bs   -> if ign 
+      SMWrite bs   -> if ign
                       then Accept
                       else W (unpack bs) Accept
       SMRegex re   -> if ign
@@ -221,7 +264,7 @@ simpleMuToActionMuTerm st ign sm =
       SMAccept     -> Accept
 
 regexToActionMuTerm  :: (RangeSet Word8 -> KleenexAction) -> Regex -> KleenexActionMu a
-regexToActionMuTerm o re = 
+regexToActionMuTerm o re =
     case re of
         One          -> Accept
         Dot          -> RW top (o top) Accept
@@ -250,3 +293,34 @@ regexToActionMuTerm o re =
 
 repeatRegex' :: (RangeSet Word8 -> KleenexAction) -> Int -> Regex -> KleenexActionMu a
 repeatRegex' o n re = foldr Seq Accept (replicate n (regexToActionMuTerm o re))
+
+
+testSimple :: String -> Either String [(SimpleMu, Marked)]
+testSimple s = either Left (Right . g) (H.parseKleenex s)
+    where
+      g k@(H.Kleenex is _) = map (f k) is
+      f h i = let sm = kleenexToSimpleMu i h
+              in (sm, findSuppressedSubterms sm)
+
+-- mu2 :: SimpleMu -- (KleenexMu a, Marked)
+-- mu2 = either (error "woot") head  $ testSimple $ --  testKleenex $
+--       [strQ|x
+-- x := a | ~b
+-- a := <a>
+-- b := ~<b>
+-- |]
+-- mu1 :: (KleenexMu a, Marked)
+-- mu1 = either (error "woot") head  $ testKleenex $
+--       [strQ|x
+-- x := a | ~b
+-- a := <a>
+-- b := ~<b>
+-- |]
+
+-- s1 = [strQ|x
+-- x := ((~a b) | (~c ~d))
+-- a := /a/
+-- b := /b/
+-- c := /c/
+-- d := /d/
+-- |]

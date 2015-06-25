@@ -1,99 +1,119 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 module KMC.TreeWriter
-(Tree(..)
-,TreeWriterT
-,TreeWriter
-,mapOutput
-,plus
-,zero
-,tell
-,tflat
-,tflat'
-,evalTreeWriterT
-,evalTreeWriter
-) where
+       (Tree(..)
+       ,TreeWriterT
+       ,TreeWriter
+       ,mapOutput
+       ,branch
+       ,zero
+       ,tell
+       ,tflat
+       ,runTreeWriterT
+       ,runTreeWriter
+       )
+where
 
-import Data.Monoid
-import Control.Monad.Trans.Free.Church
-import Control.Applicative
+import Control.Monad.Trans
 import Control.Monad.Identity
+import Control.Monad.State
+import Control.Applicative
+import Data.Maybe (catMaybes)
+import Data.Monoid
 
-{------------------------------------------------------------------------------}
-{-- Path trees and monad --}
-
--- Path trees are binary trees with an output w at each node and a state at each
--- fork.
 data Tree w a = Tip { tOutput :: w, tValue :: a }
               | Fork { tOutput :: w
-                     , tLeft :: Tree w a
-                     , tRight :: Tree w a }
+                     , tForks :: [Tree w a] }
   deriving (Eq, Ord)
 
 instance Functor (Tree w) where
-  fmap f (Tip w a) = Tip w (f a)
-  fmap f (Fork w t1 t2) = Fork w (fmap f t1) (fmap f t2)
+  fmap f (Tip w x) = Tip w (f x)
+  fmap f (Fork w xs) = Fork w (map (fmap f) xs)
+
+newtype TreeWriterT w m a = TreeWriterT { runTreeWriterT :: m (Maybe (Tree w a)) }
+  deriving (Functor)
+
+type TreeWriter w a = TreeWriterT w Identity a
 
 mapOutput :: (w -> w') -> Tree w a -> Tree w' a
 mapOutput f (Tip w a) = Tip (f w) a
-mapOutput f (Fork w t1 t2) = Fork (f w) (mapOutput f t1) (mapOutput f t2)
+mapOutput f (Fork w xs) = Fork (f w) (map (mapOutput f) xs)
 
--- | Prepends the given value to the top output of a tree
 tprepend :: (Monoid w) => w -> Tree w a -> Tree w a
 tprepend w (Tip w' x) = Tip (mappend w w') x
-tprepend w (Fork w' x1 x2) = Fork (mappend w w') x1 x2
+tprepend w (Fork w' xs) = Fork (mappend w w') xs
 
--- | Functor representing the operations that are performed in an NFA
--- simulation. The free monad over this functor can be interpreted as a path
--- tree.
-data T w a = Out w a  -- ^ Output value w
-           | Plus a a -- ^ Run computations in parallel from state q
-           | Zero     -- ^ Fail
-  deriving (Show, Functor)
+zero :: Monad m => TreeWriterT w m a
+zero = TreeWriterT $ return Nothing
 
--- | Free monad transformer over the T functor
-type TreeWriterT w m = FT (T w) m
-type TreeWriter w = TreeWriterT w Identity
+tell :: Monad m => w -> TreeWriterT w m ()
+tell w = TreeWriterT $ return $ Just $ Tip w ()
 
--- | Branch operation
-plus :: MonadFree (T w) m => m a -> m a -> m a
-plus x1 x2 = wrap (Plus x1 x2)
+branch :: (Monad m, Monoid w) => [TreeWriterT w m a] -> TreeWriterT w m a
+branch ts = TreeWriterT $ do
+  ts' <- mapM runTreeWriterT ts
+  case catMaybes ts' of
+   [] -> return Nothing
+   [t] -> return (Just t)
+   ts'' -> return (Just (Fork mempty ts''))
 
--- | Fail operation
-zero :: MonadFree (T w) m => m a
-zero = wrap Zero
+{------------------------------------------------------------------------------}
+{-- Evaluation --}
 
--- | Write operation
-tell :: MonadFree (T w) m => w -> m ()
-tell w = wrap (Out w (return ()))
+returnTreeWriterT :: (Monoid w, Monad m) => a -> TreeWriterT w m a
+returnTreeWriterT a = TreeWriterT $ return (Just $ Tip mempty a)
 
--- | Interpretation of free monad over T as a tree of branching computations
--- with possibility of failure.
-evalTreeWriterT :: (Monad m, Monoid w) => TreeWriterT w m a -> m (Maybe (Tree w a))
-evalTreeWriterT x = runFT x (return . Just . Tip mempty) ev
-    where
-      ev :: (Monoid w, Monad m)
-         => T w (m (Maybe (Tree w a))) -> m (Maybe (Tree w a))
-      ev Zero = return Nothing
-      ev (Plus x1 x2) =
-          do { t1 <- x1; t2 <- x2;
-               return $ (Fork mempty <$> t1 <*> t2) <|> t1 <|> t2
-             }
-      ev (Out w y) = do { t <- y; return (tprepend w <$> t) }
+joinTreeWriterT :: (Monoid w, Monad m, Functor m) => TreeWriterT w m (TreeWriterT w m a) -> TreeWriterT w m a
+joinTreeWriterT (TreeWriterT twt) = TreeWriterT $ do
+  y <- twt
+  case y of
+   Nothing -> return Nothing
+   Just t -> flatten t
+  where
+    flatten (Tip w (TreeWriterT x)) = do
+      mx <- x
+      case mx of
+       Nothing -> return Nothing
+       Just t -> return $ Just (tprepend w t)
+    flatten (Fork w ys) = do
+      ts <- catMaybes <$> mapM flatten ys
+      case ts of
+       [] -> return Nothing
+       [t] -> return $ Just (tprepend w t)
+       ts' -> return $ Just (Fork w ts')
 
-evalTreeWriter :: (Monoid w) => TreeWriter w a -> Maybe (Tree w a)
-evalTreeWriter = runIdentity . evalTreeWriterT
+runTreeWriter :: Monoid w => TreeWriterT w Identity a -> Maybe (Tree w a)
+runTreeWriter = runIdentity . runTreeWriterT
+
+{------------------------------------------------------------------------------}
+{-- Instances --}
+
+instance (Monoid w, Monad m, Functor m) => Applicative (TreeWriterT w m) where
+  pure = returnTreeWriterT
+  t1 <*> t2 = joinTreeWriterT (fmap (\f -> fmap f t2) t1)
+
+instance (Monoid w, Monad m, Functor m) => Monad (TreeWriterT w m) where
+  return = returnTreeWriterT
+  x >>= f = joinTreeWriterT $ fmap f x
+
+instance (Monoid w) => MonadTrans (TreeWriterT w) where
+  lift x = TreeWriterT $ x >>= \a -> return (Just (Tip mempty a))
+
+instance (Monoid w, Monad (TreeWriterT w m), MonadState s m) => MonadState s (TreeWriterT w m) where
+  get = lift get
+  put = lift . put
 
 {------------------------------------------------------------------------------}
 {-- Operations on trees --}
 
 tflat :: Tree w a -> [a]
 tflat t = go t []
-    where go (Tip _ a) xs = a:xs
-          go (Fork _ t1 t2) xs = go t1 (go t2 xs)
-
-tflat' :: Maybe (Tree w a) -> [a]
-tflat' = maybe [] tflat
+  where
+    go (Tip _ a) = (a:)
+    go (Fork _ ts) = flip (foldr go) ts
 
 {------------------------------------------------------------------------------}
 {-- Printing trees, with indentation --}
@@ -107,13 +127,14 @@ instance (Show w, Show a) => Show (Tree w a) where
                              . showsPrec 11 w
                              . showString " "
                              . showsPrec 11 a)
-          go p n (Fork w t1 t2) = showIndent n .
-                                  (showParen (p > 10)
-                                   $ showString "Fork "
-                                   . showsPrec 11 w
-                                   . showString "\n     " . showIndent n
-                                   . go 11 (n+1) t1
-                                   . showString "\n     " . showIndent n
-                                   . go 11 (n+1) t2)
+          go p n (Fork w ts) =
+            showIndent n .
+            (showParen (p > 10)
+             $ showString "Fork "
+             . showsPrec 11 w
+             . foldr (\t' sf -> showString "\n     "
+                               . showIndent n
+                               . go 11 (n+1) t'
+                               . sf) id ts)
 
           showIndent n = showString (replicate (n*3) ' ')
