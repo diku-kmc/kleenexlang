@@ -63,6 +63,7 @@ data CompileOptions =
 data VisualizeOptions =
    VisualizeOptions
    { optVisStage :: VisStage
+   , optVisPhase :: Int
    , optVisOut   :: Maybe FilePath
    }
 
@@ -131,6 +132,7 @@ instance Options VisualizeOptions where
                          , optionDefault = VisFST
                          , optionDescription = "Automaton to visualize"
                          })
+        <*> simpleOption "visphase" 1 "Which stage in the pipeline to visualize."
         <*> simpleOption "visout" Nothing ("Save visualization to file (determine type from extension). "
                                            ++ "If not set, attempt to show visualization in window.")
 
@@ -314,9 +316,12 @@ compile mainOpts compileOpts args = do
 
 visualize :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
 visualize mainOpts visOpts args = do
+  let phase = optVisPhase visOpts
   checkArgs args
-  (Transducers (fst':rest), _, _, _) <- buildTransducers mainOpts args
-  when (not $ null rest) $ hPutStrLn stderr "WARNING: Multiple stages, only the first is visualized"
+  (Transducers fsts, _, _, _) <- buildTransducers mainOpts args
+  when (phase < 1 || phase > length fsts) $ error "Invalid phase specified for visualization."
+  when (length fsts > 1) $ hPutStrLn stderr $ "WARNING: Multiple stages, only phase " ++ show phase ++ " is visualized"
+  let fst' = fsts !! (phase-1)
   dg <- case optVisStage visOpts of
           VisFST -> return $ fstToDot fst'
           VisSST -> do
