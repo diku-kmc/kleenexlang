@@ -1,10 +1,9 @@
 /* Performs Apache log parsing */
 start: logfile
 
-logfile := "[" (loglines | "") "]\n"
+logfile := "[" loglines? "]\n"
 
-loglines := logline "," /\n/ loglines
-         |  logline ~/\n?/
+loglines := (logline "," /\n/)* logline /\n/
 
 logline := "{" host ~sep ~userid ~sep ~authuser sep timestamp sep request sep code sep bytes sep referer sep useragent "}"
 
@@ -31,5 +30,5 @@ sep := "," ~ws
 
 quotedString := /"([^"\n]|\\")*"/
 integer := /[0-9]+/
-ip := integer /\./ integer /\./ integer /\./ integer
+ip := integer (/\./ integer){3}
 rfc1413 := /-/

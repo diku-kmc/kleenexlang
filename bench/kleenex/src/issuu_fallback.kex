@@ -14,13 +14,11 @@
 */
 start: objects
 
-objects := object /\n/ objects
-         | object ~/\n?/
+objects := (object /\n/)*
 
 object := ~/\{/ sep keyValPairs ~/}/
 
-keyValPairs := keyVal ~/,/ keyValPairs
-             | keyVal
+keyValPairs := (keyVal ~/,/)* keyVal
 
 sep := "\n"
 nl := "\n"
