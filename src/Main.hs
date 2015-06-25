@@ -328,8 +328,9 @@ visualize mainOpts visOpts args = do
             (DetTransducers (sst:_),_,_) <- compileTransducers mainOpts (Transducers [fst'])
             return $ sstToDot sst
           VisASST -> do
-            (DetTransducers (sst:_))  <- buildActionSSTs mainOpts args
-            return $ sstToDot sst
+            (DetTransducers ssts)  <- buildActionSSTs mainOpts args
+            return $ sstToDot $ ssts !! (phase-1)
+
   case optVisOut visOpts of
     Nothing -> do
         GC.runGraphvizCanvas GC.Dot dg GC.Xlib
