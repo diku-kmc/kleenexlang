@@ -15,10 +15,8 @@
 // OUT:aaa
 // OUT:aaaa
 
-go
-
-go := test /\n/ go
-    | test /\n/
+main := test /\n/ main
+      | test /\n/
 
 test := (as1 | as2 | as3)
 

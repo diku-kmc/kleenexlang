@@ -1,9 +1,7 @@
 // IN:aabbaa
 // OUT:aabbaa
 
-test
-
-test := ( keep "\n" | ~drop ) ~/\n/ test
+main := ( keep "\n" | ~drop ) ~/\n/ main
       | ( keep "\n" | ~drop ) ~/\n/
 
 keep := /(a|b)+(a|b)(a|b)+/

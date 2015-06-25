@@ -33,8 +33,6 @@
 // OUT:yep d
 // OUT:nope d
 
-main
-
 main := (test /\n/)*
 
 test := as | bs | cs | ds

@@ -9,6 +9,4 @@
 // OUT:abcd
 // OUT:abcde
 
-program
-
-program := ((~/a/ "a")? (~/a/ "b")? (~/a/ "c") (~/a/ "d")? (~/a/ "e")? /\n/)*
+main := ((~/a/ "a")? (~/a/ "b")? (~/a/ "c") (~/a/ "d")? (~/a/ "e")? /\n/)*

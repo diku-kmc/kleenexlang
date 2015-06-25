@@ -6,6 +6,4 @@
 // OUT:a
 // OUT:a
 // OUT:a
-program
-
-program := ( (~/a/+ "a" | ~/a/* "b") /\n/ ) *
+main := ( (~/a/+ "a" | ~/a/* "b") /\n/ ) *
