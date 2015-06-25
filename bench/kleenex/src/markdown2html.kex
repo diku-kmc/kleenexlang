@@ -23,12 +23,12 @@ markdownElement :=
    | horizontalRule
    | catchall
 
-header := ~/\#{6}[ ]/ "<h6>" line "</h6>"
-       |  ~/\#{5}[ ]/ "<h5>" line "</h5>"
-       |  ~/\#{4}[ ]/ "<h4>" line "</h4>"
-       |  ~/\#{3}[ ]/ "<h3>" line "</h3>"
-       |  ~/\#{2}[ ]/ "<h2>" line "</h2>"
-       |  ~/\#[ ]/    "<h1>" line "</h1>"
+header := ~/#{6}[ ]/ "<h6>" line "</h6>"
+       |  ~/#{5}[ ]/ "<h5>" line "</h5>"
+       |  ~/#{4}[ ]/ "<h4>" line "</h4>"
+       |  ~/#{3}[ ]/ "<h3>" line "</h3>"
+       |  ~/#{2}[ ]/ "<h2>" line "</h2>"
+       |  ~/#[ ]/    "<h1>" line "</h1>"
 
 fancyHeader := "<h1>" line "</h1>" ~/\n/ ~/={3,}/
             |  "<h2>" line "</h2>" ~/\n/ ~/[\-]{3,}/
@@ -51,8 +51,8 @@ blockquote := "/blockquote/" blockquoteBlock "//blockquote/"
 blockquoteBlock := blockquoteLine /\n/ blockquoteBlock
                 |  blockquoteLine
 
-blockquoteLine := ~/\/[ ]> line
-               |  ~/\/>
+blockquoteLine := ~/>[ ]/ line
+               |  ~/>/
 
 horizontalRule := ~/[\-][ ]*[\-][ ]*[\-][ \-]*/ "/hr//"
                |  ~/\*[ ]*\*[ ]*\*[ *]*/ "/hr//"
@@ -77,10 +77,10 @@ line := code line
 
 */
 
-code := /* ~/``/ "/pre/" /([^\n`]|`[^\n`])*/ "//pre/" ~/``/
-     |  */ ~/`/  "/pre/" /[^\n`]*/ "//pre/" ~/`/
+code := // ~/``/ "/pre/" /([^\n`]|`[^\n`])*/ "//pre/" ~/``/
+ /*    |  */ ~/`/  "/pre/" /[^\n`]*/ "//pre/" ~/`/
 
-image := "<img alt=\"" ~/\!\[\/ \/([^]]|\\])*/ ~/]/ "\" src=\"" ~/\(/ /([^)]|\\\))*/ ~/\)/ "\"/>"
+image := "<img alt=\"" ~/!\[\/ \/([^]]|\\])*/ ~/]/ "\" src=\"" ~/\(/ /([^)]|\\\))*/ ~/\)/ "\"/>"
 
 // XXX: Um. Why doesn't format work right?
 format := ~/\*\*/ "<strong>" line "</strong>" ~/\*\*/

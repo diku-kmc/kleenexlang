@@ -11,48 +11,52 @@
    8. agggta[cgt]a|t[acg]taccct
    9. agggtaa[cgt]|[acg]ttaccct
 
-   Output is given as an un-delimited sequence of these ID numbers.
-
-   Furthermore, the following aliases are respected in the input data:
-
-      B ::= (c|g|t)
-      D ::= (a|g|t)
-      H ::= (a|c|t)
-      K ::= (g|t)
-      M ::= (a|c)
-      N ::= (a|c|g|t)
-      R ::= (a|g)
-      S ::= (c|g)
-      V ::= (a|c|g)
-      W ::= (a|t)
-      Y ::= (c|t)
+   Output is given in unary representation, counting how many matches each of these patterns has.
 */
+start: init >> seq1 >> seq1b >> seq2 >> seq2b >> seq3 >> seq3b >> seq4 >> seq4b >> seq5 >> seq5b >> seq6 >> seq6b >> seq7 >> seq7b >> seq8 >> seq8b >> seq9 >> seq9b >> cleanup
 
-fasta := sequenceIdent ~/\n/ sequence ~/\n/ fasta
-       | sequenceIdent ~/\n/ sequence ~/\n?/
+init := filter addCounts
+
+// Filter out sequence identifiers + newlines
+filter := (sequenceIdent | ~/\n/ | /./)*
 
 /* for now we ignore the sequence separation */
-sequenceIdent := ~/\>[^\n]*/
+sequenceIdent := ~/>[^\n]*/
 
-a := ~/\n?[aAdDhHmMnNrRvVwW]/
-c := ~/\n?[cCbBhHmMnNsSvVyY]/
-g := ~/\n?[gGbBdDkKnNrRsSvV]/
-t := ~/\n?[tTbBdDhHkKnNwWyY]/
+// Add counters for all 9 types at the end of the file
+addCounts := "\n"
+             "[type 1: ]\n"
+             "[type 2: ]\n"
+             "[type 3: ]\n"
+             "[type 4: ]\n"
+             "[type 5: ]\n"
+             "[type 6: ]\n"
+             "[type 7: ]\n"
+             "[type 8: ]\n"
+             "[type 9: ]\n"
 
-singleSeq :=
-    (
-      "1" (a g g g t a a a | t t t a c c t) |
-      "2" ((c|g|t) g g g t a a a | t t t a c c c (a|c|g)) |
-      "3" (a (a|c|t) g g t a a a | t t t a c c (a|g|t) t) |
-      "4" (a g (a|c|t) g t a a a | t t t a c (a|g|t) c t) |
-      "5" (a g g (a|c|t) t a a a | t t t a (a|g|t) c c t) |
-      "6" (a g g g (a|c|g) a a a | t t t (c|g|t) c c c t) |
-      "7" (a g g g t (c|g|t) a a | t t (a|c|g) a c c c t) |
-      "8" (a g g g t a (c|g|t) a | t (a|c|g) t a c c c t) |
-      "9" (a g g g t a a (c|g|t) | (a|c|g) t t a c c c t) |
-      (a|c|g|t)
-    )
+a := ~/[aAdDhHmMnNrRvVwW]/
+c := ~/[cCbBhHmMnNsSvVyY]/
+g := ~/[gGbBdDkKnNrRsSvV]/
+t := ~/[tTbBdDhHkKnNwWyY]/
 
-sequence := singleSeq sequence
-          | singleSeq
+seq1  := (a g g g t a a a [a <- a "1"] | /type 1: / !a | /./)*
+seq1b := (t t t a c c c t [a <- a "1"] | /type 1: / !a | /./)*
+seq2  := ((c|g|t) g g g t a a a [a <- a "1"] | /type 2: / !a | /./)*
+seq2b := (t t t a c c c (a|c|g) [a <- a "1"] | /type 2: / !a | /./)*
+seq3  := (a (a|c|t) g g t a a a [a <- a "1"] | /type 3: / !a | /./)*
+seq3b := (t t t a c c (a|g|t) t [a <- a "1"] | /type 3: / !a | /./)*
+seq4  := (a g (a|c|t) g t a a a [a <- a "1"] | /type 4: / !a | /./)*
+seq4b := (t t t a c (a|g|t) c t [a <- a "1"] | /type 4: / !a | /./)*
+seq5  := (a g g (a|c|t) t a a a [a <- a "1"] | /type 5: / !a | /./)*
+seq5b := (t t t a (a|g|t) c c t [a <- a "1"] | /type 5: / !a | /./)*
+seq6  := (a g g g (a|c|g) a a a [a <- a "1"] | /type 6: / !a | /./)*
+seq6b := (t t t (c|g|t) c c c t [a <- a "1"] | /type 6: / !a | /./)*
+seq7  := (a g g g t (c|g|t) a a [a <- a "1"] | /type 7: / !a | /./)*
+seq7b := (t t (a|c|g) a c c c t [a <- a "1"] | /type 7: / !a | /./)*
+seq8  := (a g g g t a (c|g|t) a [a <- a "1"] | /type 8: / !a | /./)*
+seq8b := (t (a|c|g) t a c c c t [a <- a "1"] | /type 8: / !a | /./)*
+seq9  := (a g g g t a a (c|g|t) [a <- a "1"] | /type 9: / !a | /./)*
+seq9b := ((a|c|g) t t a c c c t [a <- a "1"] | /type 9: / !a | /./)*
 
+cleanup := ~/[^[]*/ /.*/

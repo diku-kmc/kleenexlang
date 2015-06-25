@@ -59,7 +59,7 @@ keyVal := ~/"ts":/ "Timestamp=" someNumber sep
         | ~( /"env_build":/ someString )
         | ~( /"env_name":/ someString )
         | ~( /"env_component":/ someString )
-        | "Unknown key/Val: " someString ~/:\/ "/" (someString | someNumber) sep
+        | "Unknown key/Val: " someString ~/:/ "/" (someString | someNumber) sep
 
 hash16 := /[a-f0-9]{16}/
 someString := ~/"\/ \/([^"])*\/ ~\/"/
