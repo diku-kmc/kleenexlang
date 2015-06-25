@@ -18,8 +18,8 @@ syn match kleenexOperator /:=\||/
 
 syn region kleenexString matchgroup=kleenexStringStart start=+"+ skip=+\\\\\|\\"+ end=+"+
 
-syn region kleenexRegex matchgroup=kleenexRegexStart start=+<+ skip=+\\\\\|\\>+ end=+>+
-syn region kleenexIgnored matchgroup=kleenexIgnoreRegexStart start=+\~<+ skip=+\\\\\|\\>+ end=+>+
+syn region kleenexRegex matchgroup=kleenexRegexStart start=+/[/*]\@!+ skip=+\\\\\|\\/+ end=+/+
+syn region kleenexIgnored matchgroup=kleenexIgnoreRegexStart start=+\~/+ skip=+\\\\\|\\/+ end=+/+
 
 syn match kleenexIgnored /\~\w\+/
 syn region kleenexIgnored matchgroup=kleenexIgnoreGroupStart start=+\~(+ end=+)+
