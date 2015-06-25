@@ -1,0 +1,11 @@
+--- graphviz-2999.17.0.2_/Data/GraphViz/Algorithms.hs	2015-06-15 10:17:46.025306496 +0200
++++ graphviz-2999.17.0.2/Data/GraphViz/Algorithms.hs	2015-06-15 10:20:57.705536103 +0200
+@@ -52,6 +52,8 @@
+ import           Data.Set                  (Set)
+ import qualified Data.Set                  as Set
+ 
++import           Prelude                   hiding (traverse)
++
+ -- -----------------------------------------------------------------------------
+ 
+ {- $options
