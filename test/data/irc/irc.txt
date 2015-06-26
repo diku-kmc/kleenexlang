@@ -1,0 +1,19 @@
+PING :kornbluth.freenode.net
+NOTICE AUTH :*** Looking up your hostname...
+NOTICE AUTH :*** Found your hostname, welcome back
+NOTICE AUTH :*** Checking ident
+NOTICE AUTH :*** No identd (auth) response
+:irc.example.com 001 MyNickname :Welcome to the Internet Relay Network MyNickname!~MyUsername@client.example.com
+:irc.example.com 002 MyNickname :Your host is irc.example.com, running version 2.10.3p5
+:irc.example.com 003 MyNickname :This server was created Mon Oct 13 2003 at 15:56:53 EEST
+:irc.example.com 004 MyNickname irc.example.com 2.10.3p5 aoOirw abeiIklmnoOpqrstv
+:irc.example.com 251 MyNickname :There are 123375 users and 7 services on 48 servers
+:irc.example.com 252 MyNickname 204 :operators online
+:irc.example.com 253 MyNickname 6 :unknown connections
+:irc.example.com 254 MyNickname 55926 :channels formed
+:irc.example.com 255 MyNickname :I have 3981 users, 0 services and 1 servers
+:MyNickname MODE MyNickname :+i
+:MyNickname!MyUsername@client.example.com JOIN :#twilight_zone
+:irc.example.com 353 MyNickname @ #twilight_zone :MyNickname @thor-work @Diazemuls @thor @thor-away @Actilyse
+:irc.example.com 366 MyNickname #twilight_zone :End of NAMES list.
+ERROR :Closing Link: Paul (Client Quit)

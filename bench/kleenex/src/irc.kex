@@ -1,0 +1,47 @@
+
+
+main := message* main
+      | "Malformed line: " /[^\r\n]*\r?\n/ main
+      | ""
+
+message := (~/:/ "Prefix: " prefix "\n"  ~/ /)?
+           "Command: " command "\n"
+           "Parameters: " params? "\n"
+           ~crlf
+
+command := letter+ | digit{3}
+// params :=
+
+prefix := servername
+        | nickname ((/!/ user)? /@/ host )?
+
+user := /[^\n\r @]/+ // Missing \x00
+
+middle  :=  nospcrlfcl ( /:/ | nospcrlfcl )*
+
+params  :=  (~/ / middle ", "){,14} ( ~/ :/ trailing )?
+         |  ( ~/ / middle ){14} ( / / /:/?  trailing )?
+trailing :=  ( /:/ | / / | nospcrlfcl )*
+
+nickname := ( letter | special ) ( letter | special | digit){,10}
+
+host := hostname
+      | hostaddr
+servername := hostname
+
+hostname := shortname ( /\./ shortname)*
+
+hostaddr := ip4addr
+
+shortname := ( letter | digit ) ( letter | digit | /-/ )* ( letter | digit )*
+
+ip4addr := (digit{1,3} /\./ ){3} digit{1,3}
+
+
+// Utilitiy definitions
+letter := /[a-zA-Z]/
+digit  := /[0-9]/
+hexdigit := /[a-fA-F0-9]/
+crlf := /\r?\n/
+nospcrlfcl :=  /[^\n\r :]/ // Missing \x00
+special := /[\][\\`_^{|}]/
