@@ -2,18 +2,19 @@
 
    Known limitations:
    * Missing some features:
-       * Code blocks
-       * Horizontal rules (implemented but commented out)
        * Images (implemented but commented out)
    * Doesn't handle lists well
        * Doesn't handle nested lists
-   * Can't do links. (Wrong order of arguments.)
-       * Especially can't do links with references.
+   * Can't do links with references.
+   * Doesn't handle not parsing things inside of code blocks.
 */
-start: markdown
+start: large >> small >> references >> formatting
 
-markdown := markdownElement /\n/ markdown
-          | /\n?/
+large := (markdownElement /\n/)*
+
+small := (code | /./)*
+
+references := (image | link | /./)*
 
 markdownElement :=
      header
@@ -23,68 +24,66 @@ markdownElement :=
    | horizontalRule
    | catchall
 
-header := ~/#{6}[ ]/ "<h6>" line "</h6>"
-       |  ~/#{5}[ ]/ "<h5>" line "</h5>"
-       |  ~/#{4}[ ]/ "<h4>" line "</h4>"
-       |  ~/#{3}[ ]/ "<h3>" line "</h3>"
-       |  ~/#{2}[ ]/ "<h2>" line "</h2>"
-       |  ~/#[ ]/    "<h1>" line "</h1>"
+header := ~/#{6} / "<h6>" line "</h6>"
+       |  ~/#{5} / "<h5>" line "</h5>"
+       |  ~/#{4} / "<h4>" line "</h4>"
+       |  ~/#{3} / "<h3>" line "</h3>"
+       |  ~/#{2} / "<h2>" line "</h2>"
+       |  ~/# /    "<h1>" line "</h1>"
 
 fancyHeader := "<h1>" line "</h1>" ~/\n/ ~/={3,}/
-            |  "<h2>" line "</h2>" ~/\n/ ~/[\-]{3,}/
+            |  "<h2>" line "</h2>" ~/\n/ ~/-{3,}/
 
-list := "/ul/" unorderedList "//ul/"
-      | "/ol/" orderedList "//ol/"
+list := "<ul>" unorderedList "</ul>"
+      | "<ol>" orderedList "</ol>"
 
 unorderedList := unorderedListLine /\n/ unorderedList
               |  unorderedListLine
 
-unorderedListLine := ~/[*+-][ ]/ "/li/" continuedLine "//li/"
+unorderedListLine := ~/[*+-] / "<li>" continuedLine "</li>"
 
 orderedList := orderedListLine /\n/ orderedList
             |  orderedListLine
 
-orderedListLine := ~/[0-9]+\.[ ]/ "/li/" continuedLine "//li/"
+orderedListLine := ~/[0-9]+\. / "<li>" continuedLine "</li>"
 
-blockquote := "/blockquote/" blockquoteBlock "//blockquote/"
+blockquote := "<blockquote>" blockquoteBlock "</blockquote>"
 
 blockquoteBlock := blockquoteLine /\n/ blockquoteBlock
                 |  blockquoteLine
 
-blockquoteLine := ~/>[ ]/ line
+blockquoteLine := ~/> / line
                |  ~/>/
 
-horizontalRule := ~/[\-][ ]*[\-][ ]*[\-][ \-]*/ "/hr//"
-               |  ~/\*[ ]*\*[ ]*\*[ *]*/ "/hr//"
+horizontalRule := ~/ *(- *){3,}/ "<hr/>"
+               |  ~/ *(\* *){3,}/ "<hr/>"
 
 catchall := line
 
-continuedLine := line ~/\n[ ][ ]+/ " " continuedLine
+continuedLine := line ~/\n {2,}/ " " continuedLine
               |  line
 
-line := code line
-     |  format line
-     |  /[^\n]/ line
-     |  /[^\n]?/
+line := /[^\n]*/
 
-/* XXX: Denne kode giver syntax fejl:
+initFormat := boldp@"/" emp@"/" strikep@"/"
 
-line := code line
-     |  format line
-//     |  image line
-     |  /[^\n]/ line
-     |  /[^\n]?/
+swapBold   := tmp@(!boldp) boldp@(!bolda) bolda@(!tmp)
+swapEm     := tmp@(!emp) emp@(!ema) ema@(!tmp)
+swapStrike := tmp@(!strikep) strikep@(!strikea) strikea@(!tmp)
 
-*/
+code :=  ~/``/ "<pre>" /([^\n`]|`[^\n`])*/ "</pre>" ~/``/
+      |  ~/`/  "<pre>" /[^\n`]*/ "</pre>" ~/`/
 
-code := // ~/``/ "/pre/" /([^\n`]|`[^\n`])*/ "//pre/" ~/``/
- /*    |  */ ~/`/  "/pre/" /[^\n`]*/ "//pre/" ~/`/
+// ![foo](http://bar) -> <img alt="foo" src="http://bar"/>
+image := ~/!/ "<img alt=\"" ~/\[/ /([^]]|\\.)*/ ~/]/ "\" src=\"" ~/\(/ /([^)]|\\.)*/ ~/\)/ "\"/>"
 
-image := "<img alt=\"" ~/!\[\/ \/([^]]|\\])*/ ~/]/ "\" src=\"" ~/\(/ /([^)]|\\\))*/ ~/\)/ "\"/>"
+// [foo](http://bar) -> <a href="http://bar">foo</a>
+link := ~/\[/ linktitle@/([^]]|\\.)*/ ~/]/ "<a href=\"" ~/\(/ /([^)]|\\.)*/ ~/\)/ "\"/>" !linktitle "</a>"
 
-// XXX: Um. Why doesn't format work right?
-format := ~/\*\*/ "<strong>" line "</strong>" ~/\*\*/
-       |  ~/__/   "<strong>" line "</strong>" ~/__/
-       |  ~/\*/   "<em>"     line "</em>"     ~/\*/
-       |  ~/_/    "<em>"     line "</em>"     ~/_/
-       |  ~/~~/   "<strike>" line "</strike>" ~/~~/
+formatting := initFormat (format | /./)*
+
+format := ~/\*\*/ "<" !bolda   "strong>" swapBold
+       |  ~/__/   "<" !bolda   "strong>" swapBold
+       |  ~/\*/   "<" !ema     "em>"     swapEm
+       |  ~/_/    "<" !ema     "em>"     swapEm
+       |  ~/~~/   "<" !strikea "strike>" swapStrike
