@@ -15,7 +15,7 @@ import           Data.Word (Word8)
 import           KMC.Syntax.External
 import           KMC.Theories
 import           KMC.OutputTerm
-import           KMC.RangeSet
+import           KMC.RangeSet hiding (size)
 import           KMC.Expression
 import           KMC.Kleenex.Lang
 import qualified KMC.Kleenex.Parser as H
@@ -35,9 +35,11 @@ fromRegex (Chr a)        = RW (singleton n) (Join [Inl $ Const [bFalse]]) Accept
 fromRegex (Group _ e)    = fromRegex e
 fromRegex (Concat e1 e2) = Seq (fromRegex e1) (fromRegex e2)
 fromRegex (Branch e1 e2) = Alt (W [bFalse] (fromRegex e1)) (W [bTrue] (fromRegex e2))
-fromRegex (Class b rs)   = RW rs' (Join [Inr $ Enumerator rs']) Accept
-    where rs' = (if b then id else complement)
-                $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
+fromRegex (Class b rs)   = RW rs' (Join [out]) Accept
+    where
+        out = if size rs' == 1 then (Inl $ Const [bFalse]) else (Inr $ Enumerator rs')
+        rs' = (if b then id else complement)
+             $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
 fromRegex (Star e)       = Loop $ \x -> Alt (W [bFalse] (Seq (fromRegex e) (Var x)))
                                             (W [bTrue] Accept)
 fromRegex (LazyStar e)   = Loop $ \x -> Alt (W [bFalse] Accept)
