@@ -256,43 +256,43 @@ simpleMuToActionMuTerm st ign sm =
       SMWrite bs   -> if ign
                       then Accept
                       else W (unpack bs) Accept
-      SMRegex re   -> if ign
-                      then regexToActionMuTerm nop re
-                      else regexToActionMuTerm parseBitsAction re
+      SMRegex re   -> regexToActionMuTerm ign re
       SMIgnore sm' -> simpleMuToActionMuTerm st True sm'
       SMAction a e -> Action a $ simpleMuToActionMuTerm st ign e
       SMAccept     -> Accept
 
-regexToActionMuTerm  :: (RangeSet Word8 -> KleenexAction) -> Regex -> KleenexActionMu a
-regexToActionMuTerm o re =
+regexToActionMuTerm  :: Bool -> Regex -> KleenexActionMu a
+regexToActionMuTerm ign re =
     case re of
         One          -> Accept
         Dot          -> RW top (o top) Accept
-        Chr a        -> foldr1 Seq $ map (\c -> RW (matchVal) (o $ singleton c) Accept) (encodeChar a)
-        Group _ e    -> regexToActionMuTerm o e
-        Concat e1 e2 -> Seq (regexToActionMuTerm o e1) (regexToActionMuTerm o e2)
-        Branch e1 e2 -> Alt (regexToActionMuTerm o e1) (regexToActionMuTerm o e2)
+        Chr a        -> if ign then Accept else W (encodeChar a) Accept
+        Group _ e    -> regexToActionMuTerm ign e
+        Concat e1 e2 -> Seq (regexToActionMuTerm ign e1) (regexToActionMuTerm ign e2)
+        Branch e1 e2 -> Alt (regexToActionMuTerm ign e1) (regexToActionMuTerm ign e2)
         (Class b rs)   ->  let rs' = (if b then id else complement)
                                      $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
                                rs'' = rangeSet [ (toEnum 0, toEnum $ size rs' - 1) ]
                            in  RW rs'' (o rs') Accept
-        (Star e)       -> Loop $ \x -> Alt (Seq (regexToActionMuTerm o e) (Var x)) Accept
-        (LazyStar e)   -> Loop $ \x -> Alt Accept (Seq (regexToActionMuTerm o e) (Var x))
-        (Plus e)       -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (Star e))
-        (LazyPlus e)   -> Seq (regexToActionMuTerm o e) (regexToActionMuTerm o (LazyStar e))
-        (Question e)   -> Alt (regexToActionMuTerm o e) Accept
-        (LazyQuestion e)   -> Alt (regexToActionMuTerm o e) Accept
-        (Suppress e)   -> regexToActionMuTerm nop e
+        (Star e)       -> Loop $ \x -> Alt (Seq (regexToActionMuTerm ign e) (Var x)) Accept
+        (LazyStar e)   -> Loop $ \x -> Alt Accept (Seq (regexToActionMuTerm ign e) (Var x))
+        (Plus e)       -> Seq (regexToActionMuTerm ign e) (regexToActionMuTerm ign (Star e))
+        (LazyPlus e)   -> Seq (regexToActionMuTerm ign e) (regexToActionMuTerm ign (LazyStar e))
+        (Question e)   -> Alt (regexToActionMuTerm ign e) Accept
+        (LazyQuestion e)   -> Alt (regexToActionMuTerm ign e) Accept
+        (Suppress e)   -> regexToActionMuTerm True e
         (Range e n m)  -> case m of
-                           Nothing -> Seq (repeatRegex' o n e) (regexToActionMuTerm o (Star e))
-                           Just m' -> if n == m' then repeatRegex' o n e
-                                      else Seq (repeatRegex' o n e) (repeatRegex' o m' (Question e))
+                           Nothing -> Seq (repeatRegex' ign n e) (regexToActionMuTerm ign (Star e))
+                           Just m' -> if n == m' then repeatRegex' ign n e
+                                      else Seq (repeatRegex' ign n e) (repeatRegex' ign m' (Question e))
         (NamedSet _ _) -> error "Named sets not yet supported"
         (LazyRange _ _ _) -> error "Lazy ranges not yet supported"
+    where
+        o = if ign then nop else parseBitsAction
 
 
-repeatRegex' :: (RangeSet Word8 -> KleenexAction) -> Int -> Regex -> KleenexActionMu a
-repeatRegex' o n re = foldr Seq Accept (replicate n (regexToActionMuTerm o re))
+repeatRegex' :: Bool -> Int -> Regex -> KleenexActionMu a
+repeatRegex' ign n re = foldr Seq Accept (replicate n (regexToActionMuTerm ign re))
 
 
 testSimple :: String -> Either String [(SimpleMu, Marked)]

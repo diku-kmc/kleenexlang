@@ -290,6 +290,9 @@ void consume(int c)
 INLINE
 int readnext(int minCount, int maxCount)
 {
+  // We can always take epsilon transitions
+  if (minCount == 0) return 1;
+
   if (avail < maxCount)
   {
     int remaining = avail;

@@ -10,6 +10,7 @@ module KMC.SymbolicSST
 ,UpdateStringFunc(..)
 ,Atom(..)
 ,EdgeAction(..)
+,EdgeSet(..)
 ,ActionExpr(..)
 ,constUpdateStringFunc
 ,normalizeUpdateStringFunc
@@ -51,17 +52,17 @@ type UpdateString var rng      = [Either var rng]
 type RegisterUpdate var func   = M.Map var (UpdateStringFunc var func)
 
 type EdgeSet st pred func var = M.Map st [([pred], EdgeAction var func, st)]
-type EdgeAction var func = RegisterUpdate var func :+: ActionExpr var
-data ActionExpr var = PushOut var
-                    | PopOut
-                    | ParseBits (RS.RangeSet Word8)
-                    | RegUpdate var [Atom var (ActionExpr var)]
-                    | OutputConst [Word8]
+type EdgeAction var func = RegisterUpdate var func :+: ActionExpr var (Dom func) (Rng func)
+data ActionExpr var dom rng = PushOut var
+                            | PopOut
+                            | RegUpdate var [Atom var (ActionExpr var dom rng)]
+                            | ParseBits (RS.RangeSet dom)
+                            | OutputConst rng
     deriving (Ord, Show, Eq)
 
-instance Function (ActionExpr var) where
-    type Dom (ActionExpr var) = Word8
-    type Rng (ActionExpr var) = [Word8]
+instance (rng ~ [dom], Enum dom, Bounded dom) => Function (ActionExpr var dom rng) where
+    type Dom (ActionExpr var dom rng) = dom
+    type Rng (ActionExpr var dom rng) = rng
     eval (ParseBits rs) x = [decodeRangeSet rs x]
     eval (OutputConst c) x = const c x
     isConst _ = Nothing
@@ -95,6 +96,7 @@ data SST st pred func var =
 sstV :: (Ord var, Show var) => SST st pred func var -> S.Set var
 sstV sst = S.unions $ [ M.keysSet upd | (_,_,Inl upd,_) <- edgesToList $ sstE sst ]
                    ++ [ S.singleton var | (_,_,Inr (PushOut var),_) <- edgesToList $ sstE sst ]
+                   ++ [ S.singleton var | (_,atoms) <- M.toList $ sstF sst, (Left var) <- atoms]
 
 -- | Get the designated output variable of an SST.
 sstOut :: (Ord var, Show var) => SST st pred func var -> var
@@ -103,7 +105,7 @@ sstOut = S.findMin . sstV
 deriving instance (Show var, Show func, Show (Rng func)) => Show (Atom var func)
 deriving instance (Eq var, Eq func, Eq (Rng func)) => Eq (Atom var func)
 deriving instance (Ord var, Ord func, Ord (Rng func)) => Ord (Atom var func)
-deriving instance (Ord var, Show st, Show pred, Show func, Show var, Show (Rng func))
+deriving instance (Ord var, Show st, Show pred, Show func, Show var, Show (Rng func), Show (Dom func))
              => Show (SST st pred func var)
 
 evalUpdateStringFunc :: (Function func, Rng func ~ [delta]) =>

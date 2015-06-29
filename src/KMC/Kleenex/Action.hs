@@ -21,14 +21,12 @@ import Foreign.Marshal.Utils
 import KMC.Coding
 import KMC.Expression
 import qualified KMC.RangeSet as RS
-import KMC.FSTConstruction
-import KMC.SymbolicFST
-import qualified KMC.SymbolicSST as S
+import KMC.SymbolicSST
 import KMC.Theories
 import KMC.OutputTerm
 import Debug.Trace
 
-type KleenexAction = S.ActionExpr Int
+type KleenexAction = ActionExpr Int Word8 [Word8]
 type KleenexActionMu a = Mu BitInputTerm KleenexAction a
 
 type BitInputTerm = RS.RangeSet Word8
@@ -38,80 +36,89 @@ matchVal = RS.singleton minBound
 
 -- | The term that copies the input char to output.
 parseBitsAction :: RS.RangeSet Word8 -> KleenexAction
-parseBitsAction rs = S.ParseBits $ rs
+parseBitsAction rs = ParseBits rs
 
 -- | The term that outputs nothing.
 nop :: a -> KleenexAction
-nop = const (S.OutputConst [])
+nop = const (OutputConst [])
+
+
+-- SST Construction with a bit oracle for determinization
+data ConstructState st pred func var =
+  ConstructState { edges     :: EdgeSet st pred func var
+                 , nextState :: st
+                 , states    :: S.Set st
+                 , marks     :: Marked
+                 }
+
+type Construct st pred func var = State (ConstructState st pred func var)
+
+fresh :: (Enum st, Ord st) => Construct st pred func var st
+fresh = do
+  q <- gets nextState
+  modify $ \s -> s { nextState = succ q
+                   , states    = S.insert q (states s)
+                   }
+  return q
+
+addEdge :: (Ord st) => st -> [pred] -> EdgeAction var func -> st
+        -> Construct st pred func var ()
+addEdge q m o q' = modify $ \s -> s { edges = M.insertWith (++) q [(m, o, q')] (edges s) }
 
 actionConstruct :: (Enum st, Ord st, Monoid (Rng KleenexAction))
-             => st -> Mu BitInputTerm KleenexAction st -> Construct st BitInputTerm (WithNull KleenexAction) st
+             => st -> Mu BitInputTerm KleenexAction st -> Construct st BitInputTerm (WithNull KleenexAction) Int st
 actionConstruct _ (Var q) = return q
 actionConstruct qf (Loop e) = mfix (actionConstruct qf . e)
 actionConstruct qf (RW p f e) = do
   q' <- actionConstruct qf e
   q <- fresh
-  addEdge q (Left (p, Inl f)) q'
+  addEdge q [p] (fixAction f) q'
   return q
 actionConstruct qf (W d e) = do
   q' <- actionConstruct qf e
   q <- fresh
-  addEdge q (Left (bFalse, Inl $ S.OutputConst d)) q'
+  addEdge q [] (Inr $ OutputConst d) q'
   return q
 actionConstruct qf (Action a e) = do
   q' <- actionConstruct qf e
   q <- fresh
-  addEdge q (Left (bFalse, Inl a)) q'
+  addEdge q [] (fixAction a) q'
   return q
 actionConstruct qf (Alt e1 e2) = do
   q1 <- actionConstruct qf e1
   q2 <- actionConstruct qf e2
   q <- fresh
-  addEdge q (Left (bFalse, Inl $ S.OutputConst [])) q1
-  addEdge q (Left (bTrue, Inl $ S.OutputConst [])) q2
+  addEdge q [bFalse] (Inr $ OutputConst []) q1
+  addEdge q [bTrue]  (Inr $ OutputConst []) q2
   return q
 actionConstruct qf Accept = return qf
 actionConstruct qf (Seq e1 e2) = do
   q2 <- actionConstruct qf e2
   actionConstruct q2 e1
 
-fromBitcodeMu :: (Enum st, Ord st, Monoid (Rng KleenexAction)) =>
-          Mu BitInputTerm KleenexAction st
-       -> FST st BitInputTerm (WithNull KleenexAction)
-fromBitcodeMu e =
-  let (qin, cs) = runState (actionConstruct (toEnum 0) e)
-                           (ConstructState { edges     = []
-                                           , nextState = toEnum 1
-                                           , states    = S.singleton (toEnum 0)
-                                           , marks     = S.empty
-                                           })
-  in FST { fstS = states cs
-         , fstE = edgesFromList (edges cs)
-         , fstI = qin
-         , fstF = S.singleton (toEnum 0)
-         }
+fixAction :: KleenexAction -> EdgeAction Int (WithNull KleenexAction)
+fixAction (RegUpdate var atoms) = Inl $ M.singleton var $ map conv atoms
+fixAction (ParseBits rs) = Inl $ M.singleton 0 [VarA 0, FuncA (Inl $ ParseBits rs) 0]
+fixAction a = Inr $ a
 
-genActionSST :: (Ord st, Enum st) => KleenexActionMu st -> S.SST st BitInputTerm (WithNull KleenexAction) Int
+conv (FuncA f i) = FuncA (Inl f) i
+conv (VarA var) = VarA var
+conv (ConstA c) = ConstA c
+
+genActionSST :: (Ord st, Enum st, Show st) => KleenexActionMu st -> SST st BitInputTerm (WithNull KleenexAction) Int
 genActionSST mu = sst
     where
-        fst = fromBitcodeMu mu
-        sst = do S.SST { S.sstS = fstS fst
-                       , S.sstE = edges
-                       , S.sstI = fstI fst
-                       , S.sstF = final
-                       }
+        (qin, cs) = runState (actionConstruct (toEnum 0) mu)
+                             (ConstructState { edges     = M.empty
+                                             , nextState = toEnum 1
+                                             , states    = S.singleton (toEnum 0)
+                                             , marks     = S.empty
+                                             })
+        sst = do SST { sstS = states cs
+                     , sstE = edges cs
+                     , sstI = qin
+                     , sstF = final
+                     }
             where
-                edges = M.fromList $ do (st, e) <- M.toList $ eForward $ fstE fst
-                                        let e' = [ ([p], convert a, st') | (p, Inl a, st') <- e]
-                                        return (st, e') 
-                final = M.fromList $ map (\s -> (s, [Left 0])) $  S.toList $ fstF fst
-    
-                hack (S.VarA a) = S.VarA a
-                hack (S.ConstA a) = S.ConstA a
-                hack (S.FuncA f i) = S.FuncA (Inl f) i
-                convert :: KleenexAction -> S.EdgeAction Int (WithNull KleenexAction)
-                convert (S.RegUpdate var atoms) = Inl $ M.singleton var (map hack atoms)
-                convert (S.ParseBits rs)        = Inl $ M.singleton 0 [S.VarA 0, S.FuncA (Inl $ S.ParseBits rs) 0]
-                convert (S.PushOut var)         = Inr $ S.PushOut var
-                convert (S.PopOut)              = Inr $ S.PopOut
-                convert (S.OutputConst c)       = Inl $ M.singleton 0 [S.VarA 0, S.ConstA c]
+                final = M.fromList $ [(toEnum 0,[Left 0])]
+

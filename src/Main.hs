@@ -149,7 +149,7 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
 data Transducers delta where
     Transducers :: ( Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta]
                    , Pretty f, Pretty delta, Ord delta, Enum delta
-                   , Bounded delta
+                   , Bounded delta, Show delta
                    )
                    => [FST Int (RangeSet Word8) (WithNull f)] -> Transducers delta
 
@@ -157,7 +157,7 @@ data Transducers delta where
 data DetTransducers delta where
     DetTransducers :: ( Function f, Ord f, Pretty f, Dom f ~ Word8
                       , Rng f ~ [delta], Ord delta, Enum delta
-                      , Bounded delta, Pretty delta
+                      , Bounded delta, Pretty delta, Show delta
                       )
                      =>
                      [SST Int (RangeSet Word8) (WithNull f) Int] -> DetTransducers delta
