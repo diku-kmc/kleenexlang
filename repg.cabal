@@ -18,6 +18,11 @@ executable repg
   main-is:             Main.hs
   -- other-modules:
   -- other-extensions:
+  ghc-options:
+    -O2
+    -threaded
+--    -fprof-auto
+--    "-with-rtsopts=-N -p -s -h -i0.1"
   build-depends:       MissingH >= 1.3
                      , base >=4.6
                      , bytestring >= 0.10.0.2
