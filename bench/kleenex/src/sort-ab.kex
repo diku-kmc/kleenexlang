@@ -1,3 +1,0 @@
-sortab
-
-sortab := (~/a/ [as <- as "a"] | ~/b/ [bs <- bs "b"])* !as !bs
