@@ -1,12 +1,11 @@
 /* Converts a markdown document to HTML
 
    Known limitations:
-   * Missing some features:
-       * Images (implemented but commented out)
    * Doesn't handle lists well
        * Doesn't handle nested lists
    * Can't do links with references.
    * Doesn't handle not parsing things inside of code blocks.
+   * Assumes wellformedness of formatting tags. (I.e., doesn't check if ** is balanced.)
 */
 start: large >> small >> references >> formatting
 
