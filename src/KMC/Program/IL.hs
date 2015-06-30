@@ -70,3 +70,5 @@ data Program delta =
   , progBlocks       :: M.Map BlockId (Block delta)
   }
   deriving (Eq, Show)
+
+type Pipeline delta gamma = Either [Program delta] [(Program delta, Program gamma)]

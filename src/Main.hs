@@ -245,17 +245,18 @@ transducerToProgram :: MainOptions
                     -> String
                     -> String
                     -> DetTransducers delta
-                    -> DetTransducers delta
+                    -> DetTransducers gamma
                     -> IO (ExitCode, NominalDiffTime)
 transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
                     (DetTransducers ssts) (DetTransducers assts) = do
   timeCompile <- getCurrentTime
   let optimizeTables = if optElimIdTables compileOpts then elimIdTables else id
+  let optimizeTables' = if optElimIdTables compileOpts then elimIdTables else id
   let progs  = map (optimizeTables . compileAutomaton) ssts
-  let aprogs = map (optimizeTables . compileAutomaton) assts
+  let aprogs = map (optimizeTables' . compileAutomaton) assts
   let progs' = if optActionEnabled mainOpts
-               then concat $ zipWith (\p a -> [p,a]) progs aprogs
-               else progs
+               then Right $ zip progs aprogs
+               else Left progs
   let envInfo = intercalate "\\n" [ "Options:"
                                   , prettyOptions mainOpts compileOpts
                                   , ""

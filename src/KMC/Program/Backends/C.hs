@@ -38,10 +38,10 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> [String] -> String
-progTemplate buString tablesString declsString infoString initString progStrings =
+progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String 
+progTemplate buString tablesString declsString infoString initString progStrings withActions =
  [strQ|
-#define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
+#define NUM_PHASES |] ++ show (if withActions then length progStrings else 2*length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
   ++ [fileQ|crt/crt.c|] ++ "\n"
   ++ tablesString ++ "\n"
@@ -418,12 +418,15 @@ prettyExpr e =
     op str e1 e2 = parens (prettyExpr e1 <+> text str <+> prettyExpr e2)
 
 -- | Pretty print all table declarations.
-prettyTableDecl :: (Enum delta, Bounded delta) =>
-                   CType            -- ^ Table unit type
-                -> [Program delta]  -- ^ Programs
+prettyTableDecl :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
+                   CType                 -- ^ Table unit type
+                -> Pipeline delta gamma  -- ^ Programs
                 -> Doc
-prettyTableDecl tbltype progs = vcat $ zipWith tableDecl progs  [1..]
+prettyTableDecl tbltype pipeline = case pipeline of 
+                                    Left  progs -> vcat $ zipWith tableDecl progs [1..]
+                                    Right progs -> vcat $ zipWith combine progs [1,3..]
   where
+    combine (p,a) i = tableDecl p i $+$ tableDecl a (i+1)
     tableDecl prog phase = 
         if null tables 
         then text "/* no tables */" 
@@ -436,20 +439,22 @@ prettyTableDecl tbltype progs = vcat $ zipWith tableDecl progs  [1..]
         tableSize = length . tblTable . head $ tables
 
 -- | Pretty print all buffer declarations.
-prettyBufferDecls :: [Program delta] -> Doc
+prettyBufferDecls :: Pipeline delta gamma -> Doc
 prettyBufferDecls progs =
   vcat (map bufferDecl $ neededBuffers progs)
   where
     bufferDecl (BufferId n) = text "buffer_t" <+> text bufferPrefix <> int n <> semi
 
-prettyConstantDecls :: (Enum delta, Bounded delta) =>
+prettyConstantDecls :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
                         CType -- ^ Buffer unit type
-                     -> [Program delta]
+                     -> Pipeline delta gamma
                      -> Doc
-prettyConstantDecls buftype progs =
-  vcat $ zipWith (\prog i -> vcat $ map (constantDecl i) $ M.toList $ progConstants prog) 
-                 progs [1..]
+prettyConstantDecls buftype pipeline = case pipeline of
+    Left progs -> vcat $ zipWith constantDecls progs [1..]
+    Right progs -> vcat $ zipWith combine progs [1,3..]
   where
+    constantDecls prog i = vcat $ map (constantDecl i) $ M.toList $ progConstants prog
+    combine (p,a) i = constantDecls p i $+$ constantDecls a (i+1)
     constantDecl phase (ConstId n, deltas) =
       let chunks = splitAppends buftype deltas
           constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
@@ -464,17 +469,27 @@ prettyConstantDecls buftype progs =
                 (braces $ hcat $ punctuate comma constdocs) <> semi
              ]
 
-neededBuffers :: [Program delta] -> [BufferId]
-neededBuffers progs = S.toList $ S.unions $ map (S.fromList . progBuffers) progs
+neededBuffers :: Pipeline delta gamma -> [BufferId]
+neededBuffers pipeline = case pipeline of 
+        Left  progs -> deduplicate $ concatMap progBuffers progs
+        Right progs -> deduplicate $ concatMap combine progs
+    where
+        combine (p,a) = progBuffers p ++ progBuffers a
+        deduplicate = S.toList . S.fromList
 
-neededNonStreamBuffers :: [Program delta] -> [BufferId]
-neededNonStreamBuffers progs = 
-    S.toList $ S.unions $ 
-    map (\prog -> S.fromList $ filter (/= progStreamBuffer prog) $ progBuffers prog) progs
+neededNonStreamBuffers :: Pipeline delta gamma -> [BufferId]
+neededNonStreamBuffers pipeline = S.toList . S.unions $ case pipeline of
+    Left  progs -> map needed progs
+    Right progs -> map (\(p,a) -> S.union (needed p) (needed a)) progs
+  where
+    needed prog = S.fromList $ filter (/= progStreamBuffer prog) $ progBuffers prog 
+    
+    
+
 
 -- | Pretty print initialization code. This is just a call to init_buffer() for
 -- each buffer in the program.
-prettyInit :: [Program delta] -> Doc
+prettyInit :: Pipeline delta gamma -> Doc
 prettyInit progs =
   vcat (map bufferInit $ neededNonStreamBuffers progs)
   where
@@ -489,31 +504,32 @@ prettyProg buftype tbltype prog phase =
       blck blid phase <>  char ':'
                       <+> prettyBlock buftype tbltype prog is phase
 
-programsToC :: (Enum delta, Bounded delta) => CType -> [Program delta] -> CProg
-programsToC buftype progs =
+programsToC :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) => CType -> Pipeline delta gamma -> CProg
+programsToC buftype pipeline =
   CProg
-  { cTables       = prettyTableDecl tbltype progs
-  , cDeclarations = prettyBufferDecls progs
-                    $+$ prettyConstantDecls buftype progs
-  , cInit         = prettyInit progs
-  , cProg         = zipWith (prettyProg buftype tbltype) progs [1..]
+  { cTables       = prettyTableDecl tbltype pipeline
+  , cDeclarations = prettyBufferDecls pipeline
+                    $+$ prettyConstantDecls buftype pipeline
+  , cInit         = prettyInit pipeline
+  , cProg         = prettyProgs
   , cBufferUnit   = ctyp buftype
   }
   where
     tbltype = UInt8T
+    prettyProgs = case pipeline of
+                    Left progs  -> zipWith (prettyProg buftype tbltype) progs [1..]
+                    Right progs -> concat $ zipWith combine progs [1,3..]
+    combine (p,a) i = [prettyProg buftype tbltype p i, prettyProg buftype tbltype a (i+1)]
 
-renderCProg :: String -> CProg -> String
-renderCProg compInfo cprog =
+renderCProg :: String -> Bool -> CProg -> String
+renderCProg compInfo withActions cprog =
   progTemplate (render $ cBufferUnit cprog)
                (render $ cTables cprog)
                (render $ cDeclarations cprog)
                compInfo
                (render $ cInit cprog)
                (map render $ cProg cprog)
-
-renderProgram :: (Enum delta, Bounded delta) => CType -> [Program delta] -> String
-renderProgram buftype = renderCProg "\"TODO: insert descriptive string from renderProgram\""
-                        . programsToC buftype
+               withActions
 
 ccVersion :: FilePath -> IO String
 ccVersion comp = do
@@ -524,21 +540,24 @@ ccVersion comp = do
   errStr <- hGetContents hErr
   return $ intercalate "\\n" $ lines $ errStr
 
-compileProgram :: (Enum delta, Bounded delta) =>
+compileProgram :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
                   CType
                -> Int
                -> Bool
-               -> [Program delta]
+               -> Pipeline delta gamma
                -> Maybe String -- ^ Optional descriptor to put in program.
                -> FilePath     -- ^ Path to C compiler
                -> Maybe FilePath
                -> Maybe FilePath
                -> Bool -- ^ Use word alignment
                -> IO ExitCode
-compileProgram buftype optLevel optQuiet progs desc comp moutPath cCodeOutPath wordAlign = do
+compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPath wordAlign = do
   cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
-  let cstr = renderCProg info . programsToC buftype $ progs
+  let withActions = case pipeline of
+                      Left  _ -> False
+                      Right _ -> True
+  let cstr = renderCProg info withActions . programsToC buftype $ pipeline
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do

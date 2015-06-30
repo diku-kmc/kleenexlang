@@ -105,6 +105,11 @@ class PartialOrder a where
 -- `Boolean`, and `PartialOrder`.
 class (Ord pred, Boolean pred, PartialOrder pred) => Predicate pred where
 
+class (Ord var, Show var, Eq var) => Variable var where
+
+-- Finite alphabet
+class (Ord delta, Show delta, Eq delta, Enum delta, Bounded delta) => Alphabet delta where
+
 {----------------------------------------------------------------------}
 {- Instances                                                          -}
 {----------------------------------------------------------------------}
