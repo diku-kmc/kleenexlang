@@ -4,7 +4,7 @@
 repgc=../dist/build/repg/repg # Location of our compiler
 
 # 'nola' is "no lookahead" and 'la' is "lookahead"
-opt_levels=(3-nola) # (0-nola 3-nola 3-la)
+opt_levels=(3-la) # (0-nola 3-nola 3-la)
 compiler_conf_file="${BASH_SOURCE%/*}/compilers.txt"
 reps=1
 src_dir="kleenex/src"
@@ -96,6 +96,10 @@ done
 set_compiler_names
 mkdir -p $time_dir
 mkdir -p $bin_dir
+
+if [ "$dryrun" = true ]; then
+    echo "# Executing dry-run; use -f to perform an actual run."
+fi
 
 for opt_la_level in ${opt_levels[@]}; do # for each SST optimization level
     opt_level=${opt_la_level%-*}
