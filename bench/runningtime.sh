@@ -9,7 +9,8 @@ all_test_cases=$(cat ${test_case_table} | awk '$1 !~ /#/ { print $1 }')
 time_suffix=".runningtime"
 
 data_dir="../test/data"
-time_dir="times"
+timestamp="$(date "+%Y_%m_%d__%k_%M_%S")"
+time_dir="times/$timestamp"
 
 # Default settings
 warmup_reps=0   # Number of warm-up runs
@@ -94,7 +95,7 @@ function run {
             inv_name=${invocation_cmds_names[i]}
             # Stitch together the actual command to run
             pf=$(basename $input)
-            out_dir="${flavor}/${time_dir}/${inv_name}"
+            out_dir="${time_dir}/${flavor}/${inv_name}"
             outfile="${out_dir}/${pf}${time_suffix}"
             _cmd="${inv} < ${data_dir}/${input} > /dev/null"
             warmup_cmd="$_cmd 2>> $tmp_file"
