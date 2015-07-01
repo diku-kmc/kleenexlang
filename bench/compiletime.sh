@@ -4,7 +4,7 @@
 repgc=../dist/build/repg/repg # Location of our compiler
 
 # 'nola' is "no lookahead" and 'la' is "lookahead"
-opt_levels=(3-la) # (0-nola 3-nola 3-la)
+opt_levels=(0-nola 0-la 3-nola 3-la)
 compiler_conf_file="${BASH_SOURCE%/*}/compilers.txt"
 reps=1
 src_dir="kleenex/src"
