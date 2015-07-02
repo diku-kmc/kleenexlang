@@ -1,7 +1,7 @@
 #!/bin/bash
 # Script for doing an automatic nightly run of the benchmarks
-warmups=2
-rounds=6
+warmups=1
+rounds=5
 log_dir="./logs"
 timestamp="$(date "+%Y_%m_%d__%k_%M_%S")"
 
