@@ -10,6 +10,13 @@ mkdir -p "$log_dir"
 
 function run_benchmarks {
     echo "# This run has timestamp: $timestamp"
+
+    echo "# Pulling in changes from git"
+    git pull
+
+    echo "# Rebuilding repg"
+    (cd .. ; touch src/KMC/Program/Backends/C.hs ; cabal build)
+
     echo "# Compiling all Kleenex programs"
     ./compiletime.sh -l "$timestamp" -f
 
