@@ -16,6 +16,7 @@ import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
 
+import           KMC.Coding
 import           KMC.Kleenex.Lang
 import           KMC.Kleenex.Action
 import           KMC.OutputTerm
@@ -85,20 +86,27 @@ instance Pretty KleenexOutTerm where
     pretty (Inl (InList _)) = "COPY"
     pretty (Inr x)          = pretty x
 
-instance (Pretty var, Pretty rng, Pretty dom) => Pretty (ActionExpr var dom rng) where
-    pretty (ParseBits _)   = "BITS!"
+instance (Pretty var, Pretty rng) => Pretty (ActionExpr var dom rng) where
+    pretty (ParseBits _ _) = "BITS!"
     pretty (RegUpdate var atoms) = pretty var ++ ":=" ++ pretty atoms
     pretty (PushOut v)     = "push outbuf " ++ pretty v
     pretty (PopOut)        = "pop outbuf"
     pretty (OutputConst c) = pretty c
 
-instance (Pretty a, Pretty var, Pretty dom, Pretty rng) => Pretty (a :+: ActionExpr var dom rng) where
+instance (Pretty a, Pretty var, Pretty rng) => Pretty (a :+: ActionExpr var dom rng) where
   pretty (Inl x) = "(" ++ pretty x ++ ")"
   pretty (Inr y) = pretty y
 
-instance (Pretty var, Pretty b, Pretty dom, Pretty rng) => Pretty (ActionExpr var dom rng :+: b) where
+instance (Pretty var, Pretty b, Pretty rng) => Pretty (ActionExpr var dom rng :+: b) where
   pretty (Inl x) = "(" ++ pretty x ++ ")"
   pretty (Inr y) = pretty y
+
+instance Pretty BitString where
+  pretty (BitString b) = map replace b
+    where
+      replace False = '0'
+      replace True  = '1'
+
 
 
 fstGlobalAttrs :: [GV.GlobalAttributes]

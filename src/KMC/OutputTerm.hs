@@ -43,6 +43,7 @@ instance (Function f) => Function (InList f) where
   eval (InList f) x = [eval f x]
   isConst (InList f) = (:[]) <$> isConst f
   inDom x (InList f) = inDom x f
+  domain (InList f) = domain f
 
 instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   type Dom (Join f rng) = Dom f
@@ -50,6 +51,7 @@ instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   eval (Join fs) x = mconcat $ map (flip eval x) fs
   isConst (Join fs) = mconcat <$> mapM isConst fs
   inDom x (Join fs) = all (inDom x) fs
+  domain (Join fs) = mconcat $ map domain fs
 
 
 instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :+: g) where
@@ -61,6 +63,8 @@ instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :
   isConst (Inr g) = isConst g
   inDom x (Inl f) = inDom x f
   inDom x (Inr g) = inDom x g
+  domain (Inl f) = domain f
+  domain (Inr g) = domain g
 
 instance Function (Const dom rng) where
   type Dom (Const dom rng) = dom
@@ -68,6 +72,7 @@ instance Function (Const dom rng) where
   eval (Const x) = const x
   isConst (Const x) = Just x
   inDom _ _ = True
+  domain (Const x) = []
 
 instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Function (Enumerator e dom rng) where
   type Dom (Enumerator e dom rng) = dom
@@ -78,5 +83,5 @@ instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Functio
                            else
                                Nothing
   inDom x (Enumerator e) = member x e
-  domain (Enumerator e)  = [lookupIndex i e | i <- [0 .. size e]]
+  domain (Enumerator e)  = [lookupIndex i e | i <- [0 .. size e - 1]]
 

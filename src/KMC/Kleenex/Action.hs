@@ -26,21 +26,17 @@ import KMC.Theories
 import KMC.OutputTerm
 import Debug.Trace
 
-type KleenexAction = ActionExpr Int Word8 [Word8]
+type KleenexAction = ActionExpr Int BitString [Word8]
 type KleenexActionMu a = Mu BitInputTerm KleenexAction a
 
-type BitInputTerm = RS.RangeSet Word8
-
-matchVal :: BitInputTerm
-matchVal = RS.singleton minBound
 
 -- | The term that copies the input char to output.
-parseBitsAction :: RS.RangeSet Word8 -> KleenexAction
-parseBitsAction rs = ParseBits rs
+parseBitsAction :: RS.RangeSet BitString -> RS.RangeSet Word8 -> KleenexAction
+parseBitsAction rs rs' = ParseBits rs rs'
 
 -- | The term that outputs nothing.
-nop :: a -> KleenexAction
-nop = const (OutputConst [])
+nop :: a -> b -> KleenexAction
+nop _ = const (OutputConst [])
 
 
 -- SST Construction with a bit oracle for determinization
@@ -88,8 +84,8 @@ actionConstruct qf (Alt e1 e2) = do
   q1 <- actionConstruct qf e1
   q2 <- actionConstruct qf e2
   q <- fresh
-  addEdge q [bFalse] (Inr $ OutputConst []) q1
-  addEdge q [bTrue]  (Inr $ OutputConst []) q2
+  addEdge q [matchZero] (Inr $ OutputConst []) q1
+  addEdge q [matchOne]  (Inr $ OutputConst []) q2
   return q
 actionConstruct qf Accept = return qf
 actionConstruct qf (Seq e1 e2) = do
@@ -98,7 +94,7 @@ actionConstruct qf (Seq e1 e2) = do
 
 fixAction :: KleenexAction -> EdgeAction Int (WithNull KleenexAction)
 fixAction (RegUpdate var atoms) = Inl $ M.singleton var $ map conv atoms
-fixAction (ParseBits rs) = Inl $ M.singleton 0 [VarA 0, FuncA (Inl $ ParseBits rs) 0]
+fixAction (ParseBits rs rs') = Inl $ M.singleton 0 [VarA 0, FuncA (Inl $ ParseBits rs rs') 0]
 fixAction a = Inr $ a
 
 conv (FuncA f i) = FuncA (Inl f) i

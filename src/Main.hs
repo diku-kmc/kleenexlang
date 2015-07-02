@@ -21,6 +21,7 @@ import           System.FilePath (takeExtension)
 import           System.IO
 
 import           KMC.Bitcoder
+import           KMC.Coding
 import           KMC.FSTConstruction hiding (Var)
 import           KMC.Kleenex.Lang (KleenexOutTerm, kleenexToMuTerm, kleenexToActionMuTerm)
 import           KMC.Kleenex.Parser (parseKleenex)
@@ -149,18 +150,18 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
 data Transducers delta where
     Transducers :: ( Function f, Ord f, Dom f ~ Word8, Rng f ~ [delta]
                    , Pretty f, Pretty delta, Ord delta, Enum delta
-                   , Bounded delta, Show delta
+                   , Show delta, Bounded delta
                    )
                    => [FST Int (RangeSet Word8) (WithNull f)] -> Transducers delta
 
 -- | Existential type representing determinized transducers that can be compiled.
-data DetTransducers delta where
-    DetTransducers :: ( Function f, Ord f, Pretty f, Dom f ~ Word8
+data DetTransducers gamma delta where
+    DetTransducers :: ( Function f, Ord f, Pretty f, Dom f ~ gamma
                       , Rng f ~ [delta], Ord delta, Enum delta
                       , Bounded delta, Pretty delta, Show delta
                       )
                      =>
-                     [SST Int (RangeSet Word8) (WithNull f) Int] -> DetTransducers delta
+                     [SST Int (RangeSet gamma) (WithNull f) Int] -> DetTransducers gamma delta
 
 transducerSize :: Transducers delta -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
@@ -184,7 +185,7 @@ getCompileFlavor args =
                                                     , "Expects one of '.kex', '.re', or '.rx'."
                                                     ]
 
-buildTransducers :: MainOptions -> [String] -> IO (Transducers Word8, String, String, NominalDiffTime)
+buildTransducers :: MainOptions -> [String] -> IO (Transducers Bool, String, String, NominalDiffTime)
 buildTransducers mainOpts args = do
   let [arg] = args
   let flav = getCompileFlavor args
@@ -210,8 +211,8 @@ buildTransducers mainOpts args = do
     else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
            let fsts = if optActionEnabled mainOpts
-                      then Transducers $ bytecodeFstFromKleenex kleenexSrc
-                      else Transducers $ fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
+                      then Transducers $ bitcodeFstFromKleenex kleenexSrc
+                      else undefined --Transducers $ fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
            return (fsts, arg, kleenexSrc)
          else do
            hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
@@ -222,7 +223,7 @@ buildTransducers mainOpts args = do
   timeFSTgen' <- getCurrentTime
   return (fsts'', srcName, md5s (Str src), diffUTCTime timeFSTgen' timeFSTgen)
 
-compileTransducers :: MainOptions -> Transducers delta -> IO (DetTransducers delta, NominalDiffTime, NominalDiffTime)
+compileTransducers :: MainOptions -> Transducers delta -> IO (DetTransducers Word8 delta, NominalDiffTime, NominalDiffTime)
 compileTransducers mainOpts (Transducers fsts') = do
   timeSSTgen <- getCurrentTime
   let ssts = map (\fst' -> enumerateVariables $ enumerateStates $
@@ -239,13 +240,17 @@ compileTransducers mainOpts (Transducers fsts') = do
          ,diffUTCTime timeSSTgen' timeSSTgen
          ,diffUTCTime timeSSTopt' timeSSTopt)
 
-transducerToProgram :: MainOptions
+transducerToProgram :: (Ord gamma, Show gamma, Eq gamma, Enum gamma
+                       ,Ord delta, Show delta, Eq delta, Enum delta, Bounded delta
+                       ,Ord delta1, Show delta1, Eq delta1, Enum delta1, Bounded delta1
+                       ,Ord gamma1, Show gamma1, Eq gamma1, Enum gamma1) =>
+                       MainOptions
                     -> CompileOptions
                     -> Bool
                     -> String
                     -> String
-                    -> DetTransducers delta
-                    -> DetTransducers gamma
+                    -> DetTransducers gamma delta
+                    -> DetTransducers gamma1 delta1
                     -> IO (ExitCode, NominalDiffTime)
 transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
                     (DetTransducers ssts) (DetTransducers assts) = do
@@ -297,7 +302,7 @@ compile mainOpts compileOpts args = do
 
   assts <- buildActionSSTs mainOpts args
 
-  let useWordAlignment = getCompileFlavor args == CompilingKleenex
+  let useWordAlignment = False --getCompileFlavor args == CompilingKleenex
   (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
                                                 useWordAlignment srcName
                                                 srcMd5 ssts assts
@@ -372,13 +377,13 @@ fstFromKleenex constructDFA str =
                        else
                            fromMu t
 
-bytecodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Word8 Word8))]
-bytecodeFstFromKleenex str =
+bitcodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Bool Word8))]
+bitcodeFstFromKleenex str =
   case parseKleenex str of
     Left e -> error e
-    Right ih -> map fromMu (kleenexToBytecodeMuTerm ih)
+    Right ih -> map fromMu (kleenexToBitcodeMuTerm ih)
 
-buildActionSSTs :: MainOptions -> [String] -> IO (DetTransducers Word8)
+buildActionSSTs :: MainOptions -> [String] -> IO (DetTransducers BitString Word8)
 buildActionSSTs mainOpts args = do
   let [arg] = args
   kleenexSrc <- readFile arg

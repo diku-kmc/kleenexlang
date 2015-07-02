@@ -14,12 +14,12 @@ import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
 
-import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
+import           KMC.Coding
 import           KMC.Expression
 import           KMC.Kleenex.Action
 import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..), NullFun(..))
-import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size)
+import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size, findMax)
 import           KMC.Syntax.External (Regex (..), unparse)
 import           KMC.Theories (top, indexOf)
 
@@ -265,15 +265,17 @@ regexToActionMuTerm  :: Bool -> Regex -> KleenexActionMu a
 regexToActionMuTerm ign re =
     case re of
         One          -> Accept
-        Dot          -> RW top (o top) Accept
+        Dot          -> RW (matchTop 8) (o (matchTop 8) top) Accept
         Chr a        -> if ign then Accept else W (encodeChar a) Accept
         Group _ e    -> regexToActionMuTerm ign e
         Concat e1 e2 -> Seq (regexToActionMuTerm ign e1) (regexToActionMuTerm ign e2)
         Branch e1 e2 -> Alt (regexToActionMuTerm ign e1) (regexToActionMuTerm ign e2)
-        (Class b rs)   ->  let rs' = (if b then id else complement)
-                                     $ rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- rs ]
-                               rs'' = rangeSet [ (toEnum 0, toEnum $ size rs' - 1) ]
-                           in  RW rs'' (o rs') Accept
+        (Class b rs) -> let len = bitWidth 2 $ fromEnum $ findMax $ rs'
+                            rs' = (if b then id else complement) $ 
+                                    rangeSet [(toEnum $ ord a, toEnum $ ord b) | (a,b) <- rs]
+                            rs'' = matchRange len (BitString $ codeFixedWidthEnum len 0) 
+                                                  (BitString $ codeFixedWidthEnum len $ size rs' - 1)
+                        in  RW rs'' (o rs'' rs') Accept
         (Star e)       -> Loop $ \x -> Alt (Seq (regexToActionMuTerm ign e) (Var x)) Accept
         (LazyStar e)   -> Loop $ \x -> Alt Accept (Seq (regexToActionMuTerm ign e) (Var x))
         (Plus e)       -> Seq (regexToActionMuTerm ign e) (regexToActionMuTerm ign (Star e))

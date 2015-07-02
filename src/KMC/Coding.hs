@@ -1,15 +1,8 @@
 {-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
-module KMC.Coding
-    (bitWidth
-    ,codeFixedWidth
-    ,codeFixedWidthEnum
-    ,codeFixedWidthEnumSized
-    ,decode
-    ,decodeEnum
-    ,decodeRangeSet)
-where
+module KMC.Coding where
 
 import KMC.RangeSet
+import Debug.Trace
 
 -- | Compute the number of digits required to fit n values in a word of digits of a given base
 bitWidth :: Int -- ^ Base
@@ -76,5 +69,40 @@ decodeEnum ds = decode base (map (toEnum . fromEnum) ds)
     where
       base = toEnum (fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1)
 
-decodeRangeSet :: (Enum a, Enum b, Bounded b) => RangeSet a -> b -> a
+decodeRangeSet :: (Enum a, Enum b, Show a) => RangeSet a -> b -> a
 decodeRangeSet rs b = lookupIndex (fromEnum b) rs
+
+-- Bit codes
+type BitInputTerm = RangeSet BitString
+newtype BitString = BitString [Bool]
+    deriving (Ord, Eq, Show)
+
+instance Enum BitString where
+    toEnum n = BitString $ codeFixedWidthEnum len (n - 2^len + 2)
+          where
+        len = floor $ logBase 2 (fromIntegral n + 2)
+    fromEnum (BitString b) = decodeEnum b + 2^(length b) - 2
+
+bOne :: BitString
+bOne = BitString [True]
+
+bZero :: BitString
+bZero = BitString [False]
+
+matchZero :: BitInputTerm
+matchZero = boundedRangeSet bZero bOne [(bZero, bZero)]
+
+matchOne :: BitInputTerm
+matchOne = boundedRangeSet bZero bOne [(bOne, bOne)]
+
+matchTop :: Int -> BitInputTerm
+matchTop n = boundedRangeSet min max [(min, max)]
+  where
+    min = BitString $ replicate n False
+    max = BitString $ replicate n True
+
+matchRange :: Int -> BitString -> BitString -> BitInputTerm
+matchRange n lower upper = boundedRangeSet min max [(lower, upper)]
+  where
+    min = BitString $ replicate n False
+    max = BitString $ replicate n True

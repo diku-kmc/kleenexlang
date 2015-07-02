@@ -56,18 +56,20 @@ type EdgeAction var func = RegisterUpdate var func :+: ActionExpr var (Dom func)
 data ActionExpr var dom rng = PushOut var
                             | PopOut
                             | RegUpdate var [Atom var (ActionExpr var dom rng)]
-                            | ParseBits (RS.RangeSet dom)
+                            | ParseBits (RS.RangeSet dom) (RS.RangeSet Word8)
                             | OutputConst rng
     deriving (Ord, Show, Eq)
 
-instance (rng ~ [dom], Enum dom, Bounded dom) => Function (ActionExpr var dom rng) where
+instance (rng ~ [Word8], Ord dom, Enum dom) => Function (ActionExpr var dom rng) where
     type Dom (ActionExpr var dom rng) = dom
     type Rng (ActionExpr var dom rng) = rng
-    eval (ParseBits rs) x = [decodeRangeSet rs x]
+    eval (ParseBits rs rs') x = [RS.lookupIndex (RS.indexOf x rs) rs']
     eval (OutputConst c) x = const c x
+    isConst (OutputConst c) = Just c
     isConst _ = Nothing
-    inDom x (ParseBits rs) = fromEnum x < RS.size rs
+    inDom x (ParseBits (RS.RangeSet minB maxB _) rs') = fromEnum x >= fromEnum minB && fromEnum x <= fromEnum maxB
     inDom _ _ = True
+    domain  (ParseBits (RS.RangeSet minB maxB _) rs') = [minB .. maxB]
 
 edgesFromList :: (Ord st) => [(st, [pred], EdgeAction var func, st)] -> EdgeSet st pred func var
 edgesFromList xs = M.fromListWith (++) [ (q,  [(ps, u, q')]) | (q,ps,u,q') <- xs ]

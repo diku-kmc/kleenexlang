@@ -20,6 +20,8 @@ import           KMC.SymbolicSST
 import           KMC.Theories
 import           KMC.Util.Map (swapMap)
 
+import Debug.Trace
+
 class PredicateListToExpr p where
     predListToExpr :: [p] -> Int -> Expr
 
@@ -102,15 +104,14 @@ usFunctions (_:xs) = usFunctions xs
 
 -- | Tabulate a function. It is assumed that the codomain is a set of
 -- bit-vectors with pairwise equal length.
-tabulate :: (Function t,Enum (Dom t),Bounded (Dom t)
+tabulate :: (Function t,Enum (Dom t)
             ,Rng t ~ [delta], Show (Dom t))
          => t -> Table delta
 tabulate f = Table bitTable bitSize
   where
-    bitTable = map eval' [minBound .. maxBound]
+    bitTable = map (eval f) $ (traceShow (domain f) (domain f))
     bitSize = foldr max 0 (map length bitTable)
-    eval' x | inDom x f = eval f x
-            | otherwise = []
+       
 
 look :: (Ord k) => M.Map k a -> k -> a
 look m k = case M.lookup k m of
@@ -195,7 +196,7 @@ compileTransitions i (BranchT action tests) = do
                         bufid <- (M.! var) <$> asks bmap
                         cid <- (M.! const) <$> asks cmap
                         return [ConsumeI i, AppendI bufid cid, GotoI bid]
-                    Just (Inr (ParseBits rs), st') -> do
+                    Just (Inr (ParseBits rs rs'), st') -> do
                         return $ error "ParseBits"
                     Just (Inr (RegUpdate var atoms), st') -> do
                         return $ error "RegUpdate"
@@ -276,7 +277,7 @@ elimIdTables prog = prog { progTables = rest
 
 compileAutomaton :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta
-    , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
+    , Function func, Enum (Dom func), Rng func ~ [delta]
     , PredicateListToExpr pred, Show (Dom func), Show var, Show delta) =>
     SST st pred func var
     -> Program delta
