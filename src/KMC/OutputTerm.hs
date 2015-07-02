@@ -27,13 +27,15 @@ instance (Monoid b) => Function (NullFun a b) where
     eval NullFun _  = mempty
     isConst NullFun = Just mempty
     inDom _ NullFun = True
+    domain NullFun  = []
 
-instance Function (Ident a) where
+instance (Enum a, Bounded a) => Function (Ident a) where
   type Dom (Ident a) = a
   type Rng (Ident a) = a
   eval Ident = id
   isConst Ident = Nothing
   inDom _ _ = True
+  domain Ident = [minBound .. maxBound]
 
 instance (Function f) => Function (InList f) where
   type Dom (InList f) = Dom f
@@ -76,4 +78,5 @@ instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Functio
                            else
                                Nothing
   inDom x (Enumerator e) = member x e
+  domain (Enumerator e)  = [lookupIndex i e | i <- [0 .. size e]]
 
