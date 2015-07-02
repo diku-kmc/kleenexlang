@@ -208,7 +208,7 @@ for test_case in $all_test_cases; do
     c=$(contains "${only_cases[@]}" $test_case)
     if [ "$only_cases" != "" ] && [ "$c" == "y" ] ||
            [ "$only_cases" == "" ]; then
-        for prog in $progs; do
+        for prog in "${progs[@]}"; do
             d=$(contains "${only_progs[@]}" $prog)
             if [ "$only_progs" != "" ] && [ "$d" == "y" ] ||
                    [ "$only_progs" == "" ] ; then
