@@ -419,7 +419,7 @@ int main(int argc, char *argv[])
     {
       if (i != 1) close(pipes[i-2][WRITE_FD]);
 
-      if (pipe(pipes[i-1]) == 0)
+      if (pipe(pipes[i-1]) != 0)
       {
         fprintf(stderr, "Error creating pipe %d.", i);
         return 1;
