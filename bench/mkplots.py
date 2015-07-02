@@ -64,6 +64,9 @@ transformations = {
 base_dir = os.path.realpath("__file__")
 # Default plot_dir is plots/
 plot_dir = os.path.join(os.path.dirname(os.path.realpath("__file__")), "plots")
+# Default folder used for data is the latest generated.
+# Is populated once the real base_dir is known.
+data_folder = None
 # Don't override plots if they already exist.
 force_override = False
 # Don't print so much gunk.
@@ -82,11 +85,17 @@ def notice_print(msg):
 def default_version_name():
     return "DEFAULT"
 
+def data_base_dir():
+    return os.path.join(os.path.dirname(base_dir), "times")
+
 def data_dir(impl, prog):
-    return os.path.join(os.path.dirname(base_dir), impl, "times", prog)
+    return os.path.join(data_base_dir(), data_folder, impl, prog)
 
 def test_data_dir():
     return os.path.join(os.path.dirname(base_dir), "..", "test", "data")
+
+def plot_save_dir():
+    return os.path.join(plot_dir, data_folder)
 
 def go(progs = [], skip = None, default_transformation = "ms"):
     conf, inputs, skips = get_benchmark_configuration()
@@ -107,6 +116,8 @@ def go(progs = [], skip = None, default_transformation = "ms"):
         try: return transformations[skips[p][n]['transformation']]
         except KeyError:
             return transformations[default_transformation]
+
+    os.makedirs(plot_save_dir())
 
     plot_all(get_data(conf, progs), inputs, skips, skipFun, getTransFun)
 
@@ -327,7 +338,7 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         plt.tight_layout() # Throws an annoying warnings about renderers.
-    save_plot(fig, lbls, plot_data, plot_dir, output_name)
+    save_plot(fig, lbls, plot_data, plot_save_dir(), output_name)
     plt.close()
     return True
 
@@ -418,16 +429,22 @@ If no arguments are given, all programs are plotted.
                         help='Name of the program to plot')
     parser.add_argument('-t',
                         help = "Data transform (mbs=Mbit/s [DEFAULT], gbs=Gbit/s, s=Seconds, ms=Milliseconds)")
-    parser.add_argument('-c', 
+    parser.add_argument('-c',
                         help = "Alternate config file")
     parser.add_argument('-s', nargs='+', help = "Skip implementation")
     parser.add_argument('-b', nargs=1,
                         help = "Alternate base bench/ directory than current dir.")
+    parser.add_argument('-l', nargs=1,
+                        help = "Label/timestamp of the run to use data from")
     parser.add_argument('-v', action='count', help = "Be more verbose.")
     parser.add_argument('-d', nargs=1,
-                        help = "Destination directory for plots.  Default plots/")
+                        help = "Destination directory for plots.  Default plots/<label>")
     parser.add_argument('-f', action='count', help = "Force overwrite of existing plots.")
     args = parser.parse_args()
+
+    if args.v != None:
+        is_verbose = True
+        print "Entering verbose mode."
 
     if args.p == None: progs = []
     else:              progs = args.p
@@ -453,9 +470,16 @@ If no arguments are given, all programs are plotted.
             base_dir = "%s/" % new
             notice_print("Using %s as base directory instead of %s." % (base_dir, old))
 
-    if args.v != None:
-        is_verbose = True
-        print "Entering verbose mode."
+    if args.l != None:
+        data_folder = args.l[0]
+    else:
+        dirs = sorted(os.listdir(data_base_dir()), reverse=True,
+                      key=lambda d: os.path.getctime(os.path.join(data_base_dir(), d)))
+        if len(dirs) < 1:
+            warning_print("No folders found in timing directory.")
+            exit(2)
+        data_folder = dirs[0]
+        notice_print("No data directory specified; using %s." % data_folder)
 
     if args.d != None:
         a = args.d[0]
@@ -471,5 +495,6 @@ If no arguments are given, all programs are plotted.
 
     if args.f != None:
         force_override = True
+
 
     go(progs, skip = args.s, default_transformation = transform)

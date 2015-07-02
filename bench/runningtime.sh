@@ -10,7 +10,7 @@ time_suffix=".runningtime"
 
 data_dir="../test/data"
 timestamp="$(date "+%Y_%m_%d__%k_%M_%S")"
-time_dir="times/$timestamp"
+time_base_dir="times"
 
 # Default settings
 warmup_reps=0   # Number of warm-up runs
@@ -143,11 +143,12 @@ function usage {
     echo "  -h:    print this message"
     echo "  -w n:  do n warm-up runs of each test (default 0)"
     echo "  -r n:  do n repetitions of each test (default 1)"
+    echo "  -t TS: use \"TS\" as the time stamp for this run"
     exit 1
 }
 
 # Parse command-line parameters.
-while getopts ":fhi:p:w:r:d:" opt; do
+while getopts ":fhi:p:w:r:d:l:" opt; do
     case $opt in
         p)
             IFS=',' read -a only_cases <<< $OPTARG
@@ -173,6 +174,10 @@ while getopts ":fhi:p:w:r:d:" opt; do
             echo "# Doing $OPTARG benchmark runs."
             reps=$OPTARG
             ;;
+        l)
+            echo "# Setting label of this run to $OPTARG."
+            timestamp="$OPTARG"
+            ;;
         h)
             usage
             ;;
@@ -182,6 +187,8 @@ while getopts ":fhi:p:w:r:d:" opt; do
             ;;
     esac
 done
+
+time_dir="$time_base_dir/$timestamp"
 
 function contains() {
     arr=$1

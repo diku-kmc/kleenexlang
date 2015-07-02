@@ -10,7 +10,7 @@ reps=1
 src_dir="kleenex/src"
 bin_dir="kleenex/bin"
 timestamp="$(date "+%Y_%m_%d__%k_%M_%S")"
-time_dir="kleenex/compiletimes/$timestamp"
+time_base_dir="kleenex/compiletimes"
 compiletime_postfix=".compiletime"
 name=""
 timeoutseconds=30
@@ -53,7 +53,7 @@ dryrun=true
 use_dfa=false
 only_do=""
 
-while getopts ":fdhp:t:" opt; do
+while getopts ":fdhp:t:l:" opt; do
   case $opt in
   p)
       echo "# Only doing $OPTARG"
@@ -85,6 +85,10 @@ while getopts ":fdhp:t:" opt; do
       use_dfa=true
       echo "# Using DFA optimization"
       ;;
+  l)
+      echo "# Setting label of this run to $OPTARG."
+      timestamp="$OPTARG"
+      ;;
   \?)
       echo "Invalid option: -$OPTARG" >&2
       usage
@@ -92,6 +96,8 @@ while getopts ":fdhp:t:" opt; do
       ;;
   esac
 done
+
+time_dir="$time_base_dir/$timestamp"
 
 # Read in the compiler config file "compilers.txt" and set the names
 set_compiler_names
