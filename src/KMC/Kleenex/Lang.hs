@@ -159,6 +159,79 @@ findSuppressedSubterms = go [] S.empty
             SMWrite _  -> marked
             SMRegex _  -> marked
 
+-- | Find the locations of subterms that contain no actions.
+findActionfreeSubterms :: SimpleMu -> Marked
+findActionfreeSubterms = M.keysSet . M.filter id . findFix M.empty
+    where
+        -- | Fix-point iterate until we know which recursive subterms
+        --   contain actions for sure.
+        findFix m sm = let (_, m') = go [] m [] sm
+                       in if m == m' then m else findFix m' sm
+
+        -- Returns: (isActionFree, actionFreePaths)
+        go cp marked vars sm =
+            let (isActionFree, marked') = case sm of
+                    SMLoop e   -> go (L:cp) marked (cp:vars) e
+                    SMAlt l r  ->
+                        let (isActionFree,  marked')  = go (L:cp) marked  vars l
+                            (isActionFree', marked'') = go (R:cp) marked' vars r
+                        in (isActionFree && isActionFree', marked'')
+                    SMSeq l r  ->
+                        let (isActionFree,  marked')  = go (L:cp) marked  vars l
+                            (isActionFree', marked'') = go (R:cp) marked' vars r
+                        in (isActionFree && isActionFree', marked'')
+                    SMIgnore e -> go (L:cp) marked vars e
+                    SMAccept   -> (True, marked)
+                    SMVar v    ->
+                        let cp' = maybe (error "unable to locate variable on stack") id $ getStack v vars
+                        in (M.findWithDefault True cp' marked, marked)
+                    SMWrite _    -> (True, marked)
+                    SMAction _ e ->
+                        let (_, marked') = go (L:cp) marked vars e
+                        in (False, marked')
+                    SMRegex _    -> (True, marked)
+            in (isActionFree, M.insert cp isActionFree marked')
+
+-- | Find the locations of subterms that are both suppressed, and contain no actions.
+--   (i.e. can be safely ignored)
+findActionfreeSuppressedSubterms :: SimpleMu -> Marked
+findActionfreeSuppressedSubterms sm = go [] S.empty False sm
+    where
+        afs = findActionfreeSubterms sm
+
+        actFree cp = S.member cp afs
+
+        addIfBoth cp marks =
+            if (L:cp) `S.member` marks && (R:cp) `S.member` marks
+            then S.insert cp marks
+            else marks
+
+        addIfActFree ign cp marks =
+            if ign && actFree cp
+            then S.insert cp marks
+            else marks
+
+        go cp marked ign sm =
+            case sm of
+                SMLoop e     ->
+                    let marks = go (L:cp) marked ign e
+                    in if (L:cp) `S.member` marks
+                    then S.insert cp marks
+                    else marks
+                SMAlt l r    ->
+                    addIfBoth cp $ (go (L:cp) marked ign l) `S.union` (go (R:cp) marked ign r)
+                SMSeq l r    ->
+                    addIfBoth cp $ (go (L:cp) marked ign l) `S.union` (go (R:cp) marked ign r)
+                SMIgnore e   ->
+                    addIfActFree True cp $ go (L:cp) marked True e
+                SMAccept     -> addIfActFree ign cp marked
+                SMAction _ e -> go (L:cp) marked False e
+                    -- For action terms: assume unignored (conservative) - necessary due to push/pop.
+                    -- Consider: ~( a@foo ) !a
+                    -- Here foo isn't suppressed anymore.
+                SMVar _      -> addIfActFree ign cp marked
+                SMWrite _    -> addIfActFree ign cp marked
+                SMRegex _    -> addIfActFree ign cp marked
 
 -- | A simple mu term is converted to a "real" mu term by converting the
 -- de Bruijn-indexed variables to Haskell variables, and encoding the mu
@@ -189,8 +262,9 @@ simpleMuToMuTerm sm = simpleMuToMuTerm' [] False sm
 
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
 -- expressed in Kleenex.
-kleenexToActionMuTerm :: H.Kleenex -> [KleenexActionMu a]
-kleenexToActionMuTerm k@(H.Kleenex is terms) = map (\i -> simpleMuToActionMuTerm [] False $ kleenexToSimpleMu i k) is
+kleenexToActionMuTerm :: H.Kleenex -> Bool -> [KleenexActionMu a]
+kleenexToActionMuTerm k@(H.Kleenex is terms) suppressBits =
+    map (\i -> simpleMuToActionMuTerm [] False suppressBits $ kleenexToSimpleMu i k) is
 
 kleenexToMuTerm :: H.Kleenex -> [(KleenexMu a, Marked)]
 kleenexToMuTerm k@(H.Kleenex is h) = map f is
@@ -246,20 +320,26 @@ testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
 --- Kleenex with actions translation
 
 
-simpleMuToActionMuTerm :: [KleenexActionMu a] -> Bool -> SimpleMu -> KleenexActionMu a
-simpleMuToActionMuTerm st ign sm =
-    case sm of
-      SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
-      SMLoop sm'   -> (Loop $ \x -> simpleMuToActionMuTerm ((Var x) : st) ign sm')
-      SMAlt l r    -> (simpleMuToActionMuTerm st ign l) `Alt` (simpleMuToActionMuTerm st ign r)
-      SMSeq l r    -> (simpleMuToActionMuTerm st ign l) `Seq` (simpleMuToActionMuTerm st ign r)
-      SMWrite bs   -> if ign
-                      then Accept
-                      else W (unpack bs) Accept
-      SMRegex re   -> regexToActionMuTerm ign re
-      SMIgnore sm' -> simpleMuToActionMuTerm st True sm'
-      SMAction a e -> Action a $ simpleMuToActionMuTerm st ign e
-      SMAccept     -> Accept
+simpleMuToActionMuTerm :: [KleenexActionMu a] -> Bool -> Bool -> SimpleMu -> KleenexActionMu a
+simpleMuToActionMuTerm st ign suppressBits sm = go st ign sm []
+    where
+        suppTerms = if suppressBits then findActionfreeSuppressedSubterms sm else S.empty
+
+        go st ign sm cp =
+            if S.member cp suppTerms
+            then Accept
+            else case sm of
+                    SMVar n      -> maybe (error "stack exceeded") id $ getStack n st
+                    SMLoop sm'   -> (Loop $ \x -> go ((Var x) : st) ign sm' (L:cp))
+                    SMAlt l r    -> (go st ign l (L:cp)) `Alt` (go st ign r (R:cp))
+                    SMSeq l r    -> (go st ign l (L:cp)) `Seq` (go st ign r (R:cp))
+                    SMWrite bs   -> if ign
+                                    then Accept
+                                    else W (unpack bs) Accept
+                    SMRegex re   -> regexToActionMuTerm ign re
+                    SMIgnore sm' -> go st True sm' (L:cp)
+                    SMAction a e -> Action a $ go st ign e (L:cp)
+                    SMAccept     -> Accept
 
 regexToActionMuTerm  :: Bool -> Regex -> KleenexActionMu a
 regexToActionMuTerm ign re =

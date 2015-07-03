@@ -48,6 +48,7 @@ data MainOptions =
     , optExpressionArg    :: Bool
     , optActionEnabled    :: Bool
     , optConstructDFA     :: Bool -- ^ Enable DFA optimization
+    , optSuppressBits     :: Bool -- ^ Don't generate bitcodes that can be safely suppressed
     }
 
 data CompileOptions =
@@ -109,6 +110,7 @@ instance Options MainOptions where
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
       <*> simpleOption "act" True "Enable actions in the language"
       <*> simpleOption "dfa" False "Treat ignored Kleenex-subterms as DFAs"
+      <*> simpleOption "sb"  True "Avoid generating bits for suppressed terms whenever safe"
 
 instance Options CompileOptions where
     defineOptions =
@@ -210,7 +212,7 @@ buildTransducers mainOpts args = do
     else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
            let fsts = if optActionEnabled mainOpts
-                      then Transducers $ bytecodeFstFromKleenex kleenexSrc
+                      then Transducers $ bytecodeFstFromKleenex (optSuppressBits mainOpts) kleenexSrc
                       else Transducers $ fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
            return (fsts, arg, kleenexSrc)
          else do
@@ -372,11 +374,12 @@ fstFromKleenex constructDFA str =
                        else
                            fromMu t
 
-bytecodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Word8 Word8))]
-bytecodeFstFromKleenex str =
+bytecodeFstFromKleenex :: Bool -> String ->
+                          [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Word8 Word8))]
+bytecodeFstFromKleenex suppressBits str =
   case parseKleenex str of
     Left e -> error e
-    Right ih -> map fromMu (kleenexToBytecodeMuTerm ih)
+    Right ih -> map fromMu (kleenexToBytecodeMuTerm ih suppressBits)
 
 buildActionSSTs :: MainOptions -> [String] -> IO (DetTransducers Word8)
 buildActionSSTs mainOpts args = do
@@ -384,4 +387,4 @@ buildActionSSTs mainOpts args = do
   kleenexSrc <- readFile arg
   return $ case parseKleenex kleenexSrc of
     Left e   -> error e
-    Right ih -> DetTransducers $ map (genActionSST) (kleenexToActionMuTerm ih)
+    Right ih -> DetTransducers $ map (genActionSST) (kleenexToActionMuTerm ih (optSuppressBits mainOpts))
