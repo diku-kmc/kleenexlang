@@ -3,7 +3,7 @@
 warmups=1
 rounds=5
 log_dir="./logs"
-timestamp="$(date "+%Y_%m_%d__%k_%M_%S")"
+timestamp="$(date "+%Y_%m_%d__%H_%M_%S")"
 
 cd `dirname $0`
 mkdir -p "$log_dir"
@@ -28,6 +28,8 @@ function run_benchmarks {
 
     echo "# Generating all plots"
     ./mkplots.py -l "$timestamp" -f
+
+    echo "# All done at $(date)"
 }
 
 run_benchmarks > "$log_dir/nightly_$timestamp.log"
