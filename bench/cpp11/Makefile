@@ -24,6 +24,7 @@ csv_project3 : src/csv_project3.o
 simple_id : src/simple_id.o
 email : src/email.o
 iso_datetime_to_json : src/iso_datetime_to_json.o
+thousand_sep : src/thousand_sep.o
 
 .PHONY: clean
 
