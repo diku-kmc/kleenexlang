@@ -206,6 +206,8 @@ install-benchmark-dependencies:
 	@echo "Nothing to do for sed"
 	@echo "Installing tcl..."
 	(cd tcl && make install-tcl)
+	@echo "Installing DReX..."
+	(cd drex && ./getdrex.sh)
 	@echo "DONE"
 
 build-benchmark-programs:
