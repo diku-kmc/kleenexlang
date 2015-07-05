@@ -1,8 +1,3 @@
 // Converts all as to bs and vice versa
 // Leaves all newlines in place.
-start: x
-
-x := "b" ~/a/ x
-   | "a" ~/b/ x
-   | /\n/ x
-   | ""
+main := ("b" ~/a/ | "a" ~/b/ | /\n/)*
