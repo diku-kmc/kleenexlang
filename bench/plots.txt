@@ -41,4 +41,4 @@ csv2json              ,            DEFAULT           Mbit/s                csv2j
 csv2json              ,            DEFAULT           ms                    csv2json-ms.pdf
 
 thousand_sep          ,            DEFAULT           Mbit/s                thousand_sep.pdf
-thousand_sep          ,            DEFAULT           ms                    thousand_sep.pdf
+thousand_sep          ,            DEFAULT           ms                    thousand_sep-ms.pdf
