@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     if (regex_match(buffer, pieces_match, re)) {
         OUT(pieces_match[1].str().c_str());
         if (pieces_match[2].length() > 0) {
-            OUT( regex_replace(pieces_match[2].str(), re2, ",$1").c_str() );
+            OUT( regex_replace(pieces_match[2].str(), re2, string(",$1")).c_str() );
         }
         OUT("\n");
     } else {
