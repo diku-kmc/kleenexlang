@@ -180,7 +180,7 @@ generate-apachelog:
 
 generate-numbers:
 	@echo "Generating 250 MB numbers..."
-	(cd ../test/data/numbers && ./gen_numbers -s 250000000 > numbers_250mb.txt)
+	(cd ../test/data/numbers && ./gen_numbers.pl -s 250000000 > numbers_250mb.txt)
 
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
