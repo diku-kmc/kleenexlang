@@ -19,3 +19,4 @@ rot13               kleenex,ragel,tr
 apache_log          kleenex,perl,ragel
 dfamail             kleenex
 thousand_sep        kleenex,perl,python,cpp11
+drex_del-comments   kleenex,drex,perl

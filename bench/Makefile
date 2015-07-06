@@ -12,6 +12,7 @@ CAT_BINDIR=cat/src
 RAGEL_BINDIR=ragel/bin
 CUT_BINDIR=cut/src
 TR_BINDIR=tr/src
+DREX_BINDIR=drex/DReX/drex-bench/target/appassembler/bin/
 
 KLEENEXSOURCES = $(notdir $(wildcard $(KLEENEXDIR)/*.kex))
 KLEENEXSOURCES_OBJECTS = $(KLEENEXSOURCES:.kex=.ko)
@@ -37,6 +38,7 @@ testinput.csv2json       := $(DATA_DIR)/csv/csv_format1.sample.csv
 testinput.apache_log     := $(DATA_DIR)/apache_log/example.log
 testinput.flip_ab        := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.thousand_sep   := $(DATA_DIR)/numbers/numbers_small.txt
+testinput.drex_del-comments := $(DATA_DIR)/comments/comments_small.txt
 
 all:
 	@echo "Nothing to do."
@@ -114,7 +116,8 @@ utils/extracttime:
 		$(*F) $(CUT_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
 	@bash utils/runequalstest.sh "Tr == Kleenex       " \
 		$(*F) $(TR_BINDIR)/$(*F).sh ${testinput.$(*F)} $(*F).out
-
+	@bash utils/runequalstest.sh "DReX == Kleenex       " \
+		$(*F) $(DREX_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
 	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
@@ -133,11 +136,13 @@ csv2json: csv2json.ko
 apache_log: apache_log.ko
 flip_ab: flip_ab.ko
 thousand_sep: thousand_sep.ko
+drex_del-comments: drex_del-comments.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
-generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog generate-numbers
+generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog generate-numbers \
+	                generate-comments
 
 generate-strings: generate-ab-strings generate-a-strings generate-random-string
 
@@ -181,6 +186,10 @@ generate-apachelog:
 generate-numbers:
 	@echo "Generating 250 MB numbers..."
 	(cd ../test/data/numbers && ./gen_numbers.pl -s 250000000 > numbers_250mb.txt)
+
+generate-comments:
+	@echo "Generating 100 MB text with comments..."
+	(cd ../test/data/comments && ./gen_comments.pl -s 10000000 > comments_100mb.txt)
 
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
@@ -229,6 +238,8 @@ build-benchmark-programs:
 	(cd re2j && ./ant jar)
 	@echo "Nothing to do for sed"
 	@echo "Nothing to do for tcl..."
+	@echo "Building DReX programs..."
+	(cd drex && ./build_programs.sh)
 	@echo "DONE"
 
 clean-benchmark-programs:

@@ -1,0 +1,24 @@
+// Inject our benchmarks into DReX' build process. Hacky, but it works.
+main := (inject | /./)*
+
+inject := /<programs>/
+          del_comments
+          extract_xml
+          insert_quotes
+          rev_dict
+          swap_bibtex
+          align_bibtex
+          ~/.*?/
+          /<\/programs>/
+
+del_comments  := class "DReXDeleteComments"    becomes "drex_del-comments"  ok
+extract_xml   := class "DReXExtractXML"        becomes "drex_extract-xml"   ok
+insert_quotes := class "DReXInsertQuotes"      becomes "drex_insert-quotes" ok
+rev_dict      := class "DReXReverseDictionary" becomes "drex_rev-dict"      ok
+swap_bibtex   := class "DReXSwapBibtex"        becomes "drex_swap-bibtex"   ok
+align_bibtex  := class "DReXAlignBibtex"       becomes "drex_align-bibtex"  ok
+
+// Oh hey, a DSL.
+class := "<program><mainClass>edu.diku.kmc.benchmarks.drex."
+becomes := "</mainClass><id>"
+ok := "</id></program>\n"
