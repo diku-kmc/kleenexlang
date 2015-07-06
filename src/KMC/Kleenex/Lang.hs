@@ -22,7 +22,6 @@ import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..), Nu
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size)
 import           KMC.Syntax.External (Regex (..), unparse)
 import           KMC.Theories (top)
-import           KMC.Visualization (Pretty(..))
 import           KMC.Util.Bits (packCombine)
 
 -- for test
@@ -57,13 +56,6 @@ type KleenexMuG w a = Mu (RangeSet w) (KleenexTerm w) a
 
 type KleenexOutTerm = KleenexTerm Word8
 type KleenexMu a = KleenexMuG Word8 a
-
-instance Pretty KleenexOutTerm where
-    pretty l = case l of
-                 Inl (InList _) -> "COPY"
-                 Inr (Const []) -> "\"\""
-                 Inr (Const ws) -> "\"" ++ map toChar [ws] ++ "\""
-    
 
 -- | The term that copies the input char to output.
 copyInput :: KleenexOutTerm
