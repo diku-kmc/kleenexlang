@@ -93,10 +93,6 @@ instance (Bounded a, Enum a) => Pretty (Const x [a]) where
     pretty (Const []) = "SKIP"
     pretty (Const ws) = "\"" ++ map toChar [ws] ++ "\""
 
-instance Pretty KleenexOutTerm where
-    pretty (Inl (InList _)) = "COPY"
-    pretty (Inr x)          = pretty x
-
 instance (Pretty var, Pretty rng, Pretty dom) => Pretty (ActionExpr var dom rng) where
     pretty (ParseBits _)   = "BITS!"
     pretty (RegUpdate var atoms) = pretty var ++ ":=" ++ pretty atoms
