@@ -35,6 +35,7 @@ instance (Monoid (Rng f), Function f, o ~ Rng f) => Function (o :>: f) where
     eval (o :>: f) x = o `mappend` eval f x
     isConst (o :>: f) = fmap (mappend o) $ isConst f
     inDom x (_ :>: f) = x `inDom` f
+    domain (_ :>: f) = domain f
 
 instance (Monoid (Rng f), Function f, o ~ Rng f) => Function (f :<: o) where
     type Dom (f :<: o) = Dom f
@@ -42,6 +43,7 @@ instance (Monoid (Rng f), Function f, o ~ Rng f) => Function (f :<: o) where
     eval (f :<: o) x  = eval f x `mappend` o
     isConst (f :<: o) = fmap (flip mappend o) $ isConst f
     inDom x (f :<: _) = x `inDom` f
+    domain (f :<: _) = domain f
              
 instance (Function f, Function g) => Function (f :*: g) where
     type Dom (f :*: g) = (Dom f, Dom g)
@@ -49,6 +51,7 @@ instance (Function f, Function g) => Function (f :*: g) where
     eval (f :*: g) (x, y)  = (eval f x, eval g y)
     isConst (f :*: g)      = Nothing
     inDom (x, y) (f :*: g) = (x `inDom` f) && (y `inDom` g)
+    domain (f :*: g) = zip (domain f) (domain g)
 
 
 instance (Function f) => Function (Maybe f) where
@@ -57,6 +60,8 @@ instance (Function f) => Function (Maybe f) where
     eval f x  = liftM2 eval f x
     isConst f = liftM isConst f
     inDom x f = maybe False id $ liftM2 inDom x f
+    domain (Just f) = map Just (domain f)
+    domain Nothing  = []
    
 instance (Monoid b) => Function (NullFun a b) where
     type Dom (NullFun a b) = a
@@ -80,6 +85,7 @@ instance (Function f) => Function (InList f) where
   eval (InList f) x = [eval f x]
   isConst (InList f) = (:[]) <$> isConst f
   inDom x (InList f) = inDom x f
+  domain (InList f) = domain f
 
 instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   type Dom (Join f rng) = Dom f
@@ -87,7 +93,7 @@ instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   eval (Join fs) x = mconcat $ map (flip eval x) fs
   isConst (Join fs) = mconcat <$> mapM isConst fs
   inDom x (Join fs) = all (inDom x) fs
-
+  domain (Join fs) = mconcat $ map domain fs
 
 instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :+: g) where
   type Dom (f :+: g) = Dom f
@@ -98,6 +104,8 @@ instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :
   isConst (Inr g) = isConst g
   inDom x (Inl f) = inDom x f
   inDom x (Inr g) = inDom x g
+  domain (Inl f) = domain f
+  domain (Inr g) = domain g
 
 instance Function (Const dom rng) where
   type Dom (Const dom rng) = dom
@@ -105,6 +113,7 @@ instance Function (Const dom rng) where
   eval (Const x) = const x
   isConst (Const x) = Just x
   inDom _ _ = True
+  domain (Const _) = []
 
 instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Function (Enumerator e dom rng) where
   type Dom (Enumerator e dom rng) = dom
