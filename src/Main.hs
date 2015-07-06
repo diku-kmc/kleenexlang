@@ -214,7 +214,7 @@ buildTransducers mainOpts args = do
            kleenexSrc <- readFile arg
            let fsts = if optActionEnabled mainOpts
                       then Transducers $ bitcodeFstFromKleenex (optSuppressBits mainOpts) kleenexSrc
-                      else undefined --Transducers $ fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
+                      else undefined -- Transducers $ fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
            return (fsts, arg, kleenexSrc)
          else do
            hPutStrLn stderr $ "Unknown compile flavor: " ++ show flav
@@ -376,11 +376,12 @@ fstFromKleenex constructDFA str =
                        else
                            fromMu t
 
-bitcodeFstFromKleenex :: String -> [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Bool Word8))]
-bitcodeFstFromKleenex str =
+bitcodeFstFromKleenex :: Bool -> String ->
+                          [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Bool Word8))]
+bitcodeFstFromKleenex suppressBits str =
   case parseKleenex str of
     Left e -> error e
-    Right ih -> map fromMu (kleenexToBitcodeMuTerm ih)
+    Right ih -> map fromMu (kleenexToBitcodeMuTerm ih suppressBits)
 
 buildActionSSTs :: MainOptions -> [String] -> IO (DetTransducers BitString Word8)
 buildActionSSTs mainOpts args = do
