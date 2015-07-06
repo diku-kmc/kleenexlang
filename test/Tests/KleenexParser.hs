@@ -44,6 +44,7 @@ kleenexParserTests =
                       , run kp_test14
                       , run kp_test15
                       , run kp_sanity4
+                      , run kp_one1
                       ]
     , simpleGroup True "Postfix operator stacking"
                       [ run kp_postfix1
@@ -309,6 +310,16 @@ kp_sanity4 = "Sanity check #4" <@>
                      ]
             in
               assertProgramIs p e
+
+kp_one1 :: (TestName, IO TS.Result)
+kp_one1 = "One constructor #1" <@>
+          let p = [strQ|main := 1 | (/a/ | 1)|]
+              e = HP.Kleenex [HP.mkIdent "main"] [
+                   HP.HA (HP.mkIdent "main",
+                         HP.Sum HP.One (HP.Sum (HP.RE $ R.Chr 'a') HP.One))
+                  ]
+          in
+            assertProgramIs p e
 
        
 -------------------------------------------------------------------------------

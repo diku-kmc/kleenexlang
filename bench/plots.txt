@@ -39,3 +39,6 @@ csv_project3          ,            DEFAULT           ms                    csv_p
 
 csv2json              ,            DEFAULT           Mbit/s                csv2json.pdf
 csv2json              ,            DEFAULT           ms                    csv2json-ms.pdf
+
+thousand_sep          ,            DEFAULT           Mbit/s                thousand_sep.pdf
+thousand_sep          ,            DEFAULT           ms                    thousand_sep-ms.pdf

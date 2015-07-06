@@ -155,3 +155,4 @@ fromMuWithDFA ms e =
 fromMu :: (Predicate pred, Enum st, Ord st, Monoid (Rng func)) =>
           Mu pred func st -> FST st pred (func :+: (NullFun a b))
 fromMu = fromMuWithDFA S.empty
+

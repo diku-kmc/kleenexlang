@@ -36,6 +36,7 @@ testinput.rot13			 := $(DATA_DIR)/strings/random_small.txt
 testinput.csv2json       := $(DATA_DIR)/csv/csv_format1.sample.csv
 testinput.apache_log     := $(DATA_DIR)/apache_log/example.log
 testinput.flip_ab        := $(DATA_DIR)/strings/ab_lines_small.txt
+testinput.thousand_sep   := $(DATA_DIR)/numbers/numbers_small.txt
 
 all:
 	@echo "Nothing to do."
@@ -131,11 +132,12 @@ rot13: rot13.ko
 csv2json: csv2json.ko
 apache_log: apache_log.ko
 flip_ab: flip_ab.ko
+thousand_sep: thousand_sep.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
-generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog
+generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog generate-numbers
 
 generate-strings: generate-ab-strings generate-a-strings generate-random-string
 
@@ -176,6 +178,10 @@ generate-apachelog:
 	@echo "Generating an 250 MB apache log..."
 	(cd ../test/data/apache_log && ./generate_big_log.sh)
 
+generate-numbers:
+	@echo "Generating 250 MB numbers..."
+	(cd ../test/data/numbers && ./gen_numbers.pl -s 250000000 > numbers_250mb.txt)
+
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
 	(cd ../test/data/issuu && ./download.sh -f -c 0 -n 1000000 > issuu_1000000objs.json)
@@ -200,6 +206,8 @@ install-benchmark-dependencies:
 	@echo "Nothing to do for sed"
 	@echo "Installing tcl..."
 	(cd tcl && make install-tcl)
+	@echo "Installing DReX..."
+	(cd drex && ./getdrex.sh)
 	@echo "DONE"
 
 build-benchmark-programs:

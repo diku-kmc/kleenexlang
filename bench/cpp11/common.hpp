@@ -18,12 +18,25 @@ char buffer[BUFFER_SIZE] = {0};
 // Maximum line length
 #define LINE_LEN 100000000
 
-#define PRE(OPTS)                               \
+#define PRE_STD(INNER) \
   uint64_t preCompile = getTimeMs();            \
-  regex re(REGEX, OPTS);                        \
-  cmatch pieces_match;                          \
+  INNER                                         \
   uint64_t start = getTimeMs();                 \
   int line = 0;
+
+
+#define PRE(OPTS) PRE_STD(                      \
+    regex re(REGEX, OPTS);                      \
+    cmatch pieces_match;                        \
+  )
+
+#define PRE2(OPTS) PRE_STD(                     \
+    regex re(REGEX, OPTS);                      \
+    regex re2(REGEX2, OPTS);                    \
+    cmatch pieces_match;                        \
+    cmatch pieces_match2;                       \
+  )
+
 
 #define PRINT_TIMES                                                     \
   uint64_t stop = getTimeMs();                                          \

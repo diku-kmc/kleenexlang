@@ -6,6 +6,7 @@
 module KMC.OutputTerm where
 
 import Control.Applicative hiding (Const)
+import Control.Monad (liftM, liftM2)
 import Data.Monoid
 
 import KMC.Theories
@@ -18,8 +19,49 @@ data Join f rng = Join [f] deriving (Eq, Ord, Show)
 data Const dom rng = Const rng deriving (Eq, Ord, Show)
 data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
 data NullFun a b = NullFun deriving (Eq, Ord, Show)
+data f :*: g = f :*: g deriving (Eq, Ord, Show)
+
+data o :>: f = o :>: f deriving (Eq, Ord, Show)
+data f :<: o = f :<: o deriving (Eq, Ord, Show)
+
+type Pre f = Rng f :>: f
+type Post f = f :<: Rng f
 
 type WithNull f = f :+: (NullFun (Dom f) (Rng f))
+
+instance (Monoid (Rng f), Function f, o ~ Rng f) => Function (o :>: f) where
+    type Dom (o :>: f) = Dom f
+    type Rng (o :>: f) = Rng f
+    eval (o :>: f) x = o `mappend` eval f x
+    isConst (o :>: f) = fmap (mappend o) $ isConst f
+    inDom x (_ :>: f) = x `inDom` f
+    domain (_ :>: f) = domain f
+
+instance (Monoid (Rng f), Function f, o ~ Rng f) => Function (f :<: o) where
+    type Dom (f :<: o) = Dom f
+    type Rng (f :<: o) = Rng f
+    eval (f :<: o) x  = eval f x `mappend` o
+    isConst (f :<: o) = fmap (flip mappend o) $ isConst f
+    inDom x (f :<: _) = x `inDom` f
+    domain (f :<: _) = domain f
+
+instance (Function f, Function g) => Function (f :*: g) where
+    type Dom (f :*: g) = (Dom f, Dom g)
+    type Rng (f :*: g) = (Rng f, Rng g)
+    eval (f :*: g) (x, y)  = (eval f x, eval g y)
+    isConst (f :*: g)      = Nothing
+    inDom (x, y) (f :*: g) = (x `inDom` f) && (y `inDom` g)
+    domain (f :*: g) = zip (domain f) (domain g)
+
+
+instance (Function f) => Function (Maybe f) where
+    type Dom (Maybe f) = Maybe (Dom f)
+    type Rng (Maybe f) = Maybe (Rng f)
+    eval f x  = liftM2 eval f x
+    isConst f = liftM isConst f
+    inDom x f = maybe False id $ liftM2 inDom x f
+    domain (Just f) = map Just (domain f)
+    domain Nothing  = []
 
 instance (Monoid b) => Function (NullFun a b) where
   type Dom (NullFun a b) = a
@@ -56,7 +98,6 @@ instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   inDom x (Join fs) = all (inDom x) fs
   domain (Join fs) = mconcat $ map domain fs
   domSize _ = 1
-
 
 instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :+: g) where
   type Dom (f :+: g) = Dom f

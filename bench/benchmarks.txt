@@ -18,3 +18,4 @@ raw_io_speed        re2
 rot13               kleenex,ragel,tr
 apache_log          kleenex,perl,ragel
 dfamail             kleenex
+thousand_sep        kleenex,perl,python,cpp11

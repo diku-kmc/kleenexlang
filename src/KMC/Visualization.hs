@@ -14,7 +14,7 @@ import           Control.Concurrent (forkIO)
 import           Data.Char (chr, isPrint)
 import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
-import           Data.Word (Word8)
+import           Data.Word (Word8, Word16)
 
 import           KMC.Coding
 import           KMC.Kleenex.Lang
@@ -26,6 +26,7 @@ import           KMC.SymbolicFST
 import           KMC.SymbolicSST
 import           KMC.SymbolicAcceptor
 import           KMC.Theories
+import           KMC.Util.Bits
 
 class Pretty a where
   pretty :: a -> String
@@ -33,6 +34,13 @@ class Pretty a where
 instance Pretty (NullFun a b) where
   pretty NullFun = [chr 949]
   -- Unicode point 949 is 'GREEK SMALL LETTER EPSILON'
+
+instance Pretty KleenexOutTerm where
+    pretty l = case l of
+                 Inl (InList _) -> "COPY"
+                 Inr (Const []) -> "\"\""
+                 Inr (Const ws) -> "\"" ++ map toChar [ws] ++ "\""
+
 
 instance (Pretty f) => Pretty (f :+: (NullFun a b)) where
     pretty (Inl x)       = pretty x
@@ -46,6 +54,10 @@ instance (Eq a, Pretty a) => Pretty (RangeSet a) where
 instance Pretty Word8 where
   pretty a = let c = chr $ fromEnum a
              in if isPrint c then [c] else '\\':show a
+
+instance Pretty Word16 where
+    pretty a = let (c1, c2) = split a :: (Word8, Word8)
+               in pretty c1 ++ pretty c2
 
 instance Pretty Bool where
   pretty False = "0"

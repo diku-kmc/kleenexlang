@@ -117,7 +117,11 @@ def go(progs = [], skip = None, default_transformation = "ms"):
         except KeyError:
             return transformations[default_transformation]
 
-    os.makedirs(plot_save_dir())
+    try:
+        os.makedirs(plot_save_dir())
+    except OSError:
+        notice_print("Plot output dir already exists")
+        pass
 
     plot_all(get_data(conf, progs), inputs, skips, skipFun, getTransFun)
 

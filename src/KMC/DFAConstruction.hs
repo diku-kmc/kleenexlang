@@ -4,6 +4,7 @@ import           Control.Monad.State
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Word
+import           Data.Maybe (maybeToList)
 
 import           KMC.SymbolicAcceptor
 import           KMC.RangeSet
@@ -12,6 +13,8 @@ import           KMC.Theories
 import           KMC.Expression
 import           KMC.Util.Set (joinSets, occurs)
 import           KMC.Util.List (foldr1ifEmpty)
+
+import KMC.Visualization
 
 dfaFromMu :: (Predicate pred, Enum st, Ord st)
           => Mu pred f st -> DFA (S.Set st) pred
@@ -93,6 +96,7 @@ stepAll (NFA nfa) p = joinSets . S.map aux
             Just ns -> S.fromList [ q' | (p', q') <- S.toList ns
                                        , p `agreesWith` p' ]
 
+
 agreesWith :: (Predicate pred) => pred -> pred -> Bool
 agreesWith p p' = not $ (p `conj` p') `eq` bot
 
@@ -115,3 +119,10 @@ coarsestPredicateSet (NFA nfa) qs = coarsestPartition ps
          [ p | q <- qs
              , (p, _) <- maybe [] S.toList (M.lookup q (nfaForward $ accE nfa)) ]
 
+------------------------------------------------------------
+------------------------------------------------------------
+------------------------------------------------------------
+
+viz :: NFA Int (RangeSet Word8)
+    -> FilePath -> IO ()
+viz = mkVizToFile nfaToDot

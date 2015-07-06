@@ -1,2 +1,4 @@
-main := digit{1,3} ("," digit{3})* (/\./ digit{2})?
+main := (num /\n/)*
+
+num := digit{1,3} ("," digit{3})*
 digit := /[0-9]/

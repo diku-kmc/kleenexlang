@@ -49,6 +49,7 @@ data MainOptions =
     , optExpressionArg    :: Bool
     , optActionEnabled    :: Bool
     , optConstructDFA     :: Bool -- ^ Enable DFA optimization
+    , optSuppressBits     :: Bool -- ^ Don't generate bitcodes that can be safely suppressed
     }
 
 data CompileOptions =
@@ -110,6 +111,7 @@ instance Options MainOptions where
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
       <*> simpleOption "act" True "Enable actions in the language"
       <*> simpleOption "dfa" False "Treat ignored Kleenex-subterms as DFAs"
+      <*> simpleOption "sb"  True "Avoid generating bits for suppressed terms whenever safe"
 
 instance Options CompileOptions where
     defineOptions =
@@ -211,7 +213,7 @@ buildTransducers mainOpts args = do
     else if flav == CompilingKleenex then do
            kleenexSrc <- readFile arg
            let fsts = if optActionEnabled mainOpts
-                      then Transducers $ bitcodeFstFromKleenex kleenexSrc
+                      then Transducers $ bitcodeFstFromKleenex (optSuppressBits mainOpts) kleenexSrc
                       else undefined --Transducers $ fstFromKleenex (optConstructDFA mainOpts) kleenexSrc
            return (fsts, arg, kleenexSrc)
          else do
@@ -386,4 +388,4 @@ buildActionSSTs mainOpts args = do
   kleenexSrc <- readFile arg
   return $ case parseKleenex kleenexSrc of
     Left e   -> error e
-    Right ih -> DetTransducers $ map (genActionSST) (kleenexToActionMuTerm ih)
+    Right ih -> DetTransducers $ map (genActionSST) (kleenexToActionMuTerm ih (optSuppressBits mainOpts))
