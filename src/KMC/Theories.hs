@@ -2,8 +2,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 module KMC.Theories where
 
+import           Control.Monad (liftM2)
+    
 import           KMC.RangeSet (RangeSet)
 import qualified KMC.RangeSet as RS
 
@@ -138,7 +141,38 @@ instance (Bounded a) => Bounded (RangeSet a) where
    maxBound = RS.singleton maxBound
    minBound = RS.singleton minBound
 
+instance (Boolean a, Boolean b) => Boolean (a, b) where
+    top = (top, top)
+    bot = (bot, bot)
+    neg (x, y) = (neg x, neg y)
+    conj (x, y) (x', y') = (x `conj` x', y `conj` y')
+    disj (x, y) (x', y') = (x `disj` x', y `disj` y')
+
+instance (SetLike a doma, SetLike b domb) => SetLike (a, b) (doma, domb) where
+    member (x, y) (l, r) = (x `member` l) && (y `member` r)
+
+instance (PartialOrder a, PartialOrder b) => PartialOrder (a, b) where
+    lte (x, y) (x', y') = (x `lte` x') && (y `lte` y')
+
+-- The definition is general for (Monad m), but we get an overlapping instance:
+--      instance (Ord a, Enum a, Bounded a) => Boolean (RangeSet a)
+--      instance (Monad m, Boolean p) => Boolean (m p)
+instance (Boolean b) => Boolean (Maybe b) where
+    top      = return top
+    bot      = return bot
+    neg x    = x >>= return . neg
+    conj x y = liftM2 conj x y
+    disj x y = liftM2 disj x y
+
+instance (SetLike a doma) => SetLike (Maybe a) (Maybe doma) where
+    member x s = maybe False id $ liftM2 member x s
+
+instance (PartialOrder p) => PartialOrder (Maybe p) where
+    lte x y = maybe False id $ liftM2 lte x y
+
 instance (Ord a, Enum a, Bounded a) => Predicate (RangeSet a) where
+instance (Predicate p1, Predicate p2) => Predicate (p1, p2) where
+instance (Predicate p) => Predicate (Maybe p) where
 
 data Prefix a = Prefix [a] deriving (Eq, Ord, Show)
 
