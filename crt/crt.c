@@ -306,15 +306,14 @@ int readnext(int minCount, int maxCount)
 
   if (!avail(maxCount))
   {
-    int remaining_bits = (in_bitsize - in_bitcursor);
-    int remaining_bytes = ceil((double)remaining_bits / 8);
-    int current_byte = in_bitcursor / 8;
-    int unaligned_bits = in_bitcursor % 8;
+    int buffered_bytes = in_bitsize / 8;
+    int consumed_bytes = in_bitcursor / 8;
+    int remaining_bytes = buffered_bytes - consumed_bytes;
 
     // Move the remaining data just before INBUFFER_SIZE, and read new data
     // from INBUFFER_SIZE forward (in_bitcursor is relative to &inbuf[INBUFFER_SIZE])
-    memmove(&inbuf[INBUFFER_SIZE - remaining_bytes], &inbuf[INBUFFER_SIZE+current_byte], remaining_bytes);
-    in_bitcursor = -remaining_bits;
+    memmove(&inbuf[INBUFFER_SIZE - remaining_bytes], &inbuf[INBUFFER_SIZE+consumed_bytes], remaining_bytes);
+    in_bitcursor -= in_bitsize;
     in_bitsize = fread(&inbuf[INBUFFER_SIZE], 1, INBUFFER_SIZE, stdin)*8;
   }
   if (!avail(minCount))
@@ -345,18 +344,18 @@ unsigned char getnbits(unsigned char c, size_t bits)
 INLINE
 unsigned char next(int index, size_t bits)
 {
-  int curs = in_bitcursor + bits*index;
+  int curs = 8*INBUFFER_SIZE + in_bitcursor + bits*index;
   int current_byte = curs / 8;
   int remaining_bits = 8 - (curs % 8);
   if (remaining_bits >= bits)
   {
-    return getnbits(inbuf[INBUFFER_SIZE + current_byte] << (8 - remaining_bits), bits);
+    return getnbits(inbuf[current_byte] << (8 - remaining_bits), bits);
   }
   else
   {
     // We need to get the bits across the byte boundary
-    char c  = inbuf[INBUFFER_SIZE + current_byte] << (8 - remaining_bits);
-         c |= inbuf[INBUFFER_SIZE + current_byte + 1] >> remaining_bits;
+    char c  = inbuf[current_byte] << (8 - remaining_bits);
+         c |= inbuf[current_byte + 1] >> remaining_bits;
     return getnbits(c,bits);
   }
 }
