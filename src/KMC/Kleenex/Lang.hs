@@ -7,8 +7,8 @@ module KMC.Kleenex.Lang where
 import           Control.Monad.State
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Word (Word8)
-import           Data.ByteString (unpack, ByteString, empty)
+import           Data.Word (Word8(..), Word16(..))
+import           Data.ByteString (unpack, ByteString)
 import           Data.Char (chr, ord)
 import           Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Text as T
@@ -21,7 +21,9 @@ import qualified KMC.Kleenex.Parser as H
 import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..), NullFun(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size)
 import           KMC.Syntax.External (Regex (..), unparse)
-import           KMC.Theories (top, indexOf)
+import           KMC.Theories (top)
+import           KMC.Visualization (Pretty(..))
+import           KMC.Util.Bits (packCombine)
 
 -- for test
 import KMC.Util.Heredoc
@@ -50,16 +52,26 @@ nat2int (S n) = 1 + nat2int n
 -- | Mu-terms created from Kleenex programs either output the identity on
 -- the input character, injected into a list, or the output a constant list
 -- of characters.
-type KleenexOutTerm = (InList (Ident Word8)) :+: (Const Word8 [Word8])
+type KleenexTerm w = (InList (Ident w)) :+: (Const w [w])
+type KleenexMuG w a = Mu (RangeSet w) (KleenexTerm w) a
 
-type KleenexMu a = Mu (RangeSet Word8) KleenexOutTerm a
+type KleenexOutTerm = KleenexTerm Word8
+type KleenexMu a = KleenexMuG Word8 a
+
+instance Pretty KleenexOutTerm where
+    pretty l = case l of
+                 Inl (InList _) -> "COPY"
+                 Inr (Const []) -> "\"\""
+                 Inr (Const ws) -> "\"" ++ map toChar [ws] ++ "\""
+    
 
 -- | The term that copies the input char to output.
 copyInput :: KleenexOutTerm
 copyInput = Inl (InList Ident)
 
 -- | The term that outputs a fixed string (list of Word8).
-out :: [Word8] -> KleenexOutTerm
+--out :: [Word8] -> KleenexOutTerm
+out :: [w] -> KleenexTerm w
 out = Inr . Const
 
 -- | The term that throws away the input char.
@@ -260,6 +272,9 @@ simpleMuToMuTerm' st ign sm =
 simpleMuToMuTerm :: SimpleMu -> KleenexMu a
 simpleMuToMuTerm sm = simpleMuToMuTerm' [] False sm
 
+unpack16 :: ByteString -> [Word16]
+unpack16 = packCombine 0 . unpack
+                      
 -- | Convert a Kleenex program to a list of mu-term that encodes the string transformations
 -- expressed in Kleenex.
 kleenexToActionMuTerm :: H.Kleenex -> Bool -> [KleenexActionMu a]
@@ -382,25 +397,3 @@ testSimple s = either Left (Right . g) (H.parseKleenex s)
       f h i = let sm = kleenexToSimpleMu i h
               in (sm, findSuppressedSubterms sm)
 
--- mu2 :: SimpleMu -- (KleenexMu a, Marked)
--- mu2 = either (error "woot") head  $ testSimple $ --  testKleenex $
---       [strQ|x
--- x := a | ~b
--- a := <a>
--- b := ~<b>
--- |]
--- mu1 :: (KleenexMu a, Marked)
--- mu1 = either (error "woot") head  $ testKleenex $
---       [strQ|x
--- x := a | ~b
--- a := <a>
--- b := ~<b>
--- |]
-
--- s1 = [strQ|x
--- x := ((~a b) | (~c ~d))
--- a := /a/
--- b := /b/
--- c := /c/
--- d := /d/
--- |]

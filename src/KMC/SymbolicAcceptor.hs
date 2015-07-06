@@ -56,10 +56,10 @@ deriving instance (Show (i q), Show (e q p), Show q, Show p) => Show (Acceptor i
 newtype Single a = Single { unSingle :: a } deriving (Eq, Ord, Show)
 
 -- | An NFA has a set of initial states, and it uses the NFAEdgeSet.
-newtype NFA st pred = NFA (Acceptor S.Set NFAEdgeSet st pred)
+newtype NFA st pred = NFA { unNFA :: Acceptor S.Set NFAEdgeSet st pred }
     deriving (Eq, Ord, Show)
 -- | A DFA may only have one single initial state, and it uses the DFAEdgeSet.
-newtype DFA st pred = DFA (Acceptor Single DFAEdgeSet st pred)
+newtype DFA st pred = DFA { unDFA :: Acceptor Single DFAEdgeSet st pred }
     deriving (Eq, Ord, Show)
 
 -- | An edge in an NFA either requires a predicate on the next input
