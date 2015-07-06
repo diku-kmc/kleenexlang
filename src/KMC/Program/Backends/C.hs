@@ -402,7 +402,10 @@ prettyStr = doubleQuotes . hcat . map prettyOrd
 prettyExpr :: Int -> Expr -> Doc
 prettyExpr symbSize e =
   case e of
-    SymE i symbs        -> text "next" <> parens (int i <> comma <> (int $ symbSize*symbs))
+    SymE i symbs        -> if symbSize == 8
+                           -- Assume that we have byte alignment and no variable length symbols
+                           then text "in_byteptr" <> brackets (int i)
+                           else text "next" <> parens (int i <> comma <> (int $ symbSize*symbs))
     AvailableSymbolsE n -> text "avail"<> parens (int $ n*symbSize)
     CompareE i str      -> text "cmp"
                              <> parens (hcat $ punctuate comma

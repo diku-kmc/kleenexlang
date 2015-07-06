@@ -62,6 +62,7 @@ size_t count = 0;
 unsigned char inbuf[INBUFFER_SIZE*2];
 size_t in_bitsize = 0;
 int in_bitcursor = 0;
+char *in_byteptr = &inbuf[INBUFFER_SIZE];
 
 
 // Output buffer stack
@@ -107,10 +108,7 @@ void match(int phase);
 
 
 // Is there 'amount' bits in the input buffer?
-bool avail(int amount)
-{
-    return amount <= (in_bitsize - in_bitcursor);
-}
+#define avail(n) (n <= (in_bitsize - in_bitcursor))
 
 
 void buf_flush(buffer_t *buf)
@@ -270,6 +268,7 @@ void concat(buffer_t *dst, buffer_t *src)
 INLINE
 void outputarray(const buffer_unit_t *arr, size_t bits)
 {
+  if (bits == 0) return;
   int word_count = bits / BUFFER_UNIT_BITS;
   // Write completed words
   size_t word_index = 0;
@@ -296,6 +295,7 @@ void consume(int c)
 {
   count        += c;
   in_bitcursor += c;
+  in_byteptr   += c / 8; // Is only valid when inbuf is byte aligned
 }
 
 INLINE
@@ -315,6 +315,7 @@ int readnext(int minCount, int maxCount)
     memmove(&inbuf[INBUFFER_SIZE - remaining_bytes], &inbuf[INBUFFER_SIZE+consumed_bytes], remaining_bytes);
     in_bitcursor -= in_bitsize;
     in_bitsize = fread(&inbuf[INBUFFER_SIZE], 1, INBUFFER_SIZE, stdin)*8;
+    in_byteptr = &inbuf[INBUFFER_SIZE - remaining_bytes];
   }
   if (!avail(minCount))
   {
