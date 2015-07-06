@@ -2,20 +2,20 @@
 {-# LANGUAGE TypeFamilies #-}
 module KMC.Util.Bits ( DoubleBits(combine, split), packCombine, unpackSplit ) where
 
-import Data.Bits (shift, (.|.), (.&.), complement, zeroBits, FiniteBits(..))
+import Data.Bits (shift, (.|.), (.&.), complement, bitSize, clearBit, Bits(..))
 import Data.Word (Word8, Word16, Word32, Word64)
 
 -- | Pack two 8-bit words in a 16-bit word, two 16-bit words in a 32-bit word,
 -- etc.  Split a 16-bit word into two 8-bit words, etc.
-class (FiniteBits b, Enum b, FiniteBits (Twice b), Enum (Twice b)) => DoubleBits b where
+class (Bits b, Enum b, Bits (Twice b), Enum (Twice b)) => DoubleBits b where
     type Twice b :: *
     combine :: (b, b) -> Twice b
-    combine (w1, w2) = (castWord w1 `shift` (finiteBitSize w1)) .|. (castWord w2)
+    combine (w1, w2) = (castWord w1 `shift` (bitSize w1)) .|. (castWord w2)
 
     -- The actual split implementation requires a zero element of the correct
     -- type, so the type checker knows which instance to pick.
     split' :: b -> Twice b -> (b, b)
-    split' z w = ( castWord $ (w .&. hi) `shift` (negate (finiteBitSize w `div` 2))
+    split' z w = ( castWord $ (w .&. hi) `shift` (negate (bitSize w `div` 2))
                  , castWord $ w .&. lo
                  )
         where
@@ -26,6 +26,9 @@ class (FiniteBits b, Enum b, FiniteBits (Twice b), Enum (Twice b)) => DoubleBits
     -- The implementation is just split' but with a type-annotated zero element
     -- given to make the type checker happy.  It complains about Twice being
     -- non-injective, so we help it with type annotations in the instances.
+
+zeroBits :: (Bits a) => a
+zeroBits = clearBit (bit 0) 0
 
 instance DoubleBits Word8 where
     type Twice Word8 = Word16
