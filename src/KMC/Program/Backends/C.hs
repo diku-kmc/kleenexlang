@@ -169,7 +169,9 @@ tbl ctypectx ctypetbl (TableId n) i symbs symbSize mx phase =
   in cast ctypectx ctypetbl
      $ hcat [text "tbl" <> int phase
             ,brackets $ int n
-            ,brackets $ text "next" <> parens (hcat [offsetdoc, comma, int $ symbs*symbSize])
+            ,brackets $ if symbSize == 8
+                        then text "in_byteptr" <> brackets (offsetdoc)
+                        else text "nextcache" <> brackets (offsetdoc)
             ]
 
 -- | Pretty print a block identifier
@@ -264,7 +266,7 @@ prettyAppendTbl buftype tbltype prog bid tid i symbs mx phase =
 prettyAppendSym :: BufferId -> BufferId -> Int -> Int -> Int -> Maybe String -> Doc
 prettyAppendSym bid outBuf i symbs symbSize mx =
     let offsetdoc = maybe (int i) (\s -> int i <+> text "+" <+> text s) mx
-        symb = text "next" <> parens (hcat [offsetdoc, comma, int $ symbs*symbSize])
+        symb = text "nextcache" <> brackets (offsetdoc)
     in if bid == outBuf then
         text "outputconst" <> parens (hcat [symb, comma, int 8]) <> semi
     else
@@ -285,6 +287,11 @@ prettyInstr buftype tbltype prog instr phase =
       symbSize = symbolSize prog
   in
   case instr of
+    CacheNextI i symbs -> if symbSize == 8
+                          then text ""
+                          else  text "nextcache" <> brackets (int i) <+> text "=" <+>
+                                text "next" <> parens (hcat [int i, comma, int $ symbSize * symbs])
+                          <> semi
     FinishedI is       -> text "if (input_eof())" $$
                           lbrace $+$
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
@@ -405,7 +412,7 @@ prettyExpr symbSize e =
     SymE i symbs        -> if symbSize == 8
                            -- Assume that we have byte alignment and no variable length symbols
                            then text "in_byteptr" <> brackets (int i)
-                           else text "next" <> parens (int i <> comma <> (int $ symbSize*symbs))
+                           else text "nextcache" <> brackets (int i)
     AvailableSymbolsE n -> text "avail"<> parens (int $ n*symbSize)
     CompareE i str      -> text "cmp"
                              <> parens (hcat $ punctuate comma

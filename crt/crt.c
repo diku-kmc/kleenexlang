@@ -64,6 +64,9 @@ size_t in_bitsize = 0;
 int in_bitcursor = 0;
 char *in_byteptr = &inbuf[INBUFFER_SIZE];
 
+// Buffering cache (No, were not making this up)
+unsigned char nextcache[INBUFFER_SIZE];
+
 
 // Output buffer stack
 typedef struct {

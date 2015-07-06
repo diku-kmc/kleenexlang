@@ -9,6 +9,8 @@ module KMC.SSTCompiler where
 
 import           Control.Monad.Reader
 import           Control.Applicative ((<$>), (<*>), pure)
+import           Data.List (maximumBy)
+import           Data.Function (on)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -178,9 +180,9 @@ compileTransitions :: (Ord st, Ord var, Ord pred, Ord func, Ord delta, Show var
 compileTransitions i (BranchT action tests) = do
   testBlock <- forM tests $ \(ps, ts') ->
     do block <- compileTransitions (i+predListNeededSymbols ps) ts'
-       return [IfI ((AvailableSymbolsE (i+predListNeededSymbols ps))
-                    `AndE` (predListToExpr ps i))
-                   block]
+       return [ IfI ((AvailableSymbolsE (i+predListNeededSymbols ps))
+                    `AndE` (predListToExpr ps i)) block
+              ]
   actionBlock <- case action of
                     Nothing -> return []
                     Just (Inl upd, st') -> do
@@ -227,7 +229,12 @@ compileState trans fin = do
                            ass <- compileAssignment var (constUpdateStringFunc upd)
                            return $ [FinishedI $ ass ++ [AcceptI]]
   transitions <- compileTransitions 0 (kvtree [ (ps, (upd, st')) | (ps, upd, st') <- trans ])
-  return $ assignments ++ transitions ++ [FailI]
+  let preds = [ps | (ps,_,_) <- trans]
+  let maxIndex =  if null transitions
+                  then -1
+                  else maximum $ map length preds
+  let cache = [ CacheNextI i (predListNeededSymbols $ head preds) | i <- [0 .. maxIndex-1]]
+  return $ assignments ++ cache ++ transitions ++ [FailI]
 
 constants :: (Ord delta, Rng func ~ [delta], Show delta) =>
              [(st, pred, EdgeAction var func, st)]

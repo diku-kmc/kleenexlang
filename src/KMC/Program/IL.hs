@@ -38,6 +38,7 @@ data Expr =
 
 data Instr delta =
     AcceptI                             -- ^ accept (Program stops)
+  | CacheNextI Int Int                  -- ^ nextcache[i] = next(i, ..)
   | FailI                               -- ^ fail   (Program stops)
   | FinishedI  (Block delta)            -- ^ if (input_eof()) { ... }
   | AppendI    BufferId ConstId         -- ^ buf  := buf ++ bs
