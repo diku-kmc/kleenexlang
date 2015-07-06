@@ -34,6 +34,13 @@ instance Pretty (NullFun a b) where
   pretty NullFun = [chr 949]
   -- Unicode point 949 is 'GREEK SMALL LETTER EPSILON'
 
+instance Pretty KleenexOutTerm where
+    pretty l = case l of
+                 Inl (InList _) -> "COPY"
+                 Inr (Const []) -> "\"\""
+                 Inr (Const ws) -> "\"" ++ map toChar [ws] ++ "\""
+
+
 instance (Pretty f) => Pretty (f :+: (NullFun a b)) where
     pretty (Inl x)       = pretty x
     pretty (Inr NullFun) = pretty NullFun
