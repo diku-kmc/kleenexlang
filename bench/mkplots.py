@@ -27,14 +27,14 @@ def colored(msg, color):
 def trans_Gbit_per_s(inputsize_bytes):
     return { "median_format_string" : "%.3f",
              "trans_fun" : lambda ps : map(lambda p : ((inputsize_bytes * 8) / 1e9) / (p / 1000.0), ps),
-             "yaxis_label" : "GBit/s",
+             "yaxis_label" : "Gbit/s",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
              (prog, inputname, inputsize_bytes / 2.0**20)
          }
 def trans_Mbit_per_s(inputsize_bytes):
     return { "median_format_string" : "%.1f",
              "trans_fun" : lambda ps : map(lambda p : ((inputsize_bytes * 8) / 1e6) / (p / 1000.0), ps),
-             "yaxis_label" : "MBit/s",
+             "yaxis_label" : "Mbit/s",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
              (prog, inputname, inputsize_bytes / 2.0**20)
          }
