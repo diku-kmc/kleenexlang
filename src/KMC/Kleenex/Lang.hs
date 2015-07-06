@@ -24,10 +24,6 @@ import           KMC.Syntax.External (Regex (..), unparse)
 import           KMC.Theories (top)
 import           KMC.Util.Bits (packCombine)
 
--- for test
-import KMC.Util.Heredoc
-import Debug.Trace
-
 toChar :: (Enum a, Bounded a) => [a] -> Char
 toChar = chr . decodeEnum
 
