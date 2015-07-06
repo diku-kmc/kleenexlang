@@ -18,9 +18,9 @@ executable repg
   main-is:             Main.hs
   -- other-modules:
   -- other-extensions:
-  ghc-options:
-    -O2
-    -threaded
+  ghc-options: -O2
+               -threaded
+               -ddump-minimal-imports
 --    -fprof-auto
 --    "-with-rtsopts=-N -p -s -h -i0.1"
   build-depends:       MissingH >= 1.3
@@ -54,6 +54,9 @@ executable repg
 test-suite test-repg
   type:                detailed-0.9
   test-module:         Tests
+  ghc-options: -O2
+               -threaded
+               -ddump-minimal-imports
   other-modules:       KMC.Expression
                      , KMC.RangeSet
                      , KMC.OutputTerm
@@ -72,6 +75,7 @@ test-suite test-repg
                      , KMC.Kleenex.Action
                      , KMC.Util.Set
                      , KMC.Util.List
+                     , KMC.Util.Bits
                      , Tests.TestUtils
                      , Tests.DFAConstruction
                      , Tests.KleenexParser
