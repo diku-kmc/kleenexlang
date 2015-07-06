@@ -20,9 +20,9 @@ newtype TableId = TableId { getTableId :: Int } deriving (Eq, Ord, Show)
 newtype BufferId = BufferId { getBufferId :: Int } deriving (Eq, Ord, Show)
 
 data Expr =
-    SymE Int          -- ^ next[i] (i less than value of AvailableSymbolsE)
-  | AvailableSymbolsE -- ^ Number of available symbols
-  | CompareE Int [Int] -- compare(&next[i], str, length(str))
+    SymE Int Int          -- ^ next(index,numSymbols) (index less than available symbols)
+  | AvailableSymbolsE Int -- ^ Is there enough available symbols?
+  | CompareE Int [Int]    -- compare(&next[i], str, length(str))
   | ConstE Int
   | FalseE
   | TrueE
@@ -39,9 +39,10 @@ data Expr =
 data Instr delta =
     AcceptI                             -- ^ accept (Program stops)
   | FailI                               -- ^ fail   (Program stops)
+  | FinishedI  (Block delta)            -- ^ if (input_eof()) { ... }
   | AppendI    BufferId ConstId         -- ^ buf  := buf ++ bs
-  | AppendTblI BufferId TableId Int     -- ^ buf  := buf ++ tbl(id)(next[i])[0 .. sz(id) - 1]
-  | AppendSymI BufferId Int             -- ^ buf  := buf ++ next[i]
+  | AppendTblI BufferId TableId Int Int -- ^ buf  := buf ++ tbl(id)(next(i, numSymbols))[0 .. sz(id) - 1]
+  | AppendSymI BufferId Int Int         -- ^ buf  := buf ++ next(i, numSymbols)]
   | ConcatI    BufferId BufferId        -- ^ buf1 := buf1 ++ buf2; reset(buf2)
   | ResetI     BufferId                 -- ^ buf1 := []
   | AlignI     BufferId BufferId        -- ^ align buf1 buf2. assert that buf1 is empty, and
@@ -53,7 +54,7 @@ data Instr delta =
   | IfI        Expr (Block delta)       -- ^ if (e :: Bool) { ... }
   | GotoI      BlockId                  -- ^ goto b
   | NextI      Int Int (Block delta)    -- ^ if (!getChars(min,max)) { ... }
-  | ConsumeI   Int                      -- ^ next += i
+  | ConsumeI   Int                      -- ^ in_bitcursor += i
   | ChangeOut  BufferId                 -- ^ change the output buffer to buf, push old one to the stack
   | RestoreOut                          -- ^ pop to the previous output buffer
   deriving (Eq, Ord, Show)
@@ -68,6 +69,7 @@ data Program delta =
   , progBuffers      :: [BufferId]
   , progInitBlock    :: BlockId
   , progBlocks       :: M.Map BlockId (Block delta)
+  , symbolSize       :: Int
   }
   deriving (Eq, Show)
 

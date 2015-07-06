@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module KMC.Theories where
 
+import           Data.Word
 import           KMC.RangeSet (RangeSet)
 import qualified KMC.RangeSet as RS
 
@@ -75,6 +76,7 @@ class Function t where
   isConst :: t -> Maybe (Rng t)
   inDom   :: Dom t -> t -> Bool
   domain  :: t -> [Dom t]
+  domSize :: t -> Int
 
 {----------------------------------------------------------------------}
 {- Partial orders                                                     -}
@@ -109,11 +111,18 @@ class (Ord pred, Boolean pred, PartialOrder pred) => Predicate pred where
 class (Ord var, Show var, Eq var) => Variable var where
 
 -- Finite alphabet
-class (Ord delta, Show delta, Eq delta, Enum delta, Bounded delta) => Alphabet delta where
+class (Ord delta, Show delta, Eq delta, Enum delta) => Alphabet delta where
+    value :: delta -> Int
 
 {----------------------------------------------------------------------}
 {- Instances                                                          -}
 {----------------------------------------------------------------------}
+
+instance Alphabet Word8 where
+    value = fromEnum
+
+instance Alphabet Bool where
+    value = fromEnum
 
 instance (Ord a, Enum a, Bounded a) => Boolean (RangeSet a) where
   top  = RS.universe

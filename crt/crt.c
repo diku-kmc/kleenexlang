@@ -6,6 +6,7 @@
 #include <inttypes.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <math.h>
 #include <sys/time.h>
 
 #define RETC_PRINT_USAGE     1
@@ -36,6 +37,8 @@
 #define OUTSTREAM stdout
 #endif
 
+#define NEXT(i) &inbuf[in_bitcursor/8 + i]
+
 // Order of descriptors provided by pipe()
 #define  READ_FD 0
 #define WRITE_FD 1
@@ -50,18 +53,18 @@ typedef struct {
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
 #define BUFFER_UNIT_BITS (BUFFER_UNIT_SIZE * 8)
 
-unsigned char *next;
+// Output buffering
 buffer_t outbuf;
 buffer_t *outbuf_ptr;
-size_t count = 0;
 
+// Input buffering
+size_t count = 0;
 unsigned char inbuf[INBUFFER_SIZE*2];
-size_t in_size = 0;
-int in_cursor = 0;
-#define avail (in_size - in_cursor)
+size_t in_bitsize = 0;
+int in_bitcursor = 0;
+
 
 // Output buffer stack
-
 typedef struct {
   buffer_t **data;
   size_t capacity;
@@ -95,11 +98,20 @@ void init_outbuf_stack()
   outbuf_stack.data = malloc(OUTBUFFER_STACK_SIZE*sizeof(buffer_t *));
 }
 
-// Program interface
 
+
+// Program interface
 void printCompilationInfo();
 void init();
 void match(int phase);
+
+
+// Is there 'amount' bits in the input buffer?
+bool avail(int amount)
+{
+    return amount <= (in_bitsize - in_bitcursor);
+}
+
 
 void buf_flush(buffer_t *buf)
 {
@@ -173,7 +185,7 @@ void buf_writearray(buffer_t *dst, const buffer_unit_t *arr, size_t bits)
     int count = (bits / BUFFER_UNIT_BITS) + (bits % BUFFER_UNIT_BITS ? 1 : 0);
     memcpy(&dst->data[dst->bitpos / BUFFER_UNIT_BITS], arr, count * BUFFER_UNIT_SIZE);
     dst->bitpos += bits;
-    dst->data[dst->bitpos / BUFFER_UNIT_BITS] = 0;
+    dst->data[(dst->bitpos + BUFFER_UNIT_BITS - 1) / BUFFER_UNIT_BITS] = 0;
   } else
   {
     int word_index = 0;
@@ -282,9 +294,8 @@ void output(buffer_t *buf)
 INLINE
 void consume(int c)
 {
-  count     += c;
-  in_cursor += c;
-  next      += c;
+  count        += c;
+  in_bitcursor += c;
 }
 
 INLINE
@@ -293,19 +304,70 @@ int readnext(int minCount, int maxCount)
   // We can always take epsilon transitions
   if (minCount == 0) return 1;
 
-  if (avail < maxCount)
+  if (!avail(maxCount))
   {
-    int remaining = avail;
-    memmove(&inbuf[INBUFFER_SIZE - remaining], &inbuf[INBUFFER_SIZE+in_cursor], remaining);
-    in_cursor = -remaining;
-    in_size = fread(&inbuf[INBUFFER_SIZE], 1, INBUFFER_SIZE, stdin);
+    int remaining_bits = (in_bitsize - in_bitcursor);
+    int remaining_bytes = ceil((double)remaining_bits / 8);
+    int current_byte = in_bitcursor / 8;
+    int unaligned_bits = in_bitcursor % 8;
+
+    // Move the remaining data just before INBUFFER_SIZE, and read new data
+    // from INBUFFER_SIZE forward (in_bitcursor is relative to &inbuf[INBUFFER_SIZE])
+    memmove(&inbuf[INBUFFER_SIZE - remaining_bytes], &inbuf[INBUFFER_SIZE+current_byte], remaining_bytes);
+    in_bitcursor = -remaining_bits;
+    in_bitsize = fread(&inbuf[INBUFFER_SIZE], 1, INBUFFER_SIZE, stdin)*8;
   }
-  if (avail < minCount)
+  if (!avail(minCount))
   {
     return 0;
   }
-  next = &inbuf[INBUFFER_SIZE+in_cursor];
   return 1;
+}
+
+void print_buf(char *label, buffer_t *buf)
+{
+  size_t units = (buf->bitpos + BUFFER_UNIT_BITS - 1) / BUFFER_UNIT_BITS;
+  fprintf(stderr, "%s: ", label);
+  size_t i;
+  for (i = 0; i < units; i++) {
+    fprintf(stderr, "%02x%c", buf->data[i], i % 32 == 31 ? '\n' : ' ');
+  }
+  fprintf(stderr, "\n");
+}
+
+INLINE
+unsigned char getnbits(unsigned char c, size_t bits)
+{
+    return c >> (8 - bits);
+}
+
+
+INLINE
+unsigned char next(int index, size_t bits)
+{
+  int curs = in_bitcursor + bits*index;
+  int current_byte = curs / 8;
+  int remaining_bits = 8 - (curs % 8);
+  if (remaining_bits >= bits)
+  {
+    return getnbits(inbuf[INBUFFER_SIZE + current_byte] << (8 - remaining_bits), bits);
+  }
+  else
+  {
+    // We need to get the bits across the byte boundary
+    char c  = inbuf[INBUFFER_SIZE + current_byte] << (8 - remaining_bits);
+         c |= inbuf[INBUFFER_SIZE + current_byte + 1] >> remaining_bits;
+    return getnbits(c,bits);
+  }
+}
+
+INLINE
+bool input_eof()
+{
+  if (readnext(8,8)) return 0;
+  int remaining_bits = (8 - (in_bitcursor % 8)) % 8;
+  return (next(0,remaining_bits) == 0);
+
 }
 
 INLINE

@@ -23,9 +23,11 @@ import           KMC.Util.Map (swapMap)
 import Debug.Trace
 
 class PredicateListToExpr p where
-    predListToExpr :: [p] -> Int -> Expr
+    predListToExpr        :: [p] -> Int -> Expr
+    predListNeededSymbols :: [p] -> Int
 
-instance (Eq a, Enum a) => PredicateListToExpr (RS.RangeSet a) where
+instance (Alphabet a) => PredicateListToExpr (RS.RangeSet a) where
+    predListNeededSymbols ps = sum $ map RS.numSymbols ps
     predListToExpr [] _ = TrueE
     predListToExpr xs i =
       let (xsEq, xsRest') = span (\rs -> RS.size rs == 1) xs
@@ -44,15 +46,15 @@ instance (Eq a, Enum a) => PredicateListToExpr (RS.RangeSet a) where
          where
           fromSingleton rs | [(l,h)] <- RS.ranges rs, l == h = l
                            | otherwise = error "not a singleton rangeset"
-          
-          predToExpr rs j = case map rangeTest (RS.ranges rs) of
+
+          predToExpr rs j = case map (rangeTest $ RS.numSymbols rs) $ RS.ranges rs of
                               []     -> FalseE
                               ranges -> foldr1 OrE ranges
               where
-                rangeTest (l, h)
-                  | l == h    = EqE (SymE j) (ConstE $ fromEnum l)
-                  | otherwise = AndE (LteE (ConstE $ fromEnum l) (SymE j))
-                                     (LteE (SymE j) (ConstE $ fromEnum h))
+                rangeTest size (l, h)
+                  | l == h    = EqE (SymE j size) (ConstE $ value l)
+                  | otherwise = AndE (LteE (ConstE $ value l) (SymE j size))
+                                     (LteE (SymE j size) (ConstE $ value h))
 
 -- | Tree of tests and actions.
 data KVTree a b =
@@ -109,8 +111,10 @@ tabulate :: (Function t,Enum (Dom t)
          => t -> Table delta
 tabulate f = Table bitTable bitSize
   where
-    bitTable = map (eval f) $ (traceShow (domain f) (domain f))
+    bitTable = map eval' $ domain f
     bitSize = foldr max 0 (map length bitTable)
+    eval' x | inDom x f = eval f x
+            | otherwise = []
        
 
 look :: (Ord k) => M.Map k a -> k -> a
@@ -121,7 +125,7 @@ look m k = case M.lookup k m of
 -- The following is assumed:
 --   (1) Variable updates are linear (non-copying)
 --   (2) Within the block of updates, the updated buffer is not live. (I.e., it is safe to modify it)
-compileAssignment :: (Ord var, Show var, Ord func, Rng func ~ [delta], Ord delta) =>
+compileAssignment :: (Ord var, Show var, Ord func, Rng func ~ [delta], Ord delta, Function func) =>
                      var                       -- ^ Variable to be updated
                   -> UpdateStringFunc var func -- ^ Update function
                   -> EnvReader st var func delta (Block delta)
@@ -134,7 +138,7 @@ compileAssignment var atoms = do
     bid = look <$> (asks bmap) <*> pure var
     conv (VarA var')     = ConcatI    <$> bid <*> ((M.!) <$> asks bmap <*> pure var')
     conv (ConstA deltas) = AppendI    <$> bid <*> ((M.!) <$> asks cmap <*> pure deltas)
-    conv (FuncA f i)     = AppendTblI <$> bid <*> ((M.!) <$> asks tmap <*> pure f) <*> pure i
+    conv (FuncA f i)     = AppendTblI <$> bid <*> ((M.!) <$> asks tmap <*> pure f) <*> pure i <*> pure (domSize f)
 
 -- | Order assignments in a register update based on data dependencies. An
 -- assignment `a' should come before an assignment `b' if `a' uses the variable
@@ -160,21 +164,21 @@ orderAssignments ru
       fv (VarA v:xs) = v:fv xs
       fv (_:xs) = fv xs
 
-compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta], Ord delta, Show var) =>
+compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta], Ord delta, Show var, Function func) =>
                       RegisterUpdate var func   -- ^ Register update
                       -> EnvReader st var func delta (Block delta)
 compileRegisterUpdate rup = 
   liftM concat $ mapM (uncurry compileAssignment) $ orderAssignments rup
 
 compileTransitions :: (Ord st, Ord var, Ord pred, Ord func, Ord delta, Show var
-                      ,Rng func ~ [delta], PredicateListToExpr pred) =>
+                      ,Rng func ~ [delta], PredicateListToExpr pred, Function func) =>
                       Int
                    -> KVTree pred (EdgeAction var func, st) -- ^ Transitions
                    -> EnvReader st var func delta (Block delta)
 compileTransitions i (BranchT action tests) = do
   testBlock <- forM tests $ \(ps, ts') ->
-    do block <- compileTransitions (i+length ps) ts'
-       return [IfI ((AvailableSymbolsE `GteE` (ConstE (i+length ps)))
+    do block <- compileTransitions (i+predListNeededSymbols ps) ts'
+       return [IfI ((AvailableSymbolsE (i+predListNeededSymbols ps))
                     `AndE` (predListToExpr ps i))
                    block]
   actionBlock <- case action of
@@ -203,7 +207,7 @@ compileTransitions i (BranchT action tests) = do
   return $ concat testBlock ++ actionBlock
 
 compileState :: (Ord st, Ord var, Ord pred, Ord func, Ord delta, Show var
-                ,Rng func ~ [delta], PredicateListToExpr pred) =>
+                ,Rng func ~ [delta], PredicateListToExpr pred, Function func) =>
                 [([pred], EdgeAction var func, st)] -- ^ Transitions
              -> Maybe (UpdateString var [delta])        -- ^ Final action
              -> EnvReader st var func delta (Block delta)
@@ -212,16 +216,16 @@ compileState trans fin = do
         if null trans then
             (1, 1)
         else
-            (foldr1 min [ length ps | (ps, _, _) <- trans ]
-            ,foldr1 max [ length ps | (ps, _, _) <- trans ])
+            (foldr1 min [ predListNeededSymbols ps | (ps, _, _) <- trans ]
+            ,foldr1 max [ predListNeededSymbols ps | (ps, _, _) <- trans ])
   -- Look ahead at least minL symbols, up to maxL symbols. If minL symbols are
   -- not available, execute fallback action.
-  assignments <- liftM ((:[]) . NextI minL maxL) $ case fin of
-                   Nothing  -> return [FailI]
+  assignments <- case fin of
+                   Nothing  -> return [NextI minL maxL [FailI]]
                    Just upd -> do
                            var <- asks outvar
                            ass <- compileAssignment var (constUpdateStringFunc upd)
-                           return $ ass ++ [AcceptI]
+                           return $ [FinishedI $ ass ++ [AcceptI]]
   transitions <- compileTransitions 0 (kvtree [ (ps, (upd, st')) | (ps, upd, st') <- trans ])
   return $ assignments ++ transitions ++ [FailI]
 
@@ -258,30 +262,31 @@ type EnvReader st var func delta = Reader (Env st var func delta)
 -- function and replace all lookups in them with a special instruction,
 -- denoting that the current input character in the runtime should be output
 -- or appended.
-elimIdTables :: (Bounded delta, Enum delta) => Program delta -> Program delta
-elimIdTables prog = prog { progTables = rest
-                         , progBlocks = M.map elimTables $ progBlocks prog
-                         }
-    where
-      (idTables, rest) = M.partition isIdTable $ progTables prog
-      isIdTable = all cmp . zip [0..] . tblTable
-      cmp (ix, sym) = ix == (decodeEnum sym :: Integer)
-      elimTables = map (instrElim (M.keys idTables))
-      instrElim tids (IfI exp block) = IfI exp (elimTables block)
-      instrElim tids (NextI min max block) = NextI min max (elimTables block)
-      instrElim tids ins@(AppendTblI bid tid i) =
-          if tid `elem` tids
-          then AppendSymI bid i
-          else ins
-      instrElim _ ins = ins
+--elimIdTables :: (Bounded delta, Enum delta) => Program delta -> Program delta
+--elimIdTables prog = prog { progTables = rest
+--                         , progBlocks = M.map elimTables $ progBlocks prog
+--                         }
+--    where
+--      (idTables, rest) = M.partition isIdTable $ progTables prog
+--      isIdTable = all cmp . zip [0..] . tblTable
+--      cmp (ix, sym) = ix == (decodeEnum sym :: Integer)
+--      elimTables = map (instrElim (M.keys idTables))
+--      instrElim tids (IfI exp block) = IfI exp (elimTables block)
+--      instrElim tids (NextI min max block) = NextI min max (elimTables block)
+--      instrElim tids ins@(AppendTblI bid tid i) =
+--          if tid `elem` tids
+--          then AppendSymI bid i 8
+--          else ins
+--      instrElim _ ins = ins
 
 compileAutomaton :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta
     , Function func, Enum (Dom func), Rng func ~ [delta]
     , PredicateListToExpr pred, Show (Dom func), Show var, Show delta) =>
-    SST st pred func var
+    Int
+    -> SST st pred func var
     -> Program delta
-compileAutomaton sst =
+compileAutomaton symbSize sst =
   Program
   { progTables       = M.fromList [ (tid, tbl) | (_,tid,tbl) <- funcRel ]
   , progConstants    = swapMap (cmap env)
@@ -295,6 +300,7 @@ compileAutomaton sst =
                                    (M.lookup st (sstF sst))
                    )
                    | (st, blck) <- M.toList (smap env) ]
+  , symbolSize       = symbSize
   }
   where
     env = Env { bmap = M.fromList $ zip (S.elems $ sstV sst) (map BufferId [0..])

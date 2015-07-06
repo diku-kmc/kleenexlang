@@ -22,12 +22,13 @@ data NullFun a b = NullFun deriving (Eq, Ord, Show)
 type WithNull f = f :+: (NullFun (Dom f) (Rng f))
 
 instance (Monoid b) => Function (NullFun a b) where
-    type Dom (NullFun a b) = a
-    type Rng (NullFun a b) = b
-    eval NullFun _  = mempty
-    isConst NullFun = Just mempty
-    inDom _ NullFun = True
-    domain NullFun  = []
+  type Dom (NullFun a b) = a
+  type Rng (NullFun a b) = b
+  eval NullFun _  = mempty
+  isConst NullFun = Just mempty
+  inDom _ NullFun = True
+  domain NullFun  = []
+  domSize _ = 1
 
 instance (Enum a, Bounded a) => Function (Ident a) where
   type Dom (Ident a) = a
@@ -36,6 +37,7 @@ instance (Enum a, Bounded a) => Function (Ident a) where
   isConst Ident = Nothing
   inDom _ _ = True
   domain Ident = [minBound .. maxBound]
+  domSize _ = 1
 
 instance (Function f) => Function (InList f) where
   type Dom (InList f) = Dom f
@@ -44,6 +46,7 @@ instance (Function f) => Function (InList f) where
   isConst (InList f) = (:[]) <$> isConst f
   inDom x (InList f) = inDom x f
   domain (InList f) = domain f
+  domSize _ = 1
 
 instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   type Dom (Join f rng) = Dom f
@@ -52,6 +55,7 @@ instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   isConst (Join fs) = mconcat <$> mapM isConst fs
   inDom x (Join fs) = all (inDom x) fs
   domain (Join fs) = mconcat $ map domain fs
+  domSize _ = 1
 
 
 instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :+: g) where
@@ -65,6 +69,8 @@ instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :
   inDom x (Inr g) = inDom x g
   domain (Inl f) = domain f
   domain (Inr g) = domain g
+  domSize (Inl f) = domSize f
+  domSize (Inr g) = domSize g
 
 instance Function (Const dom rng) where
   type Dom (Const dom rng) = dom
@@ -73,8 +79,9 @@ instance Function (Const dom rng) where
   isConst (Const x) = Just x
   inDom _ _ = True
   domain (Const x) = []
+  domSize _ = 1
 
-instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Function (Enumerator e dom rng) where
+instance (Enumerable e dom, Bounded dom, Enum rng, Bounded rng, Num dom, Enum dom) => Function (Enumerator e dom rng) where
   type Dom (Enumerator e dom rng) = dom
   type Rng (Enumerator e dom rng) = [rng]
   eval (Enumerator e) x = codeFixedWidthEnumSized (size e) (indexOf x e)
@@ -83,5 +90,6 @@ instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Functio
                            else
                                Nothing
   inDom x (Enumerator e) = member x e
-  domain (Enumerator e)  = [lookupIndex i e | i <- [0 .. size e - 1]]
+  domain (Enumerator e)  = [minBound .. maxBound]
+  domSize _ = 1
 

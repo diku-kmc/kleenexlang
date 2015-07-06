@@ -172,6 +172,10 @@ kleenexTerm = skipAround kleenexExpr
           [ Prefix (schar '~' >> return Ignore <?> "Ignored"),
             Prefix (try $ do ident <- many lower
                              char '@'
+                             -- Do not change the form of this parse 
+                             -- (i.e. to Action (..) One `Seq` term `Seq` ...)
+                             -- as the supressed output optimization makes
+                             -- assumptions about it.
                              return $ (\term -> Action (PushOut (varToInt ident)) term `Seq` Action PopOut One)) ],
           -- Use the postfix function below to allow multiple stacked postfix
           -- operators without the need for parentheses around all subterms.

@@ -2,6 +2,7 @@
 module KMC.Coding where
 
 import KMC.RangeSet
+import KMC.Theories (Alphabet(..))
 import Debug.Trace
 
 -- | Compute the number of digits required to fit n values in a word of digits of a given base
@@ -77,6 +78,9 @@ type BitInputTerm = RangeSet BitString
 newtype BitString = BitString [Bool]
     deriving (Ord, Eq, Show)
 
+instance Alphabet BitString where
+    value (BitString b) = decodeEnum b
+
 instance Enum BitString where
     toEnum n = BitString $ codeFixedWidthEnum len (n - 2^len + 2)
           where
@@ -90,19 +94,19 @@ bZero :: BitString
 bZero = BitString [False]
 
 matchZero :: BitInputTerm
-matchZero = boundedRangeSet bZero bOne [(bZero, bZero)]
+matchZero = boundedRangeSet bZero bOne 1 [(bZero, bZero)]
 
 matchOne :: BitInputTerm
-matchOne = boundedRangeSet bZero bOne [(bOne, bOne)]
+matchOne = boundedRangeSet bZero bOne 1 [(bOne, bOne)]
 
 matchTop :: Int -> BitInputTerm
-matchTop n = boundedRangeSet min max [(min, max)]
+matchTop n = boundedRangeSet min max n [(min, max)]
   where
     min = BitString $ replicate n False
     max = BitString $ replicate n True
 
 matchRange :: Int -> BitString -> BitString -> BitInputTerm
-matchRange n lower upper = boundedRangeSet min max [(lower, upper)]
+matchRange n lower upper = boundedRangeSet min max n [(lower, upper)]
   where
     min = BitString $ replicate n False
     max = BitString $ replicate n True

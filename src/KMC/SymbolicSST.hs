@@ -41,6 +41,8 @@ import           KMC.Coding
 import           KMC.Theories
 import           KMC.OutputTerm
 
+import Debug.Trace
+
 type Valuation var delta       = M.Map var [delta]
 type Environment st var delta  = M.Map st (Valuation var delta)
 
@@ -60,16 +62,17 @@ data ActionExpr var dom rng = PushOut var
                             | OutputConst rng
     deriving (Ord, Show, Eq)
 
-instance (rng ~ [Word8], Ord dom, Enum dom) => Function (ActionExpr var dom rng) where
+instance (rng ~ [Word8], Ord dom, Enum dom, Show dom) => Function (ActionExpr var dom rng) where
     type Dom (ActionExpr var dom rng) = dom
     type Rng (ActionExpr var dom rng) = rng
     eval (ParseBits rs rs') x = [RS.lookupIndex (RS.indexOf x rs) rs']
     eval (OutputConst c) x = const c x
     isConst (OutputConst c) = Just c
     isConst _ = Nothing
-    inDom x (ParseBits (RS.RangeSet minB maxB _) rs') = fromEnum x >= fromEnum minB && fromEnum x <= fromEnum maxB
     inDom _ _ = True
-    domain  (ParseBits (RS.RangeSet minB maxB _) rs') = [minB .. maxB]
+    domain  (ParseBits rs _) = RS.toList rs
+    domSize (ParseBits rs _) = bitWidth 2 $ RS.size rs
+    domSize _ = 1
 
 edgesFromList :: (Ord st) => [(st, [pred], EdgeAction var func, st)] -> EdgeSet st pred func var
 edgesFromList xs = M.fromListWith (++) [ (q,  [(ps, u, q')]) | (q,ps,u,q') <- xs ]

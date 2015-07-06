@@ -7,7 +7,8 @@ module KMC.Program.Backends.C where
 import           Control.Monad (when, join)
 import           Data.Bits
 import           Data.Char (ord, chr, isPrint, isAscii, isSpace)
-import           Data.List (intercalate)
+import           Data.List (intercalate, maximumBy)
+import           Data.Function (on)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Numeric
@@ -21,6 +22,7 @@ import           KMC.Program.IL
 import           KMC.Util.Heredoc
 
 import KMC.SSTCompiler
+import Debug.Trace
 
 {- Utility functions -}
 -- | Chunk a list into list of lists of length n, starting from the left. The
@@ -38,7 +40,7 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String 
+progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String
 progTemplate buString tablesString declsString infoString initString progStrings withActions =
  [strQ|
 #define NUM_PHASES |] ++ show (if withActions then length progStrings else 2*length progStrings) ++ [strQ|
@@ -59,8 +61,8 @@ void init()
 void match(int phase)
 {
   switch(phase) {
-    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(); break;" 
-                         | i <- [1..(length progStrings)] ]++  
+    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(); break;"
+                         | i <- [1..(length progStrings)] ]++
     [strQ|
     default:
       fprintf(stderr, "Invalid phase: %d given\n", phase);
@@ -155,17 +157,19 @@ tbl :: CType        -- ^ Buffer unit type
     -> CType        -- ^ Table unit type
     -> TableId      -- ^ Table identifier
     -> Int          -- ^ Table offset
+    -> Int          -- ^ Number of symbols
+    -> Int          -- ^ Symbol size
     -> Maybe String -- ^ Optional dynamic offset
     -> Int
     -> Doc
-tbl ctypectx ctypetbl (TableId n) i mx phase =
+tbl ctypectx ctypetbl (TableId n) i symbs symbSize mx phase =
   let offsetdoc = maybe (int i)
                         (\s -> int i <+> text "+" <+> text s)
                         mx
   in cast ctypectx ctypetbl
      $ hcat [text "tbl" <> int phase
             ,brackets $ int n
-            ,brackets $ text "next" <> brackets offsetdoc
+            ,brackets $ text "next" <> parens (hcat [offsetdoc, comma, int $ symbs*symbSize])
             ]
 
 -- | Pretty print a block identifier
@@ -242,11 +246,12 @@ prettyAppendTbl :: (Bounded delta, Enum delta) =>
                 -> BufferId
                 -> TableId
                 -> Int
+                -> Int
                 -> Maybe String
                 -> Int
                 -> Doc
-prettyAppendTbl buftype tbltype prog bid tid i mx phase =
-  let arg       = tbl buftype tbltype tid i mx phase
+prettyAppendTbl buftype tbltype prog bid tid i symbs mx phase =
+  let arg       = tbl buftype tbltype tid i symbs (symbolSize prog) mx phase
       lendoc    = int (tblBitSize $ progTables prog M.! tid)
       streamBuf = progStreamBuffer prog
   in if bid == streamBuf then
@@ -256,17 +261,17 @@ prettyAppendTbl buftype tbltype prog bid tid i mx phase =
          <> parens (hcat [buf bid, comma, arg, comma, lendoc])
          <> semi
 
-prettyAppendSym :: BufferId -> BufferId -> Int -> Maybe String -> Doc
-prettyAppendSym bid outBuf i mx =
+prettyAppendSym :: BufferId -> BufferId -> Int -> Int -> Int -> Maybe String -> Doc
+prettyAppendSym bid outBuf i symbs symbSize mx =
     let offsetdoc = maybe (int i) (\s -> int i <+> text "+" <+> text s) mx
-        symb = text "next" <> brackets offsetdoc
+        symb = text "next" <> parens (hcat [offsetdoc, comma, int $ symbs*symbSize])
     in if bid == outBuf then
         text "outputconst" <> parens (hcat [symb, comma, int 8]) <> semi
     else
         text "append"
         <> parens (hcat [buf bid, comma, symb, comma, int 8]) <> semi
 
-            
+
 -- | Pretty print an instruction. Note that the C runtime currently
 -- distinguishes between regular buffers and the output buffer, and hence the
 -- pretty printer needs to handle this case specially.
@@ -276,11 +281,17 @@ prettyInstr :: forall delta. (Enum delta, Bounded delta) =>
             -> Program delta  -- ^ The surrounding program
             -> Instr delta -> Int -> Doc
 prettyInstr buftype tbltype prog instr phase =
-  let streamBuf = progStreamBuffer prog in
+  let streamBuf = progStreamBuffer prog
+      symbSize = symbolSize prog
+  in
   case instr of
+    FinishedI is       -> text "if (input_eof())" $$
+                          lbrace $+$
+                          nest 3 (prettyBlock buftype tbltype prog is phase) $+$
+                          rbrace
     AcceptI            -> text "goto accept" <> int phase <> semi
     FailI              -> text "goto fail" <> int phase <> semi
-    AppendI bid constid -> 
+    AppendI bid constid ->
       let base     = fromEnum (maxBound :: delta) - fromEnum (minBound :: delta) + 1
           baseBits = bitWidth 2 base
           lendoc   = text $ show $ length (progConstants prog M.! constid) * baseBits
@@ -292,8 +303,8 @@ prettyInstr buftype tbltype prog instr phase =
              text "appendarray"
                <> parens (hcat [buf bid, comma, cid constid phase, comma, lendoc])
                <> semi
-    AppendTblI bid tid i -> prettyAppendTbl buftype tbltype prog bid tid i Nothing phase
-    AppendSymI bid i   -> prettyAppendSym bid streamBuf i Nothing
+    AppendTblI bid tid i symbs -> prettyAppendTbl buftype tbltype prog bid tid i symbs Nothing phase
+    AppendSymI bid i symbs  -> prettyAppendSym bid streamBuf i symbs (symbolSize prog) Nothing
     ConcatI bid1 bid2  -> if bid1 == streamBuf then
                               text "output" <> parens (buf bid2) <> semi
                           else
@@ -304,17 +315,17 @@ prettyInstr buftype tbltype prog instr phase =
     AlignI bid1 bid2   -> text "align"
                           <> parens (hcat [buf bid1, comma, buf bid2])
                           <> semi
-    IfI e is           -> text "if" <+> parens (prettyExpr e) $$
+    IfI e is           -> text "if" <+> parens (prettyExpr (symbolSize prog) e) $$
                           lbrace $+$
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
                           rbrace
     GotoI blid         -> text "goto" <+> blck blid phase <> semi
     NextI minL maxL is -> text "if"
-                            <+> parens (text "!readnext" <> parens (int minL <> comma <+> int maxL)) $$
+                            <+> parens (text "!readnext" <> parens (hcat [int $ minL*symbSize, comma, int $ maxL*symbSize])) $$
                           lbrace $+$
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
                           rbrace
-    ConsumeI i         -> text "consume" <> parens (int i) <> semi
+    ConsumeI i         -> text "consume" <> parens (int $ i*symbSize) <> semi
     ChangeOut bid      -> text "pushoutbuf" <> parens (buf bid) <> semi
     RestoreOut         -> text "popoutbuf()" <> semi
 
@@ -322,26 +333,26 @@ appendSpan :: BufferId -> TableId -> Int -> Block delta -> Maybe (Int, Block del
 appendSpan bid tid i is =
   let (is1, is2) = span isAppendTbl is
   in if not (null is1)
-        && and (zipWith (==) [ j | AppendTblI _ _ j <- is1 ] [i+1..])
+        && and (zipWith (==) [ j | AppendTblI _ _ j _ <- is1 ] [i+1..])
      then
          Just (length is1, is2)
      else
          Nothing
     where
-      isAppendTbl (AppendTblI bid' tid' _) = bid == bid' && tid == tid'
+      isAppendTbl (AppendTblI bid' tid' _ _) = bid == bid' && tid == tid'
       isAppendTbl _ = False
 
 appendSymSpan :: BufferId -> Int -> Block delta -> Maybe (Int, Block delta)
 appendSymSpan bid i is =
     let (is1, is2) = span isAppendSym is
     in if not (null is1)
-           && and (zipWith (==) [ j | AppendSymI _ j <- is1 ] [i+1..])
+           && and (zipWith (==) [ j | AppendSymI _ j _ <- is1 ] [i+1..])
        then
            Just (length is1, is2)
        else
            Nothing
     where
-      isAppendSym (AppendSymI bid' _) = bid == bid'
+      isAppendSym (AppendSymI bid' _ _) = bid == bid'
       isAppendSym _ = False
 
 -- | Pretty print a list of instructions.
@@ -349,7 +360,7 @@ prettyBlock :: (Enum delta, Bounded delta) => CType -> CType -> Program delta ->
 prettyBlock buftype tbltype prog is phase = go is
   where
     go [] = empty
-    go (app@(AppendSymI bid i):is) =
+    go (app@(AppendSymI bid i symbs):is) =
         case appendSymSpan bid i is of
           Nothing -> prettyInstr buftype tbltype prog app phase $+$ go is
           Just (n, is') ->
@@ -357,11 +368,11 @@ prettyBlock buftype tbltype prog is phase = go is
                           , parens (text "i = 0; i < " <> int (n+1) <> text "; i++")
                           ]
                    , lbrace
-                   , nest 3 (prettyAppendSym bid (progStreamBuffer prog) i (Just "i"))
+                   , nest 3 (prettyAppendSym bid (progStreamBuffer prog) i symbs (symbolSize prog) (Just "i"))
                    , rbrace
                    , go is'
                    ]
-    go (app@(AppendTblI bid tid i):is) =
+    go (app@(AppendTblI bid tid i symbs):is) =
       case appendSpan bid tid i is of
         Nothing       -> prettyInstr buftype tbltype prog app phase $+$ go is
         Just (n, is') ->
@@ -369,7 +380,7 @@ prettyBlock buftype tbltype prog is phase = go is
                      ,parens (text "i = 0; i < " <> int (n+1) <> text "; i++")]
                ,lbrace
                ,nest 3
-                  (prettyAppendTbl buftype tbltype prog bid tid i (Just "i") phase)
+                  (prettyAppendTbl buftype tbltype prog bid tid i symbs (Just "i") phase)
                ,rbrace
                ,go is'
                ]
@@ -388,55 +399,55 @@ prettyStr = doubleQuotes . hcat . map prettyOrd
                       doubleQuotes . doubleQuotes $ text "\\x" <> text (showHex n "")
 
 -- | Pretty print a test expression.
-prettyExpr :: Expr -> Doc
-prettyExpr e =
+prettyExpr :: Int -> Expr -> Doc
+prettyExpr symbSize e =
   case e of
-    SymE i            -> text "next" <> brackets (int i)
-    AvailableSymbolsE -> text "avail"
-    CompareE i str    -> text "cmp"
-                           <> parens (hcat $ punctuate comma
-                                        [text "&next" <> brackets (int i)
-                                        ,text "(unsigned char *)" <+> prettyStr str
-                                        ,int (length str)])
-    ConstE n          -> let c = chr n in
-                         if isPrint c && isAscii c && c /= '\\' && c /= '\'' then
-                             quotes (char c)
-                         else
-                             int n
-    FalseE            -> int 0
-    TrueE             -> int 1
-    LteE e1 e2        -> op "<=" e1 e2
-    LtE e1 e2         -> op "<" e1 e2
-    GteE e1 e2        -> op ">=" e1 e2
-    GtE e1 e2         -> op ">" e1 e2
-    EqE e1 e2         -> op "==" e1 e2
-    OrE e1 e2         -> op "||" e1 e2
-    AndE e1 e2        -> op "&&" e1 e2
-    NotE e1           -> text "!" <> parens (prettyExpr e1)
+    SymE i symbs        -> text "next" <> parens (int i <> comma <> (int $ symbSize*symbs))
+    AvailableSymbolsE n -> text "avail"<> parens (int $ n*symbSize)
+    CompareE i str      -> text "cmp"
+                             <> parens (hcat $ punctuate comma
+                                          [text "NEXT" <> parens (int i)
+                                          ,text "(unsigned char *)" <+> prettyStr str
+                                          ,int (length str)])
+    ConstE n            -> let c = chr n in
+                           if isPrint c && isAscii c && c /= '\\' && c /= '\'' then
+                               quotes (char c)
+                           else
+                               int n
+    FalseE              -> int 0
+    TrueE               -> int 1
+    LteE e1 e2          -> op "<=" e1 e2
+    LtE e1 e2           -> op "<" e1 e2
+    GteE e1 e2          -> op ">=" e1 e2
+    GtE e1 e2           -> op ">" e1 e2
+    EqE e1 e2           -> op "==" e1 e2
+    OrE e1 e2           -> op "||" e1 e2
+    AndE e1 e2          -> op "&&" e1 e2
+    NotE e1             -> text "!" <> parens (prettyExpr symbSize e1)
 
   where
-    op str e1 e2 = parens (prettyExpr e1 <+> text str <+> prettyExpr e2)
+    op str e1 e2 = parens (prettyExpr symbSize e1 <+> text str <+> prettyExpr symbSize e2)
 
 -- | Pretty print all table declarations.
-prettyTableDecl :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
+prettyTableDecl :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma, Ord gamma, Ord delta) =>
                    CType                 -- ^ Table unit type
                 -> Pipeline delta gamma  -- ^ Programs
                 -> Doc
-prettyTableDecl tbltype pipeline = case pipeline of 
+prettyTableDecl tbltype pipeline = case pipeline of
                                     Left  progs -> vcat $ zipWith tableDecl progs [1..]
                                     Right progs -> vcat $ zipWith combine progs [1,3..]
   where
     combine (p,a) i = tableDecl p i $+$ tableDecl a (i+1)
-    tableDecl prog phase = 
-        if null tables 
-        then text "/* no tables */" 
+    tableDecl prog phase =
+        if null tables
+        then text "/* no tables */"
         else text "const" <+> ctyp tbltype <+> text "tbl" <> int phase
           <> brackets (int (length tables)) <> brackets (int tableSize) <+> text "="
-          $$ lbrace <> vcat (punctuate comma (map (prettyTableExpr tbltype) tables)) 
+          $$ lbrace <> vcat (punctuate comma (map (prettyTableExpr tbltype) tables))
           <> rbrace <> semi
       where
         tables    = M.elems $ progTables prog
-        tableSize = length . tblTable . head $ tables
+        tableSize = length . tblTable . maximumBy (compare `on` (length . tblTable)) $ tables
 
 -- | Pretty print all buffer declarations.
 prettyBufferDecls :: Pipeline delta gamma -> Doc
@@ -462,7 +473,7 @@ prettyConstantDecls buftype pipeline = case pipeline of
           escape c = if isPrint c && isAscii c && isSafe c then [c] else "\\x" ++ showHex (ord c) ""
           isSafe c = c /= '\\'
       in vcat [ text "//" <+> text comment
-              , text "const" <+> text "buffer_unit_t" <+> text constPrefix 
+              , text "const" <+> text "buffer_unit_t" <+> text constPrefix
                 <> int phase <> text "_" <> int n
                 <> brackets (int $ length chunks)
                 <+> text "=" <+>
@@ -470,7 +481,7 @@ prettyConstantDecls buftype pipeline = case pipeline of
              ]
 
 neededBuffers :: Pipeline delta gamma -> [BufferId]
-neededBuffers pipeline = case pipeline of 
+neededBuffers pipeline = case pipeline of
         Left  progs -> deduplicate $ concatMap progBuffers progs
         Right progs -> deduplicate $ concatMap combine progs
     where
@@ -482,9 +493,9 @@ neededNonStreamBuffers pipeline = S.toList . S.unions $ case pipeline of
     Left  progs -> map needed progs
     Right progs -> map (\(p,a) -> S.union (needed p) (needed a)) progs
   where
-    needed prog = S.fromList $ filter (/= progStreamBuffer prog) $ progBuffers prog 
-    
-    
+    needed prog = S.fromList $ filter (/= progStreamBuffer prog) $ progBuffers prog
+
+
 
 
 -- | Pretty print initialization code. This is just a call to init_buffer() for
@@ -504,7 +515,8 @@ prettyProg buftype tbltype prog phase =
       blck blid phase <>  char ':'
                       <+> prettyBlock buftype tbltype prog is phase
 
-programsToC :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) => CType -> Pipeline delta gamma -> CProg
+programsToC :: (Enum delta, Bounded delta, Enum gamma
+               , Bounded gamma, Ord gamma, Ord delta) => CType -> Pipeline delta gamma -> CProg
 programsToC buftype pipeline =
   CProg
   { cTables       = prettyTableDecl tbltype pipeline
@@ -540,7 +552,7 @@ ccVersion comp = do
   errStr <- hGetContents hErr
   return $ intercalate "\\n" $ lines $ errStr
 
-compileProgram :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
+compileProgram :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma, Ord gamma, Ord delta) =>
                   CType
                -> Int
                -> Bool
@@ -576,6 +588,7 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
   where
     compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
                            , "-o", binPath
+                           , "-lm"
                            -- , "-Wno-tautological-constant-out-of-range-compare"
                            ]
                            ++ (if wordAlign then ["-D FLAG_WORDALIGNED"] else [])
@@ -586,7 +599,7 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
                 , maybe "No environment info available" id desc
                 , "" -- adds newline at the end
                 ]
-    outInfo cver path = quote $ intercalate "\\n" 
+    outInfo cver path = quote $ intercalate "\\n"
                         [ "Compiler info: "
                         , cver
                         , ""

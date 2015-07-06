@@ -28,7 +28,7 @@ import           KMC.Kleenex.Parser (parseKleenex)
 import           KMC.Kleenex.Action
 import           KMC.Program.Backends.C (CType(..), compileProgram)
 import           KMC.RangeSet (RangeSet)
-import           KMC.SSTCompiler (elimIdTables, compileAutomaton)
+import           KMC.SSTCompiler (compileAutomaton)
 import           KMC.SSTConstruction (sstFromFST)
 import           KMC.SymbolicFST (FST, fstS)
 import qualified KMC.SymbolicFST as FST
@@ -240,10 +240,9 @@ compileTransducers mainOpts (Transducers fsts') = do
          ,diffUTCTime timeSSTgen' timeSSTgen
          ,diffUTCTime timeSSTopt' timeSSTopt)
 
-transducerToProgram :: (Ord gamma, Show gamma, Eq gamma, Enum gamma
-                       ,Ord delta, Show delta, Eq delta, Enum delta, Bounded delta
-                       ,Ord delta1, Show delta1, Eq delta1, Enum delta1, Bounded delta1
-                       ,Ord gamma1, Show gamma1, Eq gamma1, Enum gamma1) =>
+transducerToProgram :: (Alphabet delta, Alphabet gamma, Alphabet delta1, Alphabet gamma1
+                       ,Bounded delta ,Bounded delta1
+                       ) =>
                        MainOptions
                     -> CompileOptions
                     -> Bool
@@ -255,10 +254,8 @@ transducerToProgram :: (Ord gamma, Show gamma, Eq gamma, Enum gamma
 transducerToProgram mainOpts compileOpts useWordAlignment srcFile srcMd5
                     (DetTransducers ssts) (DetTransducers assts) = do
   timeCompile <- getCurrentTime
-  let optimizeTables = if optElimIdTables compileOpts then elimIdTables else id
-  let optimizeTables' = if optElimIdTables compileOpts then elimIdTables else id
-  let progs  = map (optimizeTables . compileAutomaton) ssts
-  let aprogs = map (optimizeTables' . compileAutomaton) assts
+  let progs  = map (compileAutomaton 8) ssts
+  let aprogs = map (compileAutomaton 1) assts
   let progs' = if optActionEnabled mainOpts
                then Right $ zip progs aprogs
                else Left progs

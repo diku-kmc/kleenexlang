@@ -270,7 +270,7 @@ regexToActionMuTerm ign re =
         Group _ e    -> regexToActionMuTerm ign e
         Concat e1 e2 -> Seq (regexToActionMuTerm ign e1) (regexToActionMuTerm ign e2)
         Branch e1 e2 -> Alt (regexToActionMuTerm ign e1) (regexToActionMuTerm ign e2)
-        (Class b rs) -> let len = bitWidth 2 $ fromEnum $ findMax $ rs'
+        (Class b rs) -> let len = bitWidth 2 $ size rs'
                             rs' = (if b then id else complement) $ 
                                     rangeSet [(toEnum $ ord a, toEnum $ ord b) | (a,b) <- rs]
                             rs'' = matchRange len (BitString $ codeFixedWidthEnum len 0) 

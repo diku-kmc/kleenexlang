@@ -86,18 +86,18 @@ instance Pretty KleenexOutTerm where
     pretty (Inl (InList _)) = "COPY"
     pretty (Inr x)          = pretty x
 
-instance (Pretty var, Pretty rng) => Pretty (ActionExpr var dom rng) where
-    pretty (ParseBits _ _) = "BITS!"
+instance (Pretty var, Pretty rng, Pretty dom, Eq dom) => Pretty (ActionExpr var dom rng) where
+    pretty (ParseBits rs _) = pretty rs
     pretty (RegUpdate var atoms) = pretty var ++ ":=" ++ pretty atoms
     pretty (PushOut v)     = "push outbuf " ++ pretty v
     pretty (PopOut)        = "pop outbuf"
     pretty (OutputConst c) = pretty c
 
-instance (Pretty a, Pretty var, Pretty rng) => Pretty (a :+: ActionExpr var dom rng) where
+instance (Pretty a, Pretty var, Pretty rng, Pretty dom, Eq dom) => Pretty (a :+: ActionExpr var dom rng) where
   pretty (Inl x) = "(" ++ pretty x ++ ")"
   pretty (Inr y) = pretty y
 
-instance (Pretty var, Pretty b, Pretty rng) => Pretty (ActionExpr var dom rng :+: b) where
+instance (Pretty var, Pretty b, Pretty rng, Pretty dom, Eq dom) => Pretty (ActionExpr var dom rng :+: b) where
   pretty (Inl x) = "(" ++ pretty x ++ ")"
   pretty (Inr y) = pretty y
 
@@ -170,7 +170,7 @@ fstToDot fst' = GV.graphElemsToDot params nodes edges
       nodes = map (\x -> (x,x)) (S.toList (fstS fst'))
       edges = [ (q, q', l) | (q, l, q') <- KMC.SymbolicFST.edgesToList (fstE fst') ]
 
-sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st, Pretty (Rng func), Pretty (Dom func))
+sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st, Pretty (Rng func), Pretty (Dom func), Eq (Dom func))
          => SST st pred func var -> GV.DotGraph Int
 sstToDot sst = GV.graphElemsToDot params nodes edges
     where
