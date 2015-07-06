@@ -25,7 +25,7 @@ public class DReXDeleteComments {
             String result = evaluator.eval(input);
             System.out.print(result);
         } catch(Exception e) {
-            System.err.print(String.format("Exception received\n"));
+            System.err.print(String.format("Exception received: %s\n", e.toString()));
         }
         long end = System.currentTimeMillis();
 

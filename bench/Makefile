@@ -188,8 +188,8 @@ generate-numbers:
 	(cd ../test/data/numbers && ./gen_numbers.pl -s 250000000 > numbers_250mb.txt)
 
 generate-comments:
-	@echo "Generating 100 MB text with comments..."
-	(cd ../test/data/comments && ./gen_comments.pl -s 10000000 > comments_100mb.txt)
+	@echo "Generating 2 MB text with comments..."
+	(cd ../test/data/comments && ./gen_comments.pl -s 2000000 > comments_2mb.txt)
 
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
