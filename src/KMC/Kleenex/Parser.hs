@@ -203,7 +203,9 @@ postfix p = Postfix . chainl1 p $ return (flip (.))
 kleenexPrimTerm :: KleenexParser KleenexTerm
 kleenexPrimTerm = skipAround elms
     where
-      elms = choice [re, identifier, constant, action, output]
+      elms = choice [one, re, identifier, constant, action, output]
+      one        = const One <$> (char '1')
+                   <?> "One"
       constant   = Constant . encodeString <$> kleenexConstant
                    <?> "Constant"
       re         = RE  <$> between (char '/') (char '/') regexP
