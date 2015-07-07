@@ -2,7 +2,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module KMC.Util.Bits ( DoubleBits(combine, split), packCombine, unpackSplit ) where
 
-import Data.Bits (shift, (.|.), (.&.), complement, bitSize, clearBit, Bits(..))
+import Data.Bits (shift, (.|.), (.&.), complement, bitSize, clearBit, Bits(bit))
 import Data.Word (Word8, Word16, Word32, Word64)
 
 -- | Pack two 8-bit words in a 16-bit word, two 16-bit words in a 32-bit word,
