@@ -18,9 +18,18 @@
      "program" : "as",
      "plots" : [{
          "filename" : "as-ms.pdf",
+         "plot_transform" : "ms",
+         "input" : "strings/as_256mb.txt"
+     }, {
+         "filename" : "as-mbs.pdf",
+         "input" : "strings/as_256mb.txt"
+     }, {
+         "filename" : "as-collated.pdf",
+         "input" : "strings/as_*",
          "plot_transform" : "ms"
      }, {
-         "filename" : "as-mbs.pdf"
+         "filename" : "as-collated-mbs.pdf",
+         "input" : "strings/as_*"
      }]},
  {
      "program" : "email",

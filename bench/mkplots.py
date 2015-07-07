@@ -64,6 +64,31 @@ transformations = {
     "ms"     : trans_ms
 }
 
+# def get_line_color_and_style(impl, version):
+#     label = format_label(impl, version)
+#     if label == "kex 0 clang":      return ("y", None)
+#     elif label == "kex 0 gcc":      return ("darkolivegreen", None)
+#     elif label == "kex 3 clang":    return ("sage", None)
+#     elif label == "kex 3 gcc":      return ("limegreen", None)
+#     elif label == "kex 0-la clang": return ("turquoise", None)
+#     elif label == "kex 0-la gcc":   return ("aqua", None)
+#     elif label == "kex 3-la clang": return ("olive", None)
+#     elif label == "kex 3-la gcc":   return ("yellowgreen", None)
+#     elif label == "gawk":           return ("gold", None)
+#     elif label == "oniguruma":      return ("darkkhaki", None)
+#     elif label == "perl":           return ("darkblue", None)
+#     elif label == "python":         return ("dodgerblue", None)
+#     elif label == "re2":            return ("magenta", None)
+#     elif label == "re2j":           return ("purple", None)
+#     elif label == "sed":            return ("indigo", None)
+#     elif label == "tcl":            return ("lightcoral", None)
+#     elif label == "ragel F1":       return ("firebrick", None)
+#     elif label == "ragel G2":       return ("sienna", None)
+#     elif label == "ragel T1":       return ("sandybrown", None)
+#     else:
+#         raise Error("I don't know the color/style of %s" % label)
+
+
 # Default base_dir is the directory of this script.
 base_dir = os.path.realpath("__file__")
 # Default plot_dir is plots/
@@ -102,7 +127,7 @@ def plot_save_dir():
     return os.path.join(plot_dir, data_folder)
 
 def go(progs = [], skip = None, default_transformation = "ms", plot_kind = 'barchart'):
-    conf, inputs, skips = get_benchmark_configuration()
+    conf, inputs, plotconf = get_benchmark_configuration()
     if skip != None: # Override whatever is read from plots.txt
         if type(skip) == list:
             skipFun = lambda p, i, n : i in skip
@@ -112,12 +137,12 @@ def go(progs = [], skip = None, default_transformation = "ms", plot_kind = 'barc
             raise Exception("If set, skip must be a list or a dictionary!")
     else: # Then we do not override the skip map from plots.txt
         def f(p, i, n): # program name, implementation name, output name
-            try: return i in skips[p][n]['skip']
+            try: return i in plotconf[p][n]['skip']
             except KeyError: return False
         skipFun = f
     
     def getTransFun(p, n):
-        try: return transformations[skips[p][n]['transformation']]
+        try: return transformations[plotconf[p][n]['transformation']]
         except KeyError:
             return transformations[default_transformation]
 
@@ -127,9 +152,29 @@ def go(progs = [], skip = None, default_transformation = "ms", plot_kind = 'barc
         notice_print("Plot output dir already exists")
         pass
 
-    plot_all(get_data(conf, progs), inputs, skips, skipFun, getTransFun, plot_kind)
+    plot_all(get_data(conf, progs), inputs, plotconf, skipFun, getTransFun, plot_kind)
 
+# returns: {"as" : { "kleenex" : { <version> : { "as_100mb.txt" : [110, 123, 35, ...],
+#                                                "as_245mb.txt" : [13, 8, 3, ...],
+#                                                 ...} } ,
+#                    "perl" : ... },
+#           ... }
 def get_data(conf, only_progs = []):
+    def read_benchmark_output(fn):
+        times = []
+        magic_word = "matching (ms):"   # ouch!
+        other_magic_word = "time (ms):" #
+        with open(fn, 'r') as f:
+            verbose_print("Looking in file %s" % fn)
+            for line in f:
+                if line.startswith(magic_word):
+                    l = int(line[len(magic_word):].strip())
+                    times.append(l)
+                elif line.startswith(other_magic_word):
+                    l = int(line[len(other_magic_word):].strip())
+                    times.append(l)
+        return times
+
     benchmarks = {}
     for prog, impls in conf.iteritems():
         if only_progs != [] and not prog in only_progs:
@@ -162,32 +207,54 @@ def get_data(conf, only_progs = []):
 # data is of the form
 #  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
-def plot_all(benchmarks, inputNames, plotConfMap, skipFun, getTransformation, plot_kind):
+def plot_all(benchmarks, inputNames, plotconf, skipFun, getTransformation, plot_kind):
     for prog, benchs in benchmarks.iteritems():
-        try: output_names = plotConfMap[prog].keys()
+        try: output_names = plotconf[prog].keys()
         except KeyError: output_names = [prog + ".pdf"]
         for output_name in output_names:
-            inputfile = ""
-            try: inputfile = plotConfMap[prog][output_name]['indata']
+            inputglob = ""
+            try: inputglob = plotconf[prog][output_name]['indata']
             except KeyError: pass
             try:
-                if inputfile == "" or inputfile == "DEFAULT":
-                    inputfile = inputNames[prog][0]
+                if inputglob == "" or inputglob == "DEFAULT":
+                    inputglob = inputNames[prog][0]
             except KeyError:
                 print "Skipping %s; no input data specified!" % prog
                 continue
-            inputname = os.path.basename(inputfile)
-            inputsize = get_input_file_size(inputfile)
-            verbose_print("Size: %s" % str(inputsize))
+            transFun = getTransformation(prog, output_name)
+            
+            inputfiles = glob.glob(os.path.join(test_data_dir(), inputglob))
+            inputnames = map(os.path.basename, inputfiles)
+
+            inputsizes_map = map(lambda f: (f, get_input_file_size(f)), inputfiles)
+            inputsizes = map(lambda (f,s): s, inputsizes_map)
+            inputfiles_by_size = sorted(inputsizes_map, key=lambda (f,s): s)
+            # A list of triples (filename, size, transformationfunc)
+            inputnames_by_size = map(lambda (f,s): (os.path.basename(f), s, transFun(s)),
+                                     inputfiles_by_size)
+            verbose_print("Sizes: %s" % str(sorted(inputsizes)))
+            verbose_print("Files: %s" % str(inputfiles_by_size))
+
             def sf(i, n): # Specialise the skip function to this program.
                 try: return skipFun(prog, i, n)
                 except KeyError: return False
-            transFun = getTransformation(prog, output_name)
-            fig = plot_benchmark(prog, benchs, inputname, output_name, sf, transFun(inputsize), plot_kind)
+            
+            if len(inputfiles) > 1:
+                plot_collated_benchmark(prog, benchs, inputnames_by_size,
+                                        output_name, sf)
+            else:
+                plot_benchmark(prog, benchs,
+                               inputnames[0], output_name,
+                               sf, transFun(inputsizes[0]),
+                               plot_kind)
 
 def strip_input_file_suffix(s):
     input_suffix = ".runningtime"
     return s[:-len(input_suffix)]
+def add_input_file_suffix(s):
+    input_suffix = ".runningtime"
+    return s + input_suffix
+    
 
 def get_benchmark_configuration(conf_file = "benchmarks.txt",
                                 inputs_file = "inputs.txt",
@@ -221,21 +288,7 @@ def get_benchmark_configuration(conf_file = "benchmarks.txt",
             except KeyError: collated = False
             plots[p["program"]][concreteplot["filename"]] = { 'skip' : skip,
                                                               'indata' : inputfilename,
-                                                              'transformation' : plot_transform,
-                                                              'collated' : collated }
-        # for line in f:
-        #     if line[0] == '#' or line.strip() == "": continue
-        #     ps = filter(lambda x : len(x) > 0, line.split(" "))
-        #     prog = ps[0].strip()
-        #     skip_list = map(lambda x : x.strip(), ps[1].split(','))
-        #     inputdata_file_name = ps[2].strip()
-        #     plot_transform = ps[3].strip()
-        #     output_file_name = ps[4].strip()
-        #     if not plots.has_key(prog):
-        #         plots[prog] = {}
-        #     plots[prog][output_file_name] = {'skip': skip_list,
-        #                                      'indata' : inputdata_file_name,
-        #                                      'transformation' : plot_transform}
+                                                              'transformation' : plot_transform }
     return (conf, inputs, plots)
 
 def get_input_file_size(inpf):
@@ -246,21 +299,97 @@ def get_input_file_size(inpf):
         warning_print("Could not get size of \"%s\", file not found!" % f)
         return 0
 
-def read_benchmark_output(fn):
-    times = []
-    magic_word = "matching (ms):"   # ouch!
-    other_magic_word = "time (ms):" #
-    with open(fn, 'r') as f:
-        verbose_print("Looking in file %s" % fn)
-        for line in f:
-            if line.startswith(magic_word):
-                l = int(line[len(magic_word):].strip())
-                times.append(l)
-            elif line.startswith(other_magic_word):
-                l = int(line[len(other_magic_word):].strip())
-                times.append(l)
-    return times
+# Make scatter plots of each implementation and connect with lines.
+def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis):
+    # trans_fun = data_trans[0]["trans_fun"]
+    # median_format_string = data_trans[0]["median_format_string"]
+    yaxis_label = inputnames[0][2]["yaxis_label"]
+    title = "%s" % prog
 
+    labels = []
+    plot_data = {}
+    for impl, versions in iter(sorted(data.iteritems())):
+        if skipThis(impl, output_name):
+            continue
+        plot_data[impl] = {}
+        for version, inputfiles in iter(sorted(versions.iteritems())):
+            plot_data[impl][version] = {}
+            avg_times = []
+            stddev_times = []
+            ls = []
+            for (inputfile, filesize, tf) in inputnames:
+                times = []
+                trans_fun = tf["trans_fun"]
+                try: times = inputfiles[add_input_file_suffix(inputfile)]
+                except KeyError:
+                    verbose_print("Skipping %s because it is not included in the series." % inputfile)
+                    continue
+                inputname = inputfile
+                if times == []:
+                    verbose_print("Skipping %s because there are no time data." % inputfile)
+                    continue
+                avg_times.append(np.average(trans_fun(times)))
+                stddev_times.append(np.std(trans_fun(times)))
+                if labels == []: # Should be the same every time, so only set it once...
+                    ls.append(filesize)
+            if labels == []:
+                labels = ls
+            if version == default_version_name():
+                v = None
+            else:
+                v = version
+            plot_data[impl][version] = { 'avgs' : avg_times,
+                                         'stddevs' : stddev_times }
+
+
+    # Now plot
+    fig, ax = plt.subplots()
+    for impl, versions in iter(sorted(plot_data.iteritems())):
+        for version, timedata in iter(sorted(versions.iteritems())):
+            x = labels
+#            (color, style) = get_line_color_and_style(impl, version)
+            line = ax.plot(x, timedata['avgs'], label = format_label(impl, version))
+            ax.errorbar(x, timedata['avgs'], yerr=timedata['stddevs'], fmt='o', color=line[0].get_color())
+
+    # Add legend so we have a chance of reading the plot.
+    ax.legend()
+    
+    # Setup plot niceness
+    numElms = len(labels)
+    ax.yaxis.grid(True,
+                  linestyle='-',
+                  which='major',
+                  color='grey',
+                  alpha=0.7)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["left"].set_color('lightgrey')
+    ax.spines["bottom"].set_color('lightgrey')
+    ax.set_xlabel("Input file size")
+    ax.set_ylabel(yaxis_label)
+    ax.set_title(title)
+    ax.set_xticks(labels)
+    ax.tick_params(axis = 'x', length = 0)
+    ax.tick_params(axis = 'y', colors = "black")
+    ax.set_ylim(bottom=0)
+    ax.set_xticklabels(np.arange(labels[-1]))
+    ax.get_xaxis().set_major_formatter(ticker.FuncFormatter(lambda x, p: sizeof_fmt(x)))
+    locale.setlocale(locale.LC_ALL, 'en_US')
+    def locale_formatter(x, p):
+        return locale.format("%d", x, grouping=True)
+    ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(locale_formatter))
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.tight_layout() # Throws an annoying warning about renderers.
+    save_plot(fig, labels, plot_data, plot_save_dir(), output_name, write_csv = False)
+    return True
+            
+def sizeof_fmt(num, suffix='B'):
+    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+        if abs(num) < 1024.0:
+            return "%3.1f%s%s" % (num, unit, suffix)
+        num /= 1024.0
+    return "%.1f%s%s" % (num, 'Yi', suffix)
 
 # data is of the form
 #  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
@@ -276,7 +405,6 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plo
     plot_data = []
     # Add the bars
     for impl, versions in iter(sorted(data.iteritems())):
-        color_idx = 0
         if skipThis(impl, output_name):
             continue
         for version, inputfiles in iter(sorted(versions.iteritems())):
@@ -417,7 +545,7 @@ def make_boxplot(ax, labels, plot_data, median_format_string):
         ax.text(txtX, txtY, median_format_string % median, horizontalalignment='center',
                 size='medium', weight="bold", color=boxColors[k])
 
-def save_plot(fig, labels, plot_data, directory, name):
+def save_plot(fig, labels, plot_data, directory, name, write_csv = True):
     make_sure_path_exists(directory)
     fn = os.path.join(directory, name)
     csv_fn = (lambda (n, _) : n + ".csv")(os.path.splitext(fn))
@@ -425,22 +553,22 @@ def save_plot(fig, labels, plot_data, directory, name):
         warning_print("File %s already exists, skipping.  Use -f to override." % fn)
     else:
         fig.savefig(fn)
-        col_count = len(plot_data)
-        row_count = max(map(lambda l : len(l), plot_data))
-        with open(csv_fn, 'w') as csvfile:
-            csvwriter = csv.writer(csvfile)
-            row = []
-            for i in xrange(0, col_count):
-                nm,vs=labels[i]
-                row.append(format_label(nm, vs))
-            csvwriter.writerow(row)
-            for i in xrange(0, row_count):
+        if write_csv:
+            col_count = len(plot_data)
+            row_count = max(map(lambda l : len(l), plot_data))
+            with open(csv_fn, 'w') as csvfile:
+                csvwriter = csv.writer(csvfile)
                 row = []
-                for j in xrange(0, col_count):
-                    try: row.append(plot_data[j][i])
-                    except IndexError:
-                        row.append(None)
+                for i in xrange(0, col_count):
+                    nm,vs=labels[i]
+                    row.append(format_label(nm, vs))
                 csvwriter.writerow(row)
+                for i in xrange(0, row_count):
+                    row = []
+                    for j in xrange(0, col_count):
+                        try:               row.append(plot_data[j][i])
+                        except IndexError: row.append(None)
+                    csvwriter.writerow(row)
         print colored("Case '%s' -- wrote files:\n  %s\n  %s" % (name, fn, csv_fn), 'green')
 
         
@@ -549,7 +677,7 @@ If no arguments are given, all programs are plotted.
     if args.l != None:
         data_folder = args.l[0]
     else:
-        dirs = sorted(os.listdir(data_base_dir()), reverse=True,
+        dirs = sorted(filter(lambda s: s[0] != '.', os.listdir(data_base_dir())), reverse=True,
                       key=lambda d: os.path.getctime(os.path.join(data_base_dir(), d)))
         if len(dirs) < 1:
             warning_print("No folders found in timing directory.")
