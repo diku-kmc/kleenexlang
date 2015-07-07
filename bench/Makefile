@@ -39,6 +39,7 @@ testinput.apache_log     := $(DATA_DIR)/apache_log/example.log
 testinput.flip_ab        := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.thousand_sep   := $(DATA_DIR)/numbers/numbers_small.txt
 testinput.drex_del-comments := $(DATA_DIR)/comments/comments_small.txt
+testinput.drex_extract-xml  := $(DATA_DIR)/xml/xml_small.xml
 
 all:
 	@echo "Nothing to do."
@@ -137,12 +138,13 @@ apache_log: apache_log.ko
 flip_ab: flip_ab.ko
 thousand_sep: thousand_sep.ko
 drex_del-comments: drex_del-comments.ko
+drex_extract-xml: drex_extract-xml.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
 generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog generate-numbers \
-	                generate-comments
+	                generate-comments generate-xml
 
 generate-strings: generate-ab-strings generate-a-strings generate-random-string
 
@@ -190,6 +192,10 @@ generate-numbers:
 generate-comments:
 	@echo "Generating 2 MB text with comments..."
 	(cd ../test/data/comments && ./gen_comments.pl -s 2000000 > comments_2mb.txt)
+
+generate-xml:
+	@echo "Generating a 2 MB XML file..."
+	(cd ../test/data/xml && ./gen_xml.pl -s 2000000 > xml_2mb.xml)
 
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."

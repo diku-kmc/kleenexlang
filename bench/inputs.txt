@@ -19,6 +19,7 @@ apache_log          apache_log/example_big.log
 dfamail             email/emails_100mb.txt
 thousand_sep        numbers/numbers_250mb.txt
 drex_del-comments   comments/comments_2mb.txt
+drex_extract-xml    xml/xml_2mb.xml
 
 # Measure the speed of reading and writing lines in C/C++.
 # The test reads lines with fgets() and prints it using either

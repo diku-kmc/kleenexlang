@@ -15,12 +15,12 @@ start: align
 align := head@header field* foot@footer (!head head@header !rest field* !title !foot foot@footer)*
 swap := (header field* !title !rest footer)*
 
-field := title@(sp /title/ sp /=/ sp /\{[^}]*},\n/)
-       | f@(sp word sp /=/ sp /\{[^}]*},\n/) [ rest += f ]
+field := title@(sp /title/ sp /=/ sp /\{[^}]*},?\n/)
+       | f@(sp word sp /=/ sp /\{[^}]*},?\n/) [ rest += f ]
 
-header := /@/ word /\{/ alnum /,\n/
-footer := /}\n/
+header := /@/ word sp /\{/ sp alnum /,\n/
+footer := /}/ (sp|/\n/)*
 
 word := /[A-Za-z_]+/
 alnum := /[A-Za-z0-9_]+/
-sp := / /*
+sp := /[ \t]/*
