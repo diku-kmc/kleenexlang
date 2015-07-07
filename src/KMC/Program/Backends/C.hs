@@ -7,7 +7,7 @@ module KMC.Program.Backends.C where
 import           Control.Monad (when, join)
 import           Data.Bits
 import           Data.Char (ord, chr, isPrint, isAscii, isSpace)
-import           Data.List (intercalate)
+import           Data.List (intercalate, isInfixOf)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Numeric
@@ -575,9 +575,10 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
       waitForProcess hproc
   where
     compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
-                           , "-o", binPath
-                           -- , "-Wno-tautological-constant-out-of-range-compare"
-                           ]
+                           , "-o", binPath] ++
+                           (if isInfixOf "clang" comp
+                           then ["-Wno-tautological-constant-out-of-range-compare"]
+                           else [])
                            ++ (if wordAlign then ["-D FLAG_WORDALIGNED"] else [])
                            ++ ["-"]
     quote s = "\"" ++ s ++ "\""
