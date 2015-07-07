@@ -9,8 +9,10 @@ cache:
   apt: true
   
 
-#notifications:
-#  email: false
+notifications:
+  email:
+      on_success: change
+      on_failure: always
 
 # The following lines enable several GHC versions and/or HP versions
 # to be tested; often it's enough to test only against the last
