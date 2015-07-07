@@ -345,9 +345,10 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plo
         return locale.format("%d", x, grouping=True)
     ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(locale_formatter))
     ax.set_ylim(bottom=0)
-    ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls),
+    ax.set_xticklabels(map(lambda (x,y): format_label(x,y), lbls),
                        rotation = 45,
-                       horizontalalignment="right"
+                       horizontalalignment="right",
+                       size="medium"
     )
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -359,9 +360,8 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plo
 def make_barplot(ax, labels, plot_data, median_format_string):
     means = map(lambda ys: np.average(ys), plot_data)
     stddevs = map(lambda ys: np.std(ys), plot_data)
-    bar_width = 0.65
+    bar_width = 0.85
     n = len(labels)
-    colors = ['steelblue', 'darkseagreen']
     def pick((x,y)):
         if x.find("kleenex") >= 0:
             return "steelblue"
@@ -377,7 +377,9 @@ def make_barplot(ax, labels, plot_data, median_format_string):
         ecolor = 'darkslategrey',
         edgecolor = 'lightgrey',
         linewidth = 0,
-        capsize=4
+        capsize=5,
+        error_kw={'elinewidth': 2,
+                  'capthick' : 1.2 }
     )
     
 
