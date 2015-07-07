@@ -599,7 +599,7 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
     compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
                            , "-o", binPath
                            , "-lm"
-                           -- , "-Wno-tautological-constant-out-of-range-compare"
+                           , "-Wno-tautological-constant-out-of-range-compare"
                            ]
                            ++ (if wordAlign then ["-D FLAG_WORDALIGNED"] else [])
                            ++ ["-"]

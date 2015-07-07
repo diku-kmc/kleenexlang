@@ -62,7 +62,7 @@ size_t count = 0;
 unsigned char inbuf[INBUFFER_SIZE*2];
 size_t in_bitsize = 0;
 int in_bitcursor = 0;
-char *in_byteptr = &inbuf[INBUFFER_SIZE];
+unsigned char *in_byteptr = &inbuf[INBUFFER_SIZE];
 
 // Buffering cache (No, were not making this up)
 unsigned char nextcache[INBUFFER_SIZE];
