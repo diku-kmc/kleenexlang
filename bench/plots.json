@@ -92,5 +92,23 @@
      }, {
          "filename" : "thousand_sep-ms.pdf",
          "plot_transform" : "ms"
-     }]}
+     }]},
+ {
+    "program": "drex_del-comments",
+    "plots": [{
+        "filename": "drex_del-comments.pdf"
+    }, {
+        "filename": "drex_del-comments-ms.pdf",
+        "plot_transform": "ms"
+    }]
+ },
+ {
+    "program": "drex_extract-xml",
+    "plots": [{
+        "filename": "drex_extract-xml.pdf"
+    }, {
+        "filename": "drex_extract-xml-ms.pdf",
+        "plot_transform": "ms"
+    }]
+ }
 ]
