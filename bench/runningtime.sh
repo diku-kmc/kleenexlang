@@ -144,7 +144,7 @@ function usage {
     echo "  -h:    print this message"
     echo "  -w n:  do n warm-up runs of each test (default 0)"
     echo "  -r n:  do n repetitions of each test (default 1)"
-    echo "  -t TS: use \"TS\" as the time stamp for this run"
+    echo "  -l TS: use \"TS\" as the time stamp for this run"
     exit 1
 }
 
