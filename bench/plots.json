@@ -1,0 +1,96 @@
+[{
+    "program" : "simple_id",
+    "plots" : [{
+        "filename" : "simple_id.pdf",
+        "skip" : ["cat", "cpp11"]
+    }, {
+        "filename" : "simple_id-ALL.pdf",
+        "plot_transform" : "Gbit/s"
+    }, {
+        "filename" : "simple_id-l80.pdf",
+        "skip" : ["cat"],
+        "input" : "strings/ab_lines_len80_250mb.txt"
+    }, {
+        "filename" : "simple_id-ms.pdf",
+        "plot_transform" : "ms"
+    }]},
+ {
+     "program" : "as",
+     "plots" : [{
+         "filename" : "as-ms.pdf",
+         "plot_transform" : "ms"
+     }, {
+         "filename" : "as-mbs.pdf"
+     }]},
+ {
+     "program" : "email",
+     "plots" : [{
+         "filename" : "email-all.pdf"
+     }, {
+         "filename" : "email-all-ms.pdf",
+         "plot_transform" : "ms"
+     }, {
+         "filename" : "email-nogrep.pdf",
+         "skip" : ["grep"]
+     }]},
+ {
+     "program" : "issuu_json2sql",
+     "plots" : [{
+         "filename" : "issuu_json2sql-mbs.pdf"
+     }, {
+         "filename" : "issuu_json2sql-ms.pdf",
+         "plot_transform" : "ms"
+     }]},
+ {
+     "program" : "flip_ab",
+     "plots" : [{
+         "filename" : "flip_ab.pdf",
+         "skip" : ["tr"]
+     }, {
+         "filename" : "flip_ab-l80.pdf",
+         "skip" : ["tr"],
+         "input" : "strings/ab_lines_len80_250mb.txt"
+     }, {
+         "filename" : "flip_ab_ALL.pdf"
+     }]},
+ {
+     "program" : "issuu_fallback",
+     "plots" : [{
+         "filename" : "issuu_fallback.pdf"
+     }, {
+         "filename" : "issuu_fallback-ms.pdf",
+         "plot_transform" : "ms"
+     }]},
+ {
+     "program" : "rot13",
+     "plots" : [{
+         "filename" : "rot13.pdf",
+         "skip" : ["tr"]
+     }, {
+         "filename" : "rot13-ALL.pdf"
+     }]},
+ {
+     "program" : "csv_project3",
+     "plots" : [{
+         "filename" : "csv_project3.pdf"
+     },{
+         "filename" : "csv_project3-ms.pdf",
+         "plot_transform" : "ms"
+     }]},
+ {
+     "program" : "csv2json",
+     "plots" : [{
+         "filename" : "csv2json.pdf"
+     }, {
+         "filename" : "csv2json-ms.pdf",
+         "plot_transform" : "ms"
+     }]},
+ {
+     "program" : "thousand_sep",
+     "plots" : [{
+         "filename" : "thousand_sep.pdf"
+     }, {
+         "filename" : "thousand_sep-ms.pdf",
+         "plot_transform" : "ms"
+     }]}
+]

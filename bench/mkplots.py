@@ -10,6 +10,7 @@ import os
 import errno
 import warnings
 import csv
+import json as json
 
 def colored(msg, color):
     color_code = { 'green'   : "\033[32m",
@@ -23,6 +24,9 @@ def colored(msg, color):
         return beg + msg + end
     except KeyError:
         return msg
+
+def shorten(label):
+    return label.replace("kleenex", "kex").replace("-nola", "").replace(", gcc", " gcc").replace(", clang", " clang")
 
 def trans_Gbit_per_s(inputsize_bytes):
     return { "median_format_string" : "%.3f",
@@ -97,7 +101,7 @@ def test_data_dir():
 def plot_save_dir():
     return os.path.join(plot_dir, data_folder)
 
-def go(progs = [], skip = None, default_transformation = "ms"):
+def go(progs = [], skip = None, default_transformation = "ms", plot_kind = 'barchart'):
     conf, inputs, skips = get_benchmark_configuration()
     if skip != None: # Override whatever is read from plots.txt
         if type(skip) == list:
@@ -123,7 +127,7 @@ def go(progs = [], skip = None, default_transformation = "ms"):
         notice_print("Plot output dir already exists")
         pass
 
-    plot_all(get_data(conf, progs), inputs, skips, skipFun, getTransFun)
+    plot_all(get_data(conf, progs), inputs, skips, skipFun, getTransFun, plot_kind)
 
 def get_data(conf, only_progs = []):
     benchmarks = {}
@@ -158,7 +162,7 @@ def get_data(conf, only_progs = []):
 # data is of the form
 #  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
-def plot_all(benchmarks, inputNames, plotConfMap, skipFun, getTransformation):
+def plot_all(benchmarks, inputNames, plotConfMap, skipFun, getTransformation, plot_kind):
     for prog, benchs in benchmarks.iteritems():
         try: output_names = plotConfMap[prog].keys()
         except KeyError: output_names = [prog + ".pdf"]
@@ -179,7 +183,7 @@ def plot_all(benchmarks, inputNames, plotConfMap, skipFun, getTransformation):
                 try: return skipFun(prog, i, n)
                 except KeyError: return False
             transFun = getTransformation(prog, output_name)
-            fig = plot_benchmark(prog, benchs, inputname, output_name, sf, transFun(inputsize))
+            fig = plot_benchmark(prog, benchs, inputname, output_name, sf, transFun(inputsize), plot_kind)
 
 def strip_input_file_suffix(s):
     input_suffix = ".runningtime"
@@ -187,7 +191,7 @@ def strip_input_file_suffix(s):
 
 def get_benchmark_configuration(conf_file = "benchmarks.txt",
                                 inputs_file = "inputs.txt",
-                                plots_file = "plots.txt"):
+                                plots_file = "plots.json"):
     def read_conf(fp, sep):
         m = {}
         with open(fp, 'r') as f:
@@ -201,20 +205,37 @@ def get_benchmark_configuration(conf_file = "benchmarks.txt",
     conf = read_conf(conf_file, ',')
     inputs = read_conf(inputs_file, ';')
     plots = {}
-    with open(plots_file, 'r') as f:
-        for line in f:
-            if line[0] == '#' or line.strip() == "": continue
-            ps = filter(lambda x : len(x) > 0, line.split(" "))
-            prog = ps[0].strip()
-            skip_list = map(lambda x : x.strip(), ps[1].split(','))
-            inputdata_file_name = ps[2].strip()
-            plot_transform = ps[3].strip()
-            output_file_name = ps[4].strip()
-            if not plots.has_key(prog):
-                plots[prog] = {}
-            plots[prog][output_file_name] = {'skip': skip_list,
-                                             'indata' : inputdata_file_name,
-                                             'transformation' : plot_transform}
+    # Read in plot setup file
+    plot_conf = None
+    with open(plots_file, 'r') as f: plot_conf = json.load(f)
+    for p in plot_conf:
+        plots[p["program"]] = {}
+        for concreteplot in p["plots"]:
+            try:             skip = concreteplot["skip"]
+            except KeyError: skip = []
+            try:             inputfilename = concreteplot["input"]
+            except KeyError: inputfilename = "DEFAULT"
+            try:             plot_transform = concreteplot["plot_transform"]
+            except KeyError: plot_transform = "Mbit/s"
+            try:             collated = concreteplot["collated"]
+            except KeyError: collated = False
+            plots[p["program"]][concreteplot["filename"]] = { 'skip' : skip,
+                                                              'indata' : inputfilename,
+                                                              'transformation' : plot_transform,
+                                                              'collated' : collated }
+        # for line in f:
+        #     if line[0] == '#' or line.strip() == "": continue
+        #     ps = filter(lambda x : len(x) > 0, line.split(" "))
+        #     prog = ps[0].strip()
+        #     skip_list = map(lambda x : x.strip(), ps[1].split(','))
+        #     inputdata_file_name = ps[2].strip()
+        #     plot_transform = ps[3].strip()
+        #     output_file_name = ps[4].strip()
+        #     if not plots.has_key(prog):
+        #         plots[prog] = {}
+        #     plots[prog][output_file_name] = {'skip': skip_list,
+        #                                      'indata' : inputdata_file_name,
+        #                                      'transformation' : plot_transform}
     return (conf, inputs, plots)
 
 def get_input_file_size(inpf):
@@ -240,18 +261,17 @@ def read_benchmark_output(fn):
                 times.append(l)
     return times
 
-# TODO:  Make histogram plots of data sets to see distribution.
 
 # data is of the form
 #  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
 # the skipThis returns True on an impl name if it should be skipped!
-def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
+def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plot_kind):
     trans_fun = data_trans["trans_fun"]
     median_format_string = data_trans["median_format_string"]
     yaxis_label = data_trans["yaxis_label"]
     title = data_trans["title"](prog, inputname)
-    fig, ax = plt.subplots()
+
     lbls = []
     plot_data = []
     # Add the bars
@@ -286,6 +306,83 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
         plt.close()
         notice_print("Not writing %s - nothing on the plot." % output_name)
         return False
+    
+    fig, ax = plt.subplots()
+    if plot_kind == "boxplot":
+        make_boxplot(ax, lbls, plot_data, median_format_string)
+    elif plot_kind == "barchart":
+        make_barplot(ax, lbls, plot_data, median_format_string)
+    else:
+        raise Error("Illegal plot kind: %s" % plot_kind)
+
+    # Set properties of plot and make it look nice.
+    if plot_kind == "boxplot":
+        ax.xaxis.grid(True,
+                      linestyle='-',
+                      which='major',
+                      color='lightgrey',
+                      alpha=0.5)
+    
+    ax.yaxis.grid(True,
+                  linestyle='-',
+                  which='major',
+                  color='grey',
+                  alpha=0.7)
+    ax.set_axisbelow(True)
+    ax.set_xlim(0, numBoxes + 0.5)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    ax.spines["left"].set_color('lightgrey')
+    ax.spines["bottom"].set_color('lightgrey')
+    ax.yaxis.set_ticks_position('left')
+    ax.set_ylabel(yaxis_label)
+    ax.set_title(title)
+    ax.set_xticks(np.arange(numBoxes) + 1)
+    ax.tick_params(axis = 'x', length = 0)
+    ax.tick_params(axis = 'y', colors = "black")
+    locale.setlocale(locale.LC_ALL, 'en_US')
+    def locale_formatter(x, p):
+        return locale.format("%d", x, grouping=True)
+    ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(locale_formatter))
+    ax.set_ylim(bottom=0)
+    ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls),
+                       rotation = 45,
+                       horizontalalignment="right"
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plt.tight_layout() # Throws an annoying warning about renderers.
+    save_plot(fig, lbls, plot_data, plot_save_dir(), output_name)
+    plt.close()
+    return True
+
+def make_barplot(ax, labels, plot_data, median_format_string):
+    means = map(lambda ys: np.average(ys), plot_data)
+    stddevs = map(lambda ys: np.std(ys), plot_data)
+    bar_width = 0.65
+    n = len(labels)
+    colors = ['steelblue', 'darkseagreen']
+    def pick((x,y)):
+        if x.find("kleenex") >= 0:
+            return "steelblue"
+        else:
+            return "darkseagreen"
+    colors = map(pick, labels)
+    bars = ax.bar(
+        left = map(lambda l:l - bar_width/2, np.arange(1, n+1)),
+        height = means,
+        width = bar_width,
+        yerr = stddevs,
+        color = colors,
+        ecolor = 'darkslategrey',
+        edgecolor = 'lightgrey',
+        linewidth = 0,
+        capsize=4
+    )
+    
+
+def make_boxplot(ax, labels, plot_data, median_format_string):
+    numBoxes = len(labels)
     # Make the actual boxplot
     bp = ax.boxplot(x=plot_data, sym='+', vert=1)
     plt.setp(bp['boxes'], color='black')
@@ -316,36 +413,7 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans):
         (txtX, txtY) = ax.transData.inverted().transform((boxTop[0], boxTop[1] + 7))
         # And write the median value there.
         ax.text(txtX, txtY, median_format_string % median, horizontalalignment='center',
-                size='x-small', weight="bold", color=boxColors[k])
-
-    # Set properties of plot and make it look nice.
-    ax.xaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    ax.yaxis.grid(True, linestyle='-', which='major', color='lightgrey', alpha=0.5)
-    ax.set_axisbelow(True)
-    ax.set_xlim(0, numBoxes + 0.5)
-    ax.spines["right"].set_visible(False)
-    ax.spines["top"].set_visible(False)
-    ax.spines["left"].set_color('lightgrey')
-    ax.spines["bottom"].set_color('lightgrey')
-    ax.yaxis.set_ticks_position('left')
-    ax.set_ylabel(yaxis_label)
-    ax.set_title(title)
-    ax.set_xticks(np.arange(numBoxes) + 1)
-    ax.tick_params(axis = 'x', length = 0)
-    ax.tick_params(axis = 'y', colors = "grey")
-    locale.setlocale(locale.LC_ALL, 'en_US')
-    def locale_formatter(x, p):
-        return locale.format("%d", x, grouping=True)
-    ax.get_yaxis().set_major_formatter(ticker.FuncFormatter(locale_formatter))
-    ax.set_ylim(bottom=0)
-    ax.set_xticklabels(map(lambda (x,y):format_label(x,y), lbls), rotation = 45, horizontalalignment="right")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        plt.tight_layout() # Throws an annoying warnings about renderers.
-    save_plot(fig, lbls, plot_data, plot_save_dir(), output_name)
-    plt.close()
-    return True
-
+                size='medium', weight="bold", color=boxColors[k])
 
 def save_plot(fig, labels, plot_data, directory, name):
     make_sure_path_exists(directory)
@@ -396,7 +464,7 @@ def format_label(name, version):
     else:
         v = ""
         n = ""
-    return "%s%s%s" % (name, n, v)
+    return shorten("%s%s%s" % (name, n, v))
 
 def format_version(vstring):
     if vstring == None:
@@ -444,6 +512,8 @@ If no arguments are given, all programs are plotted.
     parser.add_argument('-d', nargs=1,
                         help = "Destination directory for plots.  Default plots/<label>")
     parser.add_argument('-f', action='count', help = "Force overwrite of existing plots.")
+    parser.add_argument('-k',
+                        help = "Kind of plot to make (barchart, boxplot). Default: barchart.")
     args = parser.parse_args()
 
     if args.v != None:
@@ -500,5 +570,12 @@ If no arguments are given, all programs are plotted.
     if args.f != None:
         force_override = True
 
+    if args.k == None:         plot_kind = 'barchart'
+    elif args.k == "barchart": plot_kind = 'barchart'
+    elif args.k == "boxplot":  plot_kind = 'boxplot'
+    else:
+        warning_print("Unknown plot kind: %s", args.k)
+        exit(2)
 
-    go(progs, skip = args.s, default_transformation = transform)
+
+    go(progs, skip = args.s, default_transformation = transform, plot_kind = plot_kind)
