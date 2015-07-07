@@ -74,6 +74,8 @@ test-suite test-repg
                      , Tests.TestUtils
                      , Tests.DFAConstruction
                      , Tests.KleenexParser
+                     , Tests.Coding
+                     , Tests.Regression
   hs-source-dirs:      test src/
   default-language:    Haskell2010
   default-extensions:  TemplateHaskell
