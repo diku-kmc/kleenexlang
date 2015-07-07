@@ -37,8 +37,6 @@
 #define OUTSTREAM stdout
 #endif
 
-#define NEXT(i) &inbuf[in_bitcursor/8 + i]
-
 // Order of descriptors provided by pipe()
 #define  READ_FD 0
 #define WRITE_FD 1

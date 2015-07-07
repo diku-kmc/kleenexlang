@@ -416,7 +416,7 @@ prettyExpr symbSize e =
     AvailableSymbolsE n -> text "avail"<> parens (int $ n*symbSize)
     CompareE i str      -> text "cmp"
                              <> parens (hcat $ punctuate comma
-                                          [text "NEXT" <> parens (int i)
+                                          [text "&in_byteptr" <> brackets (int i)
                                           ,text "(unsigned char *)" <+> prettyStr str
                                           ,int (length str)])
     ConstE n            -> let c = chr n in
