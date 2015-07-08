@@ -5,6 +5,36 @@ rounds=5
 log_dir="./logs"
 timestamp="$(date "+%Y_%m_%d__%H_%M_%S")"
 
+function usage {
+    echo "usage: $0 [-h] [-w N] [-r N]"
+    echo " -r N: run N rounds of trials on each benchmark."
+    echo " -w N: run N rounds of warm-ups before each benchmark."
+    echo " -h: print this usage and exit."
+}
+
+while getopts "r:w:h" opt; do
+  case $opt in
+  w)
+      echo "# Doing $OPTARG warmups"
+      warmups=$OPTARG
+      ;;
+  r)
+      echo "# Doing $OPTARG rounds"
+      rounds=$OPTARG
+      ;;
+  h)
+      usage
+      exit 2
+      ;;
+  \?)
+      echo "Invalid option: -$OPTARG" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+
 cd `dirname $0`
 mkdir -p "$log_dir"
 
