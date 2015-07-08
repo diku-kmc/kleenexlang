@@ -1,13 +1,14 @@
 
-main := (escape | comment | term | symbol | /./)*
+main := (escape | comment | term | symbol | ignored | ws*)*
 
 term := black /~/ (constant | match | ident) end
       | (teal constant | yellow match | blue ident) end
 
+ignored  := /[]()|{},:[]/
 ident    := (letter | /[0-9_]/)+
 symbol   := yellow /<-|\+=|:=|>>|\*|\?|\+/ end
 constant := /"/ ( /\\./ | /[^\\"]/ )* /"/
-comment  := black /\/\/[^\n]*\n/ end
+comment  := black (/\/\/[^\n]*\n/ | /\/\*[^*\/]*\*\//) end
 match    := /\// ( /[^\/\n]/ | /\\./ )+ /\//
 
 escape := /\\\\/
@@ -17,7 +18,7 @@ escape := /\\\\/
 sp := / /*
 letter := /[a-zA-Z]/
 word  := letter+
-ws := /\n| /
+ws := /[\t\r\n ]/
 
 red   := "\x1b[31m"
 green := "\x1b[32m"
