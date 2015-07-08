@@ -38,10 +38,10 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String 
+progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String
 progTemplate buString tablesString declsString infoString initString progStrings withActions =
  [strQ|
-#define NUM_PHASES |] ++ show (if withActions then length progStrings else 2*length progStrings) ++ [strQ|
+#define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
   ++ [fileQ|crt/crt.c|] ++ "\n"
   ++ tablesString ++ "\n"
@@ -59,8 +59,8 @@ void init()
 void match(int phase)
 {
   switch(phase) {
-    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(); break;" 
-                         | i <- [1..(length progStrings)] ]++  
+    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(); break;"
+                         | i <- [1..(length progStrings)] ]++
     [strQ|
     default:
       fprintf(stderr, "Invalid phase: %d given\n", phase);
