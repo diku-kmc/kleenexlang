@@ -1,25 +1,34 @@
-# Benchmark name    Semicolon-separated input data 
-simple_id           strings/ab_lines_len1000_250mb.txt;strings/ab_lines_len80_250mb.txt
-patho1              strings/ab_lines_len1000_250mb.txt
-patho2	            strings/ab_lines_len1000_250mb.txt
+# Benchmark name    Semicolon-separated input data
+patho2	            strings/ab_lines_len1000_50mb.txt;strings/ab_lines_len1000_70mb.txt;strings/ab_lines_len1000_100mb.txt;strings/ab_lines_len1000_150mb.txt;strings/ab_lines_len1000_170mb.txt;strings/ab_lines_len1000_200mb.txt;strings/ab_lines_len1000_250mb.txt;strings/ab_lines_len80_250mb.txt
 flip_ab             strings/ab_lines_len1000_50mb.txt;strings/ab_lines_len1000_70mb.txt;strings/ab_lines_len1000_100mb.txt;strings/ab_lines_len1000_150mb.txt;strings/ab_lines_len1000_170mb.txt;strings/ab_lines_len1000_200mb.txt;strings/ab_lines_len1000_250mb.txt;strings/ab_lines_len80_250mb.txt
-issuu_fallback	    issuu/issuu_1000000objs.json
-issuu_nofallback    issuu/issuu_1000000objs.json
-issuu_json2sql      issuu/issuu_1000000objs.json
-csv2json            csv/csv_format1_250mb.csv
-csv2json_nows	    csv/csv_format1_250mb.csv
-# json2csv            csv/csv_format1_250mb.csv.csv.ws.json
-as                  strings/as_20mb.txt;strings/as_50mb.txt;strings/as_70mb.txt;strings/as_100mb.txt;strings/as_120mb.txt;as_150mb.txt;as_170mb.txt;as_200mb.txt
-csv_project3        csv/csv_format1_250mb.csv
-email               email/emails_100mb.txt
-iso_datetime_to_json datetime/datetimes_250mb.txt
-ini2json            ini/inifile_25mb.ini
 rot13               strings/random_250mb.txt
-apache_log          apache_log/example_big.log
-dfamail             email/emails_100mb.txt
+
 thousand_sep        numbers/numbers_250mb.txt
+csv_project3        csv/csv_format1_250mb.csv
+# irc              TODO
+
+apache_log          apache_log/example_big.log
+ini2json            ini/inifile_25mb.ini
+# syntax           TODO
+issuu_json2sql      issuu/issuu_1000000objs.json
+# bibtex           TODO
 drex_del-comments   comments/comments_2mb.txt
 drex_extract-xml    xml/xml_2mb.xml
+
+iso_datetime_to_json datetime/datetimes_250mb.txt
+# plus csv_project3 again but with different plot.
+
+
+# simple_id           strings/ab_lines_len1000_250mb.txt;strings/ab_lines_len80_250mb.txt
+# issuu_fallback	    issuu/issuu_1000000objs.json
+# issuu_nofallback    issuu/issuu_1000000objs.json
+# csv2json            csv/csv_format1_250mb.csv
+# csv2json_nows	    csv/csv_format1_250mb.csv
+# json2csv            csv/csv_format1_250mb.csv.csv.ws.json
+# as                  strings/as_20mb.txt;strings/as_50mb.txt;strings/as_70mb.txt;strings/as_100mb.txt;strings/as_120mb.txt;as_150mb.txt;as_170mb.txt;as_200mb.txt
+# email               email/emails_100mb.txt
+# dfamail             email/emails_100mb.txt
+
 
 # Measure the speed of reading and writing lines in C/C++.
 # The test reads lines with fgets() and prints it using either
@@ -27,4 +36,4 @@ drex_extract-xml    xml/xml_2mb.xml
 # or /one/ call to fprintf(), using the formatting to add the extra
 # newline.  It is, maybe unsurprisingly, faster to do two fputs() than
 # to do one fprintf().
-raw_io_speed        strings/ab_lines_len1000_250mb.txt
+# raw_io_speed        strings/ab_lines_len1000_250mb.txt
