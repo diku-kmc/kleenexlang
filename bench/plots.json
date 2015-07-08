@@ -95,7 +95,8 @@
          "plot_transform" : "ms"
      }, {
          "filename" : "csv_project3-kleenex.pdf",
-         "skip" : ["re2","re2j","gawk","oniguruma","perl","python","sed","tcl","ragel","cut"]
+         "skip" : ["re2","re2j","gawk","oniguruma","perl","python","sed","tcl","ragel","cut"],
+         "title" : "Effect of splitting Kleenex automata"
      }]},
  {
      "program" : "csv2json",
@@ -144,7 +145,8 @@
      "program" : "iso_datetime_to_json",
      "plots" : [{
          "filename" : "iso_datetime_to_json-kleenex.pdf",
-         "skip" : ["re2","re2j","gawk","oniguruma","perl","python","sed","tcl","ragel"]
+         "skip" : ["re2","re2j","gawk","oniguruma","perl","python","sed","tcl","ragel"],
+         "title" : "Effect of splitting automata"
      }, {
          "filename" : "iso_datetime_to_json.pdf"
      }]

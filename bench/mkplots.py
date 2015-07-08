@@ -242,16 +242,19 @@ def plot_all(benchmarks, inputNames, plotconf, skipFun, getTransformation, plot_
             def sf(i, n): # Specialise the skip function to this program.
                 try: return skipFun(prog, i, n)
                 except KeyError: return False
+
+            try: plot_title = plotconf[prog][output_name]["plot_title"]
+            except KeyError: plot_title = None # Defaults in plot_*
             
             if len(inputfiles) > 1:
                 plot_collated_benchmark(prog, benchs, inputnames_by_size,
-                                               output_name, sf)
+                                        output_name, sf, plot_title = plot_title)
             else:
                 try:
                     plot_benchmark(prog, benchs,
-                                          inputnames[0], output_name,
-                                          sf, transFun(inputsizes[0]),
-                                          plot_kind)
+                                   inputnames[0], output_name,
+                                   sf, transFun(inputsizes[0]),
+                                   plot_kind, plot_title = plot_title)
                 except IndexError:
                     warning_print("Skipping %s because inputnames is empty." % prog)
 
@@ -291,9 +294,12 @@ def get_benchmark_configuration(conf_file, inputs_file, plots_file):
             except KeyError: plot_transform = "Mbit/s"
             try:             collated = concreteplot["collated"]
             except KeyError: collated = False
+            try:             plot_title = concreteplot["title"]
+            except KeyError: plot_title = None # Defaults to input file and size
             plots[p["program"]][concreteplot["filename"]] = { 'skip' : skip,
                                                               'indata' : inputfilename,
-                                                              'transformation' : plot_transform }
+                                                              'transformation' : plot_transform,
+                                                              'plot_title' : plot_title }
     return (conf, inputs, plots)
 
 def get_input_file_size(inpf):
@@ -305,11 +311,14 @@ def get_input_file_size(inpf):
         return 0
 
 # Make scatter plots of each implementation and connect with lines.
-def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis):
+def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_title = None):
     # trans_fun = data_trans[0]["trans_fun"]
     # median_format_string = data_trans[0]["median_format_string"]
     yaxis_label = inputnames[0][2]["yaxis_label"]
-    title = "%s" % prog
+    if plot_title != None:
+        title = plot_title
+    else:
+        title = "%s" % prog
 
     labels = []
     plot_data = {}
@@ -400,11 +409,14 @@ def sizeof_fmt(num, suffix='B'):
 #  data["kleenex"][version] = {inputfilename: [1,2,3,4]}
 #  data["gawk"] = {"DEFAULT" : {inputfilename: [1,2,3,4]}}
 # the skipThis returns True on an impl name if it should be skipped!
-def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plot_kind):
+def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plot_kind, plot_title = None):
     trans_fun = data_trans["trans_fun"]
     median_format_string = data_trans["median_format_string"]
     yaxis_label = data_trans["yaxis_label"]
-    title = data_trans["title"](prog, inputname)
+    if plot_title != None:
+        title = plot_title
+    else:
+        title = data_trans["title"](prog, inputname)
 
     lbls = []
     plot_data = []
