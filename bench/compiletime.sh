@@ -38,7 +38,12 @@ function setname {
     else
         dfa=""
     fi
-    name="${1}__${2}__${3}${dfa}"
+    if [ "${5}" = false ]; then
+        action="__woACT"
+    else
+        action=""
+    fi
+    name="${1}__${2}__${3}${dfa}${action}"
 }
 function usage {
     echo "usage: $0 [-fh] [-p P] [-t N]"
@@ -114,46 +119,51 @@ for opt_la_level in ${opt_levels[@]}; do # for each SST optimization level
     for i in $(seq 0 $(expr ${#ccs[@]} - 1)); do # for each C compiler available
         cc=${ccs[i]}
         cc_name=${ccs_names[i]}
-        for n in $(ls $src_dir); do         # for each Kleenex source file
-            if [[ ${n} != *".kex" ]]; then  #
+        for act in {true,false}; do
+            if [[ "$act" == "false" && "$opt_la_level" != "3-la" ]]; then # Run once without actions on the highest optimization level
                 continue
             fi
-            if [ "$only_do" != "" ]; then
-                if [[ ${n} != $only_do* ]]; then
-                    continue;
+            for n in $(ls $src_dir); do         # for each Kleenex source file
+                if [[ ${n} != *".kex" ]]; then  #
+                    continue
                 fi
-            fi
-            if [ "$lookahead" == "la" ]; then
-                la_on_off="--la=true"
-            else
-                la_on_off="--la=false"
-            fi
-            if [ "$use_dfa" = true ]; then
-                dfa_on_off="--dfa=true"
-            else
-                dfa_on_off="--dfa=false"
-            fi
-
-            setname $n $opt_la_level $cc_name $use_dfa
-            
-            timingdata="${time_dir}/${name}${compiletime_postfix}"
-            binary="${bin_dir}/${name}"
-            precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off $dfa_on_off --opt $opt_level --cc $cc >> $timingdata"
-            if [ "$timeoutcmd" == "" ]; then
-                cmd=$precmd
-            else
-                cmd="$timeoutcmd $timeoutseconds $precmd"
-            fi
-            for i in `seq 1 $reps`; do
-                echo "#$i"
-                echo $cmd
-                if [ "$dryrun" = false ]; then
-                    eval "$cmd"
-                    if [ $? == 124 ]; then
-                        echo "# TIMED OUT!"
+                if [ "$only_do" != "" ]; then
+                    if [[ ${n} != $only_do* ]]; then
+                        continue;
                     fi
                 fi
-                echo ""
+                if [ "$lookahead" == "la" ]; then
+                    la_on_off="--la=true"
+                else
+                    la_on_off="--la=false"
+                fi
+                if [ "$use_dfa" = true ]; then
+                    dfa_on_off="--dfa=true"
+                else
+                    dfa_on_off="--dfa=false"
+                fi
+
+                setname $n $opt_la_level $cc_name $use_dfa $act
+
+                timingdata="${time_dir}/${name}${compiletime_postfix}"
+                binary="${bin_dir}/${name}"
+                precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off $dfa_on_off --opt $opt_level --cc $cc --act=$act >> $timingdata"
+                if [ "$timeoutcmd" == "" ]; then
+                    cmd=$precmd
+                else
+                    cmd="$timeoutcmd $timeoutseconds $precmd"
+                fi
+                for i in `seq 1 $reps`; do
+                    echo "#$i"
+                    echo $cmd
+                    if [ "$dryrun" = false ]; then
+                        eval "$cmd"
+                        if [ $? == 124 ]; then
+                            echo "# TIMED OUT!"
+                        fi
+                    fi
+                    echo ""
+                done
             done
         done
     done
