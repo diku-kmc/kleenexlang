@@ -61,6 +61,10 @@
          "input" : "strings/ab_lines_len80_250mb.txt"
      }, {
          "filename" : "flip_ab_ALL.pdf"
+     }, {
+         "filename" : "flip_ab-collated.pdf",
+         "input" : "strings/ab_lines_len1000*",
+         "plot_transform" : "mbs"
      }]},
  {
      "program" : "issuu_fallback",
