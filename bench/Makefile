@@ -141,12 +141,13 @@ flip_ab: flip_ab.ko
 thousand_sep: thousand_sep.ko
 drex_del-comments: drex_del-comments.ko
 drex_extract-xml: drex_extract-xml.ko
+irc: irc.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
 generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog generate-numbers \
-	                generate-comments generate-xml
+	                generate-comments generate-xml generate-irc
 
 generate-strings: generate-ab-strings generate-a-strings generate-random-strings
 
