@@ -126,8 +126,12 @@ def test_data_dir():
 def plot_save_dir():
     return os.path.join(plot_dir, data_folder)
 
-def go(progs = [], skip = None, default_transformation = "ms", plot_kind = 'barchart'):
-    conf, inputs, plotconf = get_benchmark_configuration()
+def go(progs = [], skip = None, default_transformation = "ms", plot_kind = 'barchart',
+       inputs_file = "inputs.txt", plots_file = "plots.json", benchmarks_file = "benchmarks.txt"):
+    conf, inputs, plotconf = get_benchmark_configuration(benchmarks_file,
+                                                         inputs_file,
+                                                         plots_file
+    )
     if skip != None: # Override whatever is read from plots.txt
         if type(skip) == list:
             skipFun = lambda p, i, n : i in skip
@@ -241,12 +245,15 @@ def plot_all(benchmarks, inputNames, plotconf, skipFun, getTransformation, plot_
             
             if len(inputfiles) > 1:
                 plot_collated_benchmark(prog, benchs, inputnames_by_size,
-                                        output_name, sf)
+                                               output_name, sf)
             else:
-                plot_benchmark(prog, benchs,
-                               inputnames[0], output_name,
-                               sf, transFun(inputsizes[0]),
-                               plot_kind)
+                try:
+                    plot_benchmark(prog, benchs,
+                                          inputnames[0], output_name,
+                                          sf, transFun(inputsizes[0]),
+                                          plot_kind)
+                except IndexError:
+                    warning_print("Skipping %s because inputnames is empty." % prog)
 
 def strip_input_file_suffix(s):
     input_suffix = ".runningtime"
@@ -256,9 +263,7 @@ def add_input_file_suffix(s):
     return s + input_suffix
     
 
-def get_benchmark_configuration(conf_file = "benchmarks.txt",
-                                inputs_file = "inputs.txt",
-                                plots_file = "plots.json"):
+def get_benchmark_configuration(conf_file, inputs_file, plots_file):
     def read_conf(fp, sep):
         m = {}
         with open(fp, 'r') as f:
@@ -631,8 +636,6 @@ If no arguments are given, all programs are plotted.
                         help='Name of the program to plot')
     parser.add_argument('-t',
                         help = "Data transform (mbs=Mbit/s [DEFAULT], gbs=Gbit/s, s=Seconds, ms=Milliseconds)")
-    parser.add_argument('-c',
-                        help = "Alternate config file")
     parser.add_argument('-s', nargs='+', help = "Skip implementation")
     parser.add_argument('-b', nargs=1,
                         help = "Alternate base bench/ directory than current dir.")
@@ -644,23 +647,18 @@ If no arguments are given, all programs are plotted.
     parser.add_argument('-f', action='count', help = "Force overwrite of existing plots.")
     parser.add_argument('-k',
                         help = "Kind of plot to make (barchart, boxplot). Default: barchart.")
+    parser.add_argument('-g',
+                        help = "Alternate benchmark configuration file (default: benchmarks.txt)")
+    parser.add_argument('-c',
+                        help = "Alternate plot configuration JSON file (default: plots.json)")
+    parser.add_argument('-e',
+                        help = "Alternate input configuration file (default: inputs.txt)")
+
     args = parser.parse_args()
 
     if args.v != None:
         is_verbose = True
         print "Entering verbose mode."
-
-    if args.p == None: progs = []
-    else:              progs = args.p
-
-    if args.t == None:    transform = "Mbit/s"
-    elif args.t == "mbs": transform = "Mbit/s"
-    elif args.t == "gbs": transform = "Gbit/s"
-    elif args.t == "ms":  transform = "ms"
-    elif args.t == "s":   transform = "s"
-    else:
-        warning_print("Unknown transformation: '%s'!." % args.t)
-        exit(2)
 
     if args.b != None:
         a = args.b[0]
@@ -700,12 +698,30 @@ If no arguments are given, all programs are plotted.
     if args.f != None:
         force_override = True
 
-    if args.k == None:         plot_kind = 'barchart'
-    elif args.k == "barchart": plot_kind = 'barchart'
-    elif args.k == "boxplot":  plot_kind = 'boxplot'
+    call_dict = {}
+    if args.p != None: call_dict['progs'] = args.p
+
+    if args.t == "mbs":   call_dict['default_transformation'] = "Mbit/s"
+    elif args.t == "gbs": call_dict['default_transformation'] = "Gbit/s"
+    elif args.t == "ms":  call_dict['default_transformation'] = "ms"
+    elif args.t == "s":   call_dict['default_transformation'] = "s"
     else:
-        warning_print("Unknown plot kind: %s", args.k)
-        exit(2)
+        if args.t != None:
+            warning_print("Unknown transformation: '%s'!." % args.t)
+            exit(2)
 
 
-    go(progs, skip = args.s, default_transformation = transform, plot_kind = plot_kind)
+    if args.k == "barchart":  call_dict['plot_kind'] = 'barchart'
+    elif args.k == "boxplot": call_dict['plot_kind'] = 'boxplot'
+    else:
+        if args.k != None:
+            warning_print("Unknown plot kind: %s", args.k)
+            exit(2)
+
+    if args.g != None: call_dict["benchmarks_file"] = args.g
+    if args.c != None: call_dict["plots_file"] = args.c
+    if args.e != None: call_dict["inputs_file"] = args.e
+
+    if args.s != None: call_dict["skip"] = args.s
+
+    go(**call_dict)
