@@ -62,4 +62,4 @@ function run_benchmarks {
     echo "# All done at $(date)"
 }
 
-run_benchmarks 2>&1 > "$log_dir/nightly_$timestamp.log"
+run_benchmarks &> "$log_dir/nightly_$timestamp.log"
