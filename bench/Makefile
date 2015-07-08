@@ -41,6 +41,7 @@ testinput.flip_ab        := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.thousand_sep   := $(DATA_DIR)/numbers/numbers_small.txt
 testinput.drex_del-comments := $(DATA_DIR)/comments/comments_small.txt
 testinput.drex_extract-xml  := $(DATA_DIR)/xml/xml_small.xml
+testinput.irc            := $(DATA_DIR)/irc/irc.txt
 
 all:
 	@echo "Nothing to do."
@@ -219,6 +220,10 @@ generate-comments:
 generate-xml:
 	@echo "Generating a 2 MB XML file..."
 	(cd ../test/data/xml && ./gen_xml.pl -s 2000000 > xml_2mb.xml)
+
+generate-irc:
+	@echo "Generating a 250 MB IRC command file..."
+	(cd ../test/data/irc && ./gen_irc.pl -s 250000000 > irc_250mb.txt)
 
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
