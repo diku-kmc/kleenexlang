@@ -49,6 +49,9 @@
      }, {
          "filename" : "issuu_json2sql-ms.pdf",
          "plot_transform" : "ms"
+     }, {
+         "filename" : "issuu_json2sql-9gb.pdf",
+         "input" : "issuu/issuu_issuu_large.json"
      }]},
  {
      "program" : "flip_ab",

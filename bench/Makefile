@@ -146,8 +146,9 @@ irc: irc.ko
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
 
 
-generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog generate-numbers \
-	                generate-comments generate-xml generate-irc
+generate-test-data: generate-strings download-issuu download-large-issuu generate-emails \
+					generate-csv generate-datetime generate-inifile generate-apachelog \
+					generate-numbers generate-comments generate-xml generate-irc
 
 generate-strings: generate-ab-strings generate-a-strings generate-random-strings
 
@@ -229,6 +230,10 @@ generate-irc:
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
 	(cd ../test/data/issuu && ./download.sh -f -c 0 -n 1000000 > issuu_1000000objs.json)
+
+download-large-issuu:
+	@echo "Downloading ~9Gbit JSON objects 17.000.000 from the /first/ part of the Issuu dataset..."
+	(cd ../test/data/issuu && ./download.sh -n 17000000 -c 0 -f > issuu_large.json)
 
 
 install-benchmark-dependencies:

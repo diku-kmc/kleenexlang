@@ -10,7 +10,7 @@ irc                 irc/irc_250mb.txt
 apache_log          apache_log/example_big.log
 ini2json            ini/inifile_25mb.ini
 # syntax           No benchmarks
-issuu_json2sql      issuu/issuu_1000000objs.json
+issuu_json2sql      issuu/issuu_1000000objs.json;issuu/issuu_large.json
 # bibtex           TODO
 drex_del-comments   comments/comments_2mb.txt
 drex_extract-xml    xml/xml_2mb.xml
