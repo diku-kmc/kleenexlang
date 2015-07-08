@@ -90,6 +90,9 @@
      },{
          "filename" : "csv_project3-ms.pdf",
          "plot_transform" : "ms"
+     }, {
+         "filename" : "csv_project3-kleenex.pdf",
+         "skip" : ["re2","re2j","gawk","oniguruma","perl","python","sed","tcl","ragel","cut"]
      }]},
  {
      "program" : "csv2json",
@@ -124,5 +127,23 @@
         "filename": "drex_extract-xml-ms.pdf",
         "plot_transform": "ms"
     }]
+ },
+ {
+     "program" : "patho2",
+     "plots" : [{
+         "filename" : "patho2-collated.pdf",
+         "input": "strings/ab_lines_len1000*."
+     }, {
+         "filename" : "patho2.pdf"
+     }]
+ },
+ {
+     "program" : "iso_datetime_to_json",
+     "plots" : [{
+         "filename" : "iso_datetime_to_json-kleenex.pdf",
+         "skip" : ["re2","re2j","gawk","oniguruma","perl","python","sed","tcl","ragel"]
+     }, {
+         "filename" : "iso_datetime_to_json.pdf"
+     }]
  }
 ]

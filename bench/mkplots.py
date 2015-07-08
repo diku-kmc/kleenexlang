@@ -192,7 +192,7 @@ def get_data(conf, only_progs = []):
                 sp = "%s.kex" % prog
             else:
                 sp = prog
-            # Get timing info from impl/time/prog/*
+            # Get timing info from database_dir (times/)
             timing_dirs = filter(os.path.isdir, glob.glob(data_dir(impl, sp) + "*"))
             verbose_print("Getting data for %s with %s from %s" % (str(prog), impl, timing_dirs))
             for time_dir in timing_dirs:
