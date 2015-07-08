@@ -349,7 +349,7 @@ def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis):
             x = labels
 #            (color, style) = get_line_color_and_style(impl, version)
             line = ax.plot(x, timedata['avgs'], label = format_label(impl, version))
-            ax.errorbar(x, timedata['avgs'], yerr=timedata['stddevs'], fmt='o', color=line[0].get_color())
+            ax.errorbar(x, timedata['avgs'], yerr=timedata['stddevs'], fmt='x', color=line[0].get_color())
 
     # Add legend so we have a chance of reading the plot.
     ax.legend()

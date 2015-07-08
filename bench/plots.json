@@ -64,7 +64,8 @@
      }, {
          "filename" : "flip_ab-collated.pdf",
          "input" : "strings/ab_lines_len1000*",
-         "plot_transform" : "mbs"
+         "plot_transform" : "mbs",
+         "skip" : ["tr"]
      }]},
  {
      "program" : "issuu_fallback",
