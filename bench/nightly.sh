@@ -54,7 +54,7 @@ function run_benchmarks {
     make build-benchmark-programs
 
     echo "# Benchmarking all programs ($warmups warmups; $rounds rounds)"
-    ./runningtime.sh -w 2 -r 6 -l "$timestamp" -f
+    ./runningtime.sh -w $warmups -r $rounds -l "$timestamp" -f
 
     echo "# Generating all plots"
     ./mkplots.py -l "$timestamp" -f
