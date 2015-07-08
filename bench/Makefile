@@ -149,14 +149,27 @@ generate-test-data: generate-strings download-issuu generate-emails generate-csv
 generate-strings: generate-ab-strings generate-a-strings generate-random-string
 
 generate-ab-strings:
-	@echo "Generating 250 MB a/b lines with average line length of 1000..."
+	@echo "Generating 50,70,100,150,170,200,250 MB a/b lines with average line length of 1000..."
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 50000000 > ab_lines_len1000_50mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 70000000 > ab_lines_len1000_70mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 100000000 > ab_lines_len1000_100mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 150000000 > ab_lines_len1000_150mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 170000000 > ab_lines_len1000_170mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 200000000 > ab_lines_len1000_200mb.txt)
 	(cd ../test/data/strings && ./gen_ab_lines.pl -l 1000 -s 250000000 > ab_lines_len1000_250mb.txt)
 	@echo "Generating 250 MB a/b lines with average line length of 80..."
 	(cd ../test/data/strings && ./gen_ab_lines.pl -l 80 -s 250000000 > ab_lines_len80_250mb.txt)
 
 generate-a-strings:
-	@echo "Generating 100 MB \"a\"s on one line..."
+	@echo "Generating 20,50,70,100,120,150,170,200 MB \"a\"s on one line..."
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 20000000 > as_20mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 50000000 > as_50mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 70000000 > as_70mb.txt)
 	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 100000000 > as_100mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 120000000 > as_120mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 150000000 > as_150mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 170000000 > as_170mb.txt)
+	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 200000000 > as_200mb.txt)
 generate-random-string:
 	@echo "Generating 250 MB random characters..."
 	(cd ../test/data/strings && ./gen_random_chars.sh 250000000 > random_250mb.txt)
