@@ -1,4 +1,3 @@
-
 main := (escape | comment | term | symbol | ignored | ws*)*
 
 term := black /~/ (constant | match | ident) end
