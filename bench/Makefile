@@ -147,7 +147,7 @@ drex_extract-xml: drex_extract-xml.ko
 generate-test-data: generate-strings download-issuu generate-emails generate-csv generate-datetime generate-inifile generate-apachelog generate-numbers \
 	                generate-comments generate-xml
 
-generate-strings: generate-ab-strings generate-a-strings generate-random-string
+generate-strings: generate-ab-strings generate-a-strings generate-random-strings
 
 generate-ab-strings:
 	@echo "Generating 50,70,100,150,170,200,250 MB a/b lines with average line length of 1000..."
@@ -171,8 +171,17 @@ generate-a-strings:
 	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 150000000 > as_150mb.txt)
 	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 170000000 > as_170mb.txt)
 	(cd ../test/data/strings && ./gen_ab_lines.pl -a -s 200000000 > as_200mb.txt)
-generate-random-string:
-	@echo "Generating 250 MB random characters..."
+
+generate-random-strings:
+	@echo "Generating 20,50,70,100,120,150,170,200,250 MB random characters..."
+	(cd ../test/data/strings && ./gen_random_chars.sh 20000000  > random_20mb.txt)
+	(cd ../test/data/strings && ./gen_random_chars.sh 50000000  > random_50mb.txt)
+	(cd ../test/data/strings && ./gen_random_chars.sh 70000000  > random_70mb.txt)
+	(cd ../test/data/strings && ./gen_random_chars.sh 100000000 > random_100mb.txt)
+	(cd ../test/data/strings && ./gen_random_chars.sh 120000000 > random_120mb.txt)
+	(cd ../test/data/strings && ./gen_random_chars.sh 150000000 > random_150mb.txt)
+	(cd ../test/data/strings && ./gen_random_chars.sh 170000000 > random_170mb.txt)
+	(cd ../test/data/strings && ./gen_random_chars.sh 200000000 > random_200mb.txt)
 	(cd ../test/data/strings && ./gen_random_chars.sh 250000000 > random_250mb.txt)
 
 generate-emails:
