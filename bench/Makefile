@@ -30,6 +30,7 @@ testinput.as             := $(DATA_DIR)/strings/as_small.txt
 testinput.simple_id      := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.issuu_json2sql := $(DATA_DIR)/issuu/sample.json
 testinput.email          := $(DATA_DIR)/email/emails_from_apache.txt
+testinput.dfamail       := $(DATA_DIR)/email/emails_from_apache.txt
 testinput.ini2json       := $(DATA_DIR)/ini/php.ini
 testinput.iso_datetime_to_json		 := $(DATA_DIR)/datetime/datetime_sample.txt
 testinput.url            := $(DATA_DIR)/url/test_urls.txt
@@ -121,7 +122,7 @@ utils/extracttime:
 		$(*F) $(DREX_BINDIR)/$(*F) ${testinput.$(*F)} $(*F).out
 
 # Do some cleanup!
-	@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
+	-@rm $(*F).out $(*F).sha kex_$(*F) tmp_timing
 
 # Check each program individually
 patho2: patho2.ko
