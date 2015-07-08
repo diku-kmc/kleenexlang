@@ -434,9 +434,10 @@ int main(int argc, char *argv[])
         // Should use snprintf, but I assume something else will break before we hit 10^19 phases.
         char phase[20] = {0};
         sprintf(phase, "%d", i);
-
-        char *args[] = { argv[0], "--phase", phase, 0 };
-        execv(args[0], args);
+        char filename[256] = {0};
+        readlink("/proc/self/exe", filename, 256);
+        char *args[] = { filename, "--phase", phase, 0 };
+        execv(filename, args);
       }
 
       close(STDIN_FILENO);
