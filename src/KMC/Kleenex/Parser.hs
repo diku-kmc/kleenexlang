@@ -42,15 +42,13 @@ changeState forward backward = mkPT . transform . runParsecT
     transform p st = fmap3 (mapReply forward) (p (mapState backward st))
 
 -- | An Identifier is a String that always starts with a lower-case char.
-newtype Identifier = Identifier String deriving (Eq, Ord, Show)
+newtype Identifier = Identifier { fromIdent :: String } deriving (Eq, Ord, Show)
 
 mkIdent :: String -> Identifier
 mkIdent str =
     case runParser kleenexIdentifier hpInitState "" str of
       Left e  -> error (show e)
       Right i -> i
-fromIdent :: Identifier -> String
-fromIdent (Identifier s) = s
 
 -- | A Kleenex program is a list of assignments.
 data Kleenex            = Kleenex [Identifier] [KleenexAssignment] deriving (Eq, Ord, Show)
