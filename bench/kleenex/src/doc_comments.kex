@@ -1,0 +1,21 @@
+/* Finds HTML comments of the form <!-- doc: ... -->,
+   renders basic formatting from inside of them, and
+   preserves the original doc comment.
+
+   Simple example:
+
+   <!-- doc: This is *super* exciting! -->
+
+   Becomes:
+
+   <!-- doc: This is *super* exciting! --><div> This is <b>super</b> exciting! </div>
+
+*/
+
+main := (comment | /./)*
+
+comment := /<!-- doc:/ clear doc* !orig /-->/ "<div>" !render "</div>"
+doc := ~/\*/ t@/[^*]*/ ~/\*/ [ orig += "*" t "*" ] [ render += "<b>" t "</b>" ]
+     | t@/./ [ orig += t ] [ render += t ]
+
+clear := [ orig  <- "" ] [ render <- "" ]
