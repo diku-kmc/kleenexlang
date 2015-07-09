@@ -558,6 +558,7 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
                       Left  _ -> False
                       Right _ -> True
   let cstr = renderCProg info withActions . programsToC buftype $ pipeline
+  let sourceLineCount = length (lines cstr)
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
@@ -567,7 +568,8 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
     Nothing -> return ExitSuccess
     Just outPath -> do
       when (not optQuiet) $
-        putStrLn $ "Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'"
+        putStrLn ("Generated " ++ show sourceLineCount ++ " lines of C code.") >>
+        putStrLn ("Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'")
       (Just hin, _, _, hproc) <- createProcess (proc comp (compilerOpts outPath))
                                                { std_in = CreatePipe }
       hPutStrLn hin cstr
