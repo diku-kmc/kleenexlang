@@ -85,6 +85,10 @@
          "skip" : ["tr"]
      }, {
          "filename" : "rot13-ALL.pdf"
+     }, {
+         "filename" : "rot13-collated.pdf",
+         "input" : "strings/random_*.txt",
+         "skip" : ["tr"]
      }]},
  {
      "program" : "csv_project3",
@@ -136,7 +140,7 @@
      "program" : "patho2",
      "plots" : [{
          "filename" : "patho2-collated.pdf",
-         "input": "strings/ab_lines_len1000*."
+         "input": "strings/ab_lines_len1000*"
      }, {
          "filename" : "patho2.pdf"
      }]

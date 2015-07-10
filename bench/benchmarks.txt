@@ -1,6 +1,6 @@
 # Determine for each test case which of the programs can run that case.
 simple_id       	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl,cat
-patho2          	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl
+patho2          	kleenex,re2,re2j,gawk,oniguruma,perl,python,sed,tcl
 as              	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl
 csv_project3    	kleenex,re2,re2j,gawk,oniguruma,perl,python,sed,tcl,ragel,cut
 email           	kleenex,re2,re2j,gawk,grep,oniguruma,perl,python,sed,tcl,ragel

@@ -100,6 +100,10 @@ data_folder = None
 force_override = False
 # Don't print so much gunk.
 is_verbose = False
+# Alternate directory for benchmark input data
+# Default is None, so ../test/data/ is used.
+# Useful when plotting stuff from another machine (razorblade)
+alternate_input_data_dir = None
 
 def verbose_print(msg):
     if is_verbose:
@@ -121,7 +125,10 @@ def data_dir(impl, prog):
     return os.path.join(data_base_dir(), data_folder, impl, prog)
 
 def test_data_dir():
-    return os.path.join(os.path.dirname(base_dir), "..", "test", "data")
+    if alternate_input_data_dir != None:
+        return alternate_input_data_dir
+    else:
+        return os.path.join(os.path.dirname(base_dir), "..", "test", "data")
 
 def plot_save_dir():
     return os.path.join(plot_dir, data_folder)
@@ -368,7 +375,7 @@ def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_
             x = labels
 #            (color, style) = get_line_color_and_style(impl, version)
             line = ax.plot(x, timedata['avgs'], label = format_label(impl, version))
-            ax.errorbar(x, timedata['avgs'], yerr=timedata['stddevs'], fmt='x', color=line[0].get_color())
+            ax.errorbar(x, timedata['avgs'], yerr=timedata['stddevs'], color=line[0].get_color())
 
     # Add legend so we have a chance of reading the plot.
     ax.legend()
@@ -669,9 +676,11 @@ If no arguments are given, all programs are plotted.
                         help = "Alternate plot configuration JSON file (default: plots.json)")
     parser.add_argument('-e',
                         help = "Alternate input configuration file (default: inputs.txt)")
-
+    parser.add_argument('-i',
+                        help = "Alternate directory for test input data (default: ../test/data/)")
     args = parser.parse_args()
 
+    # Set all the nice, global variables first...
     if args.v != None:
         is_verbose = True
         print "Entering verbose mode."
@@ -714,6 +723,11 @@ If no arguments are given, all programs are plotted.
     if args.f != None:
         force_override = True
 
+    # Use a different input data dir.
+    if args.i != None:
+        alternate_input_data_dir = args.i
+
+    # Now build the call to go()
     call_dict = {}
     if args.p != None: call_dict['progs'] = args.p
 
