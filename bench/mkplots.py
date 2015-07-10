@@ -33,28 +33,32 @@ def trans_Gbit_per_s(inputsize_bytes):
              "trans_fun" : lambda ps : map(lambda p : ((inputsize_bytes * 8) / 1e9) / (p / 1000.0), ps),
              "yaxis_label" : "Gbit/s",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
-             (prog, inputname, inputsize_bytes / 2.0**20)
+             (prog, inputname, inputsize_bytes / 2.0**20),
+             "inputsize_bytes" : inputsize_bytes
          }
 def trans_Mbit_per_s(inputsize_bytes):
     return { "median_format_string" : "%.1f",
              "trans_fun" : lambda ps : map(lambda p : ((inputsize_bytes * 8) / 1e6) / (p / 1000.0), ps),
              "yaxis_label" : "Mbit/s",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
-             (prog, inputname, inputsize_bytes / 2.0**20)
+             (prog, inputname, inputsize_bytes / 2.0**20),
+             "inputsize_bytes" : inputsize_bytes
          }
 def trans_s(inputsize_bytes):
     return { "median_format_string" : "%d",
              "trans_fun" : lambda ps : map(lambda p : p / 1000, ps),
              "yaxis_label" : "Time (s)",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
-             (prog, inputname, inputsize_bytes / 2.0**20)
+             (prog, inputname, inputsize_bytes / 2.0**20),
+             "inputsize_bytes" : inputsize_bytes
          }
 def trans_ms(inputsize_bytes):
     return { "median_format_string" : "%d",
              "trans_fun" : lambda ps : ps,
              "yaxis_label" : "Time (ms)",
              "title" : lambda prog, inputname : "%s (%s %.2f MB)" %
-             (prog, inputname, inputsize_bytes / 2.0**20)
+             (prog, inputname, inputsize_bytes / 2.0**20),
+             "inputsize_bytes" : inputsize_bytes
          }
 
 transformations = {
@@ -319,8 +323,6 @@ def get_input_file_size(inpf):
 
 # Make scatter plots of each implementation and connect with lines.
 def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_title = None):
-    # trans_fun = data_trans[0]["trans_fun"]
-    # median_format_string = data_trans[0]["median_format_string"]
     yaxis_label = inputnames[0][2]["yaxis_label"]
     if plot_title != None:
         title = plot_title
@@ -425,7 +427,7 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plo
     median_format_string = data_trans["median_format_string"]
     yaxis_label = data_trans["yaxis_label"]
     if plot_title != None:
-        title = plot_title
+        title = "%s (%.2f MB)" % (plot_title, data_trans["inputsize_bytes"] / 2.0**20)
     else:
         title = data_trans["title"](prog, inputname)
 
