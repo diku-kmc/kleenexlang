@@ -224,8 +224,9 @@ generate-xml:
 	(cd ../test/data/xml && ./gen_xml.pl -s 2000000 > xml_2mb.xml)
 
 generate-irc:
-	@echo "Generating a 250 MB IRC command file..."
-	(cd ../test/data/irc && ./gen_irc.pl -s 250000000 > irc_250mb.txt)
+	@echo "Generating a 250 MB, 1 GB IRC command file..."
+	(cd ../test/data/irc && ./gen_irc.pl -s  250000000 > irc_250mb.txt)
+	(cd ../test/data/irc && ./gen_irc.pl -s 1000000000 > irc_1gb.txt)
 
 download-issuu:
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."

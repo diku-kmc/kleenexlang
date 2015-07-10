@@ -5,7 +5,7 @@ rot13               strings/random_50mb.txt;strings/random_70mb.txt;strings/rand
 
 thousand_sep        numbers/numbers_250mb.txt
 csv_project3        csv/csv_format1_250mb.csv
-irc                 irc/irc_250mb.txt
+irc                 irc/irc_1gb.txt
 
 apache_log          apache_log/example_big.log
 ini2json            ini/inifile_25mb.ini

@@ -21,3 +21,4 @@ dfamail             kleenex
 thousand_sep        kleenex,perl,python,cpp11
 drex_del-comments   kleenex,drex,perl
 drex_extract-xml    kleenex,drex
+irc                 kleenex
