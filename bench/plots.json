@@ -57,7 +57,8 @@
      "program" : "flip_ab",
      "plots" : [{
          "filename" : "flip_ab.pdf",
-         "skip" : ["tr"]
+         "skip" : ["tr"],
+         "input" : "strings/ab_lines_len1000_250mb.txt"
      }, {
          "filename" : "flip_ab-l80.pdf",
          "skip" : ["tr"],
@@ -82,13 +83,17 @@
      "program" : "rot13",
      "plots" : [{
          "filename" : "rot13.pdf",
-         "skip" : ["tr"]
+         "skip" : ["tr"],
+         "input" : "strings/random_250mb.txt"
      }, {
-         "filename" : "rot13-ALL.pdf"
+         "filename" : "rot13-ALL.pdf",
+         "input" : "strings/random_250mb.txt"
      }, {
          "filename" : "rot13-collated.pdf",
          "input" : "strings/random_*.txt",
-         "skip" : ["tr"]
+         "skip" : ["tr"],
+         "plot_transform" : "s",
+         "skip_impl" : ["kex 0-la gcc", "kex 0 gcc"]
      }]},
  {
      "program" : "csv_project3",
@@ -150,7 +155,11 @@
          "filename" : "patho2-collated.pdf",
          "input": "strings/ab_lines_len1000*"
      }, {
-         "filename" : "patho2.pdf"
+         "filename" : "patho2.pdf",
+         "input" : "strings/ab_lines_len1000_250mb.txt"
+     }, {
+         "filename" : "patho2-l80.pdf",
+         "input" : "strings/ab_lines_len80_250mb.txt"
      }]
  },
  {

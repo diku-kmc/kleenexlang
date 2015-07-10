@@ -250,7 +250,10 @@ def plot_all(benchmarks, inputNames, plotconf, skipFun, getTransformation, plot_
             verbose_print("Sizes: %s" % str(sorted(inputsizes)))
             verbose_print("Files: %s" % str(inputfiles_by_size))
 
-            def sf(i, n): # Specialise the skip function to this program.
+            def sf(i, n, version): # Specialise the skip function to this program.
+                rendered = format_label(prog, version)
+                if plotconf[prog][n]['skip_impl'] != None:
+                    return rendered in plotconf[prog][n]['skip_impl']
                 try: return skipFun(prog, i, n)
                 except KeyError: return False
 
@@ -307,10 +310,13 @@ def get_benchmark_configuration(conf_file, inputs_file, plots_file):
             except KeyError: collated = False
             try:             plot_title = concreteplot["title"]
             except KeyError: plot_title = None # Defaults to input file and size
+            try:             skip_impl = concreteplot[""]
+            except KeyError: skip_impl = None
             plots[p["program"]][concreteplot["filename"]] = { 'skip' : skip,
                                                               'indata' : inputfilename,
                                                               'transformation' : plot_transform,
-                                                              'plot_title' : plot_title }
+                                                              'plot_title' : plot_title,
+                                                              'skip_impl' : skip_impl }
     return (conf, inputs, plots)
 
 def get_input_file_size(inpf):
@@ -332,10 +338,10 @@ def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_
     labels = []
     plot_data = {}
     for impl, versions in iter(sorted(data.iteritems())):
-        if skipThis(impl, output_name):
-            continue
         plot_data[impl] = {}
         for version, inputfiles in iter(sorted(versions.iteritems())):
+            if skipThis(impl, output_name, version):
+                continue
             plot_data[impl][version] = {}
             avg_times = []
             stddev_times = []
@@ -369,18 +375,21 @@ def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_
         warning_print("No labels? Skipping %s (collated)..." % prog)
         return False
     
-
+    markers = ['.', ',', 'o', 'v', '^', '<', '>', '1', '2', '3', '4',
+               '8', 's', 'p', '*', 'h', 'H', '+', 'x', 'D', 'd', '|', '_']
+    markIdx = 0
     # Now plot
     fig, ax = plt.subplots()
     for impl, versions in iter(sorted(plot_data.iteritems())):
         for version, timedata in iter(sorted(versions.iteritems())):
             x = labels
-#            (color, style) = get_line_color_and_style(impl, version)
-            line = ax.plot(x, timedata['avgs'], label = format_label(impl, version))
-            ax.errorbar(x, timedata['avgs'], yerr=timedata['stddevs'], color=line[0].get_color())
+            mark = markers[markIdx]
+            line = ax.plot(x, timedata['avgs'], label = format_label(impl, version), marker = mark)
+            ax.errorbar(x, timedata['avgs'], yerr=timedata['stddevs'], color=line[0].get_color(), fmt=mark)
+            markIdx = (markIdx + 1) % len(markers)
 
     # Add legend so we have a chance of reading the plot.
-    ax.legend()
+    ax.legend(loc='best', fancybox = True, framealpha = 0.4)
     
     # Setup plot niceness
     ax.yaxis.grid(True,
@@ -395,7 +404,7 @@ def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_
     ax.set_xlabel("Input file size")
     ax.set_ylabel(yaxis_label)
     ax.set_title(title)
-    ax.set_xticks(labels)
+#    ax.set_xticks(labels)
     ax.tick_params(axis = 'x', length = 0)
     ax.tick_params(axis = 'y', colors = "black")
     ax.set_ylim(bottom=0)
@@ -435,9 +444,9 @@ def plot_benchmark(prog, data, inputname, output_name, skipThis, data_trans, plo
     plot_data = []
     # Add the bars
     for impl, versions in iter(sorted(data.iteritems())):
-        if skipThis(impl, output_name):
-            continue
         for version, inputfiles in iter(sorted(versions.iteritems())):
+            if skipThis(impl, output_name, version):
+                continue
             for inputfile, times in iter(sorted(inputfiles.iteritems())):
                 if strip_input_file_suffix(inputfile) != inputname:
                     verbose_print("Skipping %s because the file name is wrong: %s" % (inputname, inputfile))
