@@ -4,12 +4,13 @@ Implements "swap_bibtex" from http://www.cis.upenn.edu/~lorisdan/papers/popl15dr
 Move the title attribute to the top of all entries in a bibtex file.
 */
 
-main := (header field* !title !rest footer)*
+main := (header field* !title !rest clear footer)*
 
 
 field := title@(sp /title/ sp /=/ sp /\{[^}]*},\n/)
        | f@(sp word sp /=/ sp /\{[^}]*},\n/) [ rest += f ]
 
+clear := [ rest <- "" ]
 header := /@/ word /\{/ alnum /,\n/
 footer := /}\n/
 
