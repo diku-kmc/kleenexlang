@@ -1,17 +1,35 @@
-start: /* deListings >> */ copyCode >> pComments /*>> pSuppressed*/ >> pSyntax
+// Don't use this top case unless you know what you're doing. Leads to lots of cleanup.
+//start: /*deListings >> */ copyCode >> pComments /*>> pSuppressed*/ >> pSyntax
+start: fullSyntax
+
+/* Usage: Pipe a kleenex program into this, then throw the output into a
+
+\begin{Verbatim}[commandchars=\\\{\}]
+code
+\end{Verbatim}
+
+Pro-tip: Compile this script with --copt 0
+
+*/
+
 
 deListings := (texComment | deListing | /./)*
+deListing := ~/\\begin\{lstlisting}\[language=Kleenex]/ "\\begin{kleenex}" /.*?/ "\\end{kleenex}" ~/\\end\{lstlisting}/
 deListing := /\\(begin|end)\{/ ~/lstlisting/ "kleenex" /}/ ~/\[[a-zA-Z=]*]/?
 
 texComment := /%[^\n]*\n/
 
 copyCode := (copyCodeBlock | /./)*
-copyCodeBlock := /\\begin\{kleenex}/ code@(/.*?/ "\n") ~ws* !code /\\end\{kleenex}/
+copyCodeBlock := /\\begin\{kleenex}/ resetCodeBuffers deTexComment ~ws* !origCode /\\end\{kleenex}/
                 ~(ws* /% Generated[^\n]*\n\\begin\{Verbatim}.*?\\end\{Verbatim}/)?
                 "\n% Generated syntax-highlighted render. Do not alter below; alter the above version and re-render.\n"
                 "\\begin{Verbatim}[commandchars=\\\\\\{\\}]"
                 !code
                 "\\end{Verbatim}"
+
+resetCodeBuffers := [ origCode <- "" ] [ code <- "" ]
+
+deTexComment := 1 | c@(/%/?) r@(/[^\n]*/ /\n/) [ origCode += c r ] [ code += r ] deTexComment
 
 blockStart := /\\begin\{Verbatim}\[commandchars=\\\\\\\{\\}]/
 blockEnd   := /\\end\{Verbatim}/
@@ -26,6 +44,16 @@ pSyntax := (blockStart syntax* blockEnd | /./)*
 
 already_processed := /\\PY/ /\{[^}]*}/ /\{[^}]*}/
 
+fullSyntax := (
+          color_comment suppressed end
+        | color_match match end
+        | color_string constant end
+        | comment
+        | color_ident ident end
+        | color_symbol symbol end
+        | ignored
+        | ws)*
+
 syntax := already_processed
         | color_string constant end
         | color_match match end
@@ -36,22 +64,22 @@ syntax := already_processed
 
 /* Syntax highlighter */
 
-suppressed := tilde (matchingPar3 | ident /*| match | constant*/)
+suppressed := tilde (matchingPar3 | ident | match /*| constant*/)
 
 matchingPar3 := /\(/ (/[^()]/ | matchingPar2)* /\)/
 matchingPar2 := /\(/ (/[^()]/ | matchingPar1)* /\)/
 matchingPar1 := /\(/ /[^()]/* /\)/
 
-ignored  := /[]|{},:[]/
+ignored  := curlystart | curlyend | /[]()|,:[]/
 ident    := (letter | /[0-9_]/)+
-symbol   := /<-|\+=|:=|>>|\*|\?|\+|\(|\)/ | tilde
+symbol   := /<-|\+=|:=|>>|\*|\?|\+|!|@/
 constant := dquote (/[^\x5C"'}{]/ | curlystart | curlyend | squote | color_escape escape end)* dquote
 comment  := onelineComment// | multilineComment
 match    := /\// (color_escape escape end | curlystart | curlyend | /[^\x5C\/\n]/)+ /\//
 
 escape := bs bs
         | bs /x[0-9a-fA-F]{2}/
-        | bs /[tnr/.]/
+        | bs /[tnr/.\][+?*()]/
         | bs dquote
         | bs curlystart
 
@@ -81,7 +109,7 @@ color_comment := "\\PY{c+c1}{"
 color_match   := "\\PY{l+s+sx}{"
 color_ident   := "\\PY{n+nf}{"
 color_symbol  := "\\PY{o}{"
-color_escape  := "{"
+color_escape  := "\\PY{esc}{"
 
 end   := "}"
 
