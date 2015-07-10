@@ -41,6 +41,7 @@ testinput.flip_ab        := $(DATA_DIR)/strings/ab_lines_small.txt
 testinput.thousand_sep   := $(DATA_DIR)/numbers/numbers_small.txt
 testinput.drex_del-comments := $(DATA_DIR)/comments/comments_small.txt
 testinput.drex_extract-xml  := $(DATA_DIR)/xml/xml_small.xml
+testinput.drex_swap-bibtex  := $(DATA_DIR)/bibtex/bibtex-small.bib
 testinput.irc            := $(DATA_DIR)/irc/irc.txt
 
 all:
@@ -141,6 +142,7 @@ flip_ab: flip_ab.ko
 thousand_sep: thousand_sep.ko
 drex_del-comments: drex_del-comments.ko
 drex_extract-xml: drex_extract-xml.ko
+drex_swap-bibtex: drex_swap-bibtex.ko
 irc: irc.ko
 
 .PHONY: clean patho2 csv_project3 as simple_id issuu_json2sql email ini2json iso_datetime_to_json
@@ -222,6 +224,10 @@ generate-comments:
 generate-xml:
 	@echo "Generating a 2 MB XML file..."
 	(cd ../test/data/xml && ./gen_xml.pl -s 2000000 > xml_2mb.xml)
+
+generate-bibtex:
+	@echo "Generating a 2 MB bibtex file..."
+	(cd ../test/data/bibtex && ./gen_bibtex.pl -s 2000000 > bibtex_2mb.bib)
 
 generate-irc:
 	@echo "Generating a 250 MB, 1 GB IRC command file..."

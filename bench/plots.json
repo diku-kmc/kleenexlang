@@ -137,6 +137,15 @@
     }]
  },
  {
+    "program": "drex_swap-bibtex",
+    "plots": [{
+        "filename": "drex_swap-bibtex.pdf"
+    }, {
+        "filename": "drex_swap-bibtex-ms.pdf",
+        "plot_transform": "ms"
+    }]
+ },
+ {
      "program" : "patho2",
      "plots" : [{
          "filename" : "patho2-collated.pdf",
