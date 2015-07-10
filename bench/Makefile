@@ -233,8 +233,8 @@ download-issuu:
 	(cd ../test/data/issuu && ./download.sh -f -c 0 -n 1000000 > issuu_1000000objs.json)
 
 download-large-issuu:
-	@echo "Downloading ~7Gbit JSON objects 15.000.000 from the /first/ part of the Issuu dataset..."
-	(cd ../test/data/issuu && ./download.sh -n 15000000 -c 0 -f > issuu_large.json)
+	@echo "Downloading ~7Gbit JSON objects 14.000.000 from the /first/ part of the Issuu dataset..."
+	(cd ../test/data/issuu && ./download.sh -n 14000000 -c 0 -f > issuu_14000000objs.json)
 
 
 install-benchmark-dependencies:
