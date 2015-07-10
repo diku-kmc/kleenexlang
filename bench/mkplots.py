@@ -355,6 +355,11 @@ def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_
             plot_data[impl][version] = { 'avgs' : avg_times,
                                          'stddevs' : stddev_times }
 
+    numElms = len(labels)
+    if numElms == 0:
+        warning_print("No labels? Skipping %s (collated)..." % prog)
+        return False
+    
 
     # Now plot
     fig, ax = plt.subplots()
@@ -369,7 +374,6 @@ def plot_collated_benchmark(prog, data, inputnames, output_name, skipThis, plot_
     ax.legend()
     
     # Setup plot niceness
-    numElms = len(labels)
     ax.yaxis.grid(True,
                   linestyle='-',
                   which='major',
