@@ -188,5 +188,11 @@
      "plots" : [{
          "filename" : "dfamail.pdf"
      }]
+ },
+ {
+     "program" : "irc",
+     "plots" : [{
+         "filename" : "irc.pdf"
+     }]
  }
 ]

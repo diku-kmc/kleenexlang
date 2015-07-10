@@ -252,8 +252,10 @@ def plot_all(benchmarks, inputNames, plotconf, skipFun, getTransformation, plot_
 
             def sf(i, n, version): # Specialise the skip function to this program.
                 rendered = format_label(prog, version)
-                if plotconf[prog][n]['skip_impl'] != None:
-                    return rendered in plotconf[prog][n]['skip_impl']
+                try:
+                    if plotconf[prog][n]['skip_impl'] != None:
+                        return rendered in plotconf[prog][n]['skip_impl']
+                except KeyError: pass
                 try: return skipFun(prog, i, n)
                 except KeyError: return False
 
