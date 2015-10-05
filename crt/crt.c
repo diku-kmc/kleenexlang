@@ -435,7 +435,12 @@ int main(int argc, char *argv[])
         char phase[20] = {0};
         sprintf(phase, "%d", i);
         char filename[256] = {0};
+        #ifdef __APPLE__
+        uint32_t bufsize = 256;
+        _NSGetExecutablePath(filename, &bufsize);
+        #elif
         readlink("/proc/self/exe", filename, 256);
+        #endif
         char *args[] = { filename, "--phase", phase, 0 };
         execv(filename, args);
       }
