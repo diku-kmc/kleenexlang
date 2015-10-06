@@ -438,7 +438,7 @@ int main(int argc, char *argv[])
         #ifdef __APPLE__
         uint32_t bufsize = 256;
         _NSGetExecutablePath(filename, &bufsize);
-        #elif
+        #else
         readlink("/proc/self/exe", filename, 256);
         #endif
         char *args[] = { filename, "--phase", phase, 0 };
