@@ -11,7 +11,7 @@ echo "DReX is not installed.  Fetching and installing."
 
 ../../dist/build/kexc/kexc compile fix_dep.kex --out fix_dep
 wget http://www.seas.upenn.edu/~rmukund/drex/DReX.zip
-unzip DReX.zip
+unzip -o DReX.zip
 rm DReX.zip
 cd DReX
 
@@ -24,4 +24,4 @@ cd ..
 
 ./build_programs.sh
 
-ln -s "$(pwd)/DReX/drex-bench/target/appassembler/bin"
+ln -fs "$(pwd)/DReX/drex-bench/target/appassembler/bin"
