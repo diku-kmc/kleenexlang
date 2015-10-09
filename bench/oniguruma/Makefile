@@ -15,7 +15,7 @@ all: $(OBJECTS)
 %.o: %.c
 	rm -f $(BINDIR)/BIN-$(*F)
 	mkdir -p $(BINDIR)
-	$(CC) $(CCFLAGS) -o $(BINDIR)/BIN-$(*F) $<
+	$(CC) -o $(BINDIR)/BIN-$(*F) $< $(CCFLAGS)
 	@echo "#!/bin/sh" > $(BINDIR)/$(*F)
 	@echo 'DIR=$$( cd "$$( dirname "$${BASH_SOURCE[0]}" )" && pwd )' >> $(BINDIR)/$(*F)
 	@echo "DYLD_LIBRARY_PATH=$(ONIG_DESTDIR)/usr/local/lib/ LD_LIBRARY_PATH=\$$DYLD_LIBRARY_PATH \$$DIR/BIN-$(*F)" >> $(BINDIR)/$(*F)
