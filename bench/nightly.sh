@@ -44,7 +44,7 @@ function run_benchmarks {
     echo "# Pulling in changes from git"
     git pull
 
-    echo "# Rebuilding repg"
+    echo "# Rebuilding kexc"
     (cd .. ; touch src/KMC/Program/Backends/C.hs ; cabal build)
 
     echo "# Compiling all Kleenex programs"

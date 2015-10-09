@@ -9,7 +9,7 @@ if [ -d "$" ] ; then
 fi
 echo "DReX is not installed.  Fetching and installing."
 
-../../dist/build/repg/repg compile fix_dep.kex --out fix_dep
+../../dist/build/kexc/kexc compile fix_dep.kex --out fix_dep
 wget http://www.seas.upenn.edu/~rmukund/drex/DReX.zip
 unzip DReX.zip
 rm DReX.zip

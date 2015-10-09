@@ -5,7 +5,7 @@ language: c
 # Cache the cabal sandbox and the apt-gotten packages
 cache:
   directories:
-    - $HOME/build/diku-kmc/repg/.cabal-sandbox
+    - $HOME/build/diku-kmc/kleenexlang/.cabal-sandbox
   apt: true
   
 

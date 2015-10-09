@@ -1,7 +1,7 @@
 #! /bin/bash
 # Measure compile times.
 
-repgc=../dist/build/repg/repg # Location of our compiler
+kexc=../dist/build/kexc/kexc # Location of our compiler
 
 # 'nola' is "no lookahead" and 'la' is "lookahead"
 opt_levels=(0-nola 0-la 3-nola 3-la)
@@ -147,7 +147,7 @@ for opt_la_level in ${opt_levels[@]}; do # for each SST optimization level
 
                 timingdata="${time_dir}/${name}${compiletime_postfix}"
                 binary="${bin_dir}/${name}"
-                precmd="$repgc compile ${src_dir}/$n --out $binary $la_on_off $dfa_on_off --opt $opt_level --cc $cc --act=$act >> $timingdata"
+                precmd="$kexc compile ${src_dir}/$n --out $binary $la_on_off $dfa_on_off --opt $opt_level --cc $cc --act=$act >> $timingdata"
                 if [ "$timeoutcmd" == "" ]; then
                     cmd=$precmd
                 else

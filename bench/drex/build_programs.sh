@@ -1,7 +1,7 @@
 #!/bin/sh
 cd "$(dirname "$0")"
 
-../../dist/build/repg/repg compile inject_benchmarks.kex --out inject_benchmarks
+../../dist/build/kexc/kexc compile inject_benchmarks.kex --out inject_benchmarks
 
 mkdir -p DReX/drex-bench/src/main/java/edu/diku/kmc/benchmarks/drex
 cp src/* DReX/drex-bench/src/main/java/edu/diku/kmc/benchmarks/drex

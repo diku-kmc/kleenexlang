@@ -18,7 +18,7 @@ KLEENEXSOURCES = $(notdir $(wildcard $(KLEENEXDIR)/*.kex))
 KLEENEXSOURCES_OBJECTS = $(KLEENEXSOURCES:.kex=.ko)
 KLEENEXDIR = kleenex/src
 
-REPG = ../dist/build/repg/repg
+KEXC = ../dist/build/kexc/kexc
 DATA_DIR = ../test/data
 
 # Through unimaginable hackery, we can get a hashmap-like thing in make.
@@ -73,7 +73,7 @@ data_check:
 equality_check: $(KLEENEXSOURCES_OBJECTS)
 
 utils/extracttime:
-	@$(REPG) compile --out utils/extracttime --quiet utils/extracttime.kex
+	@$(KEXC) compile --out utils/extracttime --quiet utils/extracttime.kex
 
 %.ko: $(KLEENEXDIR)/%.kex utils/extracttime
 	@bash -c "if [[ \"${testinput.$(*F)}\" == \"\" ]] ; then \
@@ -82,7 +82,7 @@ utils/extracttime:
 	fi"
 	@echo "------------------------------------------"
 	@echo "Checking $(*F)..."
-	$(REPG) compile $< --out kex_$(*F) --quiet=true
+	$(KEXC) compile $< --out kex_$(*F) --quiet=true
 	./kex_$(*F) < ${testinput.$(*F)} > $(*F).out 2> /dev/null
 	shasum $(*F).out > $(*F).sha
 

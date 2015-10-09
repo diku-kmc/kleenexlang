@@ -1,6 +1,6 @@
 # The KMC regular expression compiler #
 
-[![Travis status](https://travis-ci.org/diku-kmc/kleenexlang.svg?branch=master)](https://travis-ci.org/diku-kmc/repg)
+[![Travis status](https://travis-ci.org/diku-kmc/kleenexlang.svg?branch=master)](https://travis-ci.org/diku-kmc/kexc)
 
 This is a compiler that can:
 
@@ -9,7 +9,7 @@ This is a compiler that can:
 
 ## Build ##
 
-To build, run `cabal configure && cabal build`. This will place a binary in `dist/build/repg/repg`.
+To build, run `cabal configure && cabal build`. This will place a binary in `dist/build/kexc/kexc`.
 
 ## Test suite ##
 
