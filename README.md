@@ -1,6 +1,6 @@
 # The KMC regular expression compiler #
 
-[![Travis status](https://travis-ci.org/diku-kmc/repg.svg?branch=master)](https://travis-ci.org/diku-kmc/repg)
+[![Travis status](https://travis-ci.org/diku-kmc/kleenexlang.svg?branch=master)](https://travis-ci.org/diku-kmc/repg)
 
 This is a compiler that can:
 
