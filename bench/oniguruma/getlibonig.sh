@@ -10,7 +10,7 @@ if [ -d "$ONIG_SRCDIR" ]; then
 fi
 echo "Oniguram is not installed.  Fetching and installing it now."
 
-wget http://www.geocities.jp/kosako3/oniguruma/archive/"$ONIG_SRCDIR".tar.gz -O - | tar xz
+wget https://github.com/kkos/oniguruma/releases/download/v5.9.6/"$ONIG_SRCDIR".tar.gz -O - | tar xz
 (cd "$ONIG_SRCDIR" && ./configure)
 (cd "$ONIG_SRCDIR" && make)
 (cd "$ONIG_SRCDIR" && make install DESTDIR="$ONIG_DESTDIR")
