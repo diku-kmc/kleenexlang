@@ -20,8 +20,8 @@ mv drex-front/pom_new.xml drex-front/pom.xml
 
 ./build
 
-./build_programs.sh
-
 cd ..
+
+./build_programs.sh
 
 ln -s "$(pwd)/DReX/drex-bench/target/appassembler/bin"
