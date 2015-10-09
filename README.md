@@ -9,7 +9,7 @@ This is a compiler that can:
 
 ## Build ##
 
-To clone, run `git clone --recursive git@github.com:diku-kmc/kleenexlang.git`.
+To clone, run `git clone --recursive https://github.com/diku-kmc/kleenexlang.git`.
 
 Due to dependencies not on Hackage, it is easiest to build in a sandbox. After cloning, cd into project directory and run `cabal sandbox init && cabal sandbox add-source regexps-syntax`. Then pull in dependencies by `cabal install --dependencies-only`.
 
