@@ -1,0 +1,3 @@
+// Swap two input lines
+main := a@line b@line !b !a
+line := /[^\n]*\n/

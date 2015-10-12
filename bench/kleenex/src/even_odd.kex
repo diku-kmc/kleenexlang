@@ -1,0 +1,1 @@
+main := odd  ~/a/      | even ~/a/odd  := ~/aa/ "bb" odd      | "c"even := ~/a/ "c" even      | "b"
