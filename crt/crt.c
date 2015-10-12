@@ -7,6 +7,9 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <sys/time.h>
+#ifdef __APPLE__
+#   include <mach-o/dyld.h>
+#endif
 
 #define RETC_PRINT_USAGE     1
 #define RETC_PRINT_INFO      2
