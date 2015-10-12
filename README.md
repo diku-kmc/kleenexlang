@@ -8,7 +8,7 @@ This is a compiler that can:
 * compile programs written in the regular expression-based language Kleenex into fast, streaming string transformations.
 
 ## Download VM for testing ##
-If you want to quickly get a sense of what Kleenex is, you can download a VirtualBox image that is ready to play around with from [[http://kleenexlang.org]].  
+If you want to quickly get a sense of what Kleenex is, you can download a VirtualBox image that is ready to play around with from http://kleenexlang.org.  
 
 ## Build ##
 
