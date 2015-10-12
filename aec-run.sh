@@ -1,10 +1,11 @@
 #!/bin/bash
 
 go=""
-timestamp="$(date "+%Y_%m_%d__%k_%M_%S")"
+timestamp="AEC-$(date "+%Y_%m_%d__%k_%M_%S")"
 
-# Assumes that it all benchmark programs have already been built.
-# This is the case for the evaluation VM image :-) 
+# Assumes that it all benchmark programs have already been built and
+# that the relevant test data is present.  This is the case for the
+# evaluation VM image :-) 
 
 cd bench
 
@@ -12,7 +13,7 @@ cd bench
 echo ""
 echo "######################################"
 while true; do
-    read -p "Do you wish to /run/ the benchmark runs, as opposed to seeing what would be run? " yn
+    read -p "Run the benchmarks, as opposed to seeing what would be run? " yn
     case $yn in
         [Yy]* ) go="-f"; break;;
         [Nn]* ) echo "Only making a dry-run showing what would've been done..."; break;;
@@ -26,7 +27,7 @@ done
 ./runningtime.sh $go -w 0 -r 1 -l $timestamp -p thousand_sep
 ./runningtime.sh $go -w 0 -r 1 -l $timestamp -p url
 ./runningtime.sh $go -w 0 -r 1 -l $timestamp -p csv2json
-./runningtime.sh $go -w 0 -r 1 -l $timestamp -p isp_datetime_to_json
+./runningtime.sh $go -w 0 -r 1 -l $timestamp -p iso_datetime_to_json
 
 # 2.  Make some plots
 echo ""
