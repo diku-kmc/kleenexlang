@@ -7,7 +7,7 @@ timestamp="AEC-$(date "+%Y_%m_%d__%k_%M_%S")"
 # that the relevant test data is present.  This is the case for the
 # evaluation VM image :-) 
 
-cd bench
+cd ~/kleenexlang/bench
 
 # 1.  Run some of the benchmark programs
 echo ""
