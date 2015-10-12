@@ -153,7 +153,7 @@ generate-aec-data:
 	@echo "Generating a 250 MB apache log..."
 	(cd ../test/da	ta/apache_log && ./generate_big_log.sh)
 # For the "irc" program
-    @echo "Generating a 250 MB IRC command file..."
+	@echo "Generating a 250 MB IRC command file..."
 	(cd ../test/data/irc && ./gen_irc.pl -s  250000000 > irc_250mb.txt)
 # For the "issuu_json2sql" program (note: the data is downloaded, not generated)
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
