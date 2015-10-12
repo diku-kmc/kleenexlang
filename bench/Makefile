@@ -151,10 +151,10 @@ irc: irc.ko
 generate-aec-data:
 # For the "apache_log" program
 	@echo "Generating a 250 MB apache log..."
-	(cd ../test/da	ta/apache_log && ./generate_big_log.sh)
+	(cd ../test/data/apache_log && ./generate_big_log.sh)
 # For the "irc" program
-	@echo "Generating a 250 MB IRC command file..."
-	(cd ../test/data/irc && ./gen_irc.pl -s  250000000 > irc_250mb.txt)
+	@echo "Generating a 50 MB IRC command file..."
+	(cd ../test/data/irc && ./gen_irc.pl -s  50000000 > irc_50mb.txt)
 # For the "issuu_json2sql" program (note: the data is downloaded, not generated)
 	@echo "Downloading 1,000,000 json objects from the /first/ part of the Issuu dataset..."
 	(cd ../test/data/issuu && ./download.sh -f -c 0 -n 1000000 > issuu_1000000objs.json)
@@ -164,7 +164,9 @@ generate-aec-data:
 # Some random strings for general playing around
 	@echo "Generating 20 MB random characters..."
 	(cd ../test/data/strings && ./gen_random_chars.sh 20000000  > random_20mb.txt)
-
+# Some random numbers
+	@echo "Generating 250 MB numbers..."
+	(cd ../test/data/numbers && ./gen_numbers.pl -s 250000000 > numbers_250mb.txt)
 
 
 generate-test-data: generate-strings download-issuu download-large-issuu generate-emails \
