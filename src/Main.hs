@@ -108,8 +108,7 @@ instance Options MainOptions where
       <*> simpleOption "func" False "Functionalize FST before SST construction"
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
-          -- TODO Actions disabled by default until runtime fixed on OS X etc.
-      <*> simpleOption "act" False "Enable actions in the language"
+      <*> simpleOption "act" True "Enable actions in the language"
       <*> simpleOption "dfa" False "Treat ignored Kleenex-subterms as DFAs"
       <*> simpleOption "sb"  True "Avoid generating bits for suppressed terms whenever safe"
 
