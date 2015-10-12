@@ -167,6 +167,13 @@ generate-aec-data:
 # Some random numbers
 	@echo "Generating 250 MB numbers..."
 	(cd ../test/data/numbers && ./gen_numbers.pl -s 250000000 > numbers_250mb.txt)
+# Some random CSV files formatted in a certain way
+	@echo "Generating 250 MB \"format 1\" csv data..."
+	(cd ../test/data/csv && ./gen_csv.pl -f 1 -s 250000000 > csv_format1_250mb.csv)
+# Some ISO datetime stamps
+	@echo "Generating 250 MB ISO datetime stamps..."
+	(cd ../test/data/datetime && ./gen_datetime.pl -s 250000000 > datetimes_250mb.txt)
+
 
 
 generate-test-data: generate-strings download-issuu download-large-issuu generate-emails \
