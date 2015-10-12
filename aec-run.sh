@@ -21,6 +21,8 @@ while true; do
 done
 
 # 2.  Run some of the benchmark programs
+echo ""
+echo "######################################"
 while true; do
     read -p "Do you wish to run the benchmark runs? " yn
     case $yn in
@@ -39,6 +41,8 @@ done
 ./runningtime.sh $go -w 0 -r 1 -l $timestamp -p isp_datetime_to_json
 
 # 3.  Make some plots
+echo ""
+echo "######################################"
 while true; do
     read -p "Generate plots? " yn
     case $yn in
