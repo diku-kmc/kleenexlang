@@ -1,7 +1,7 @@
 #!/bin/bash
 
 go=""
-timestamp="AEC-$(date "+%Y_%m_%d__%k_%M_%S")"
+timestamp="AEC-$(date "+%Y_%m_%d__%H_%M_%S")"
 
 # Assumes that it all benchmark programs have already been built and
 # that the relevant test data is present.  This is the case for the
