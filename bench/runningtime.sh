@@ -9,7 +9,7 @@ all_test_cases=$(cat ${test_case_table} | awk '$1 !~ /#/ { print $1 }')
 time_suffix=".runningtime"
 
 data_dir="../test/data"
-timestamp="$(date "+%Y_%m_%d__%k_%M_%S")"
+timestamp="$(date "+%Y_%m_%d__%H_%M_%S")"
 time_base_dir="times"
 
 # Default settings
