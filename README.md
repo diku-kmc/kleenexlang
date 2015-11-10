@@ -1,4 +1,4 @@
-# The KMC regular expression compiler #
+# The KMC Kleenex compiler #
 
 [![Travis status](https://travis-ci.org/diku-kmc/kleenexlang.svg?branch=master)](https://travis-ci.org/diku-kmc/kexc)
 
