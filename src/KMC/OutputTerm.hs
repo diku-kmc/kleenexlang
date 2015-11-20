@@ -49,7 +49,7 @@ instance (Function f, Function g) => Function (f :*: g) where
     type Dom (f :*: g) = (Dom f, Dom g)
     type Rng (f :*: g) = (Rng f, Rng g)
     eval (f :*: g) (x, y)  = (eval f x, eval g y)
-    isConst (f :*: g)      = Nothing
+    isConst (_ :*: _)      = Nothing
     inDom (x, y) (f :*: g) = (x `inDom` f) && (y `inDom` g)
     domain (f :*: g) = zip (domain f) (domain g)
 
