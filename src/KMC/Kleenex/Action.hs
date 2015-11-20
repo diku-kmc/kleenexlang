@@ -6,25 +6,15 @@
 
 module KMC.Kleenex.Action where
 
-
-import Data.Monoid (Monoid, mempty)
-import Data.ByteString (ByteString, pack)
-import Data.Char
-import Data.Word
-import Data.List
-import Control.Monad.State
-import Control.Arrow
+import           Control.Monad.State
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Foreign.Marshal.Utils
-
-import KMC.Coding
-import KMC.Expression
+import           Data.Word
+import           KMC.Expression
+import           KMC.OutputTerm
 import qualified KMC.RangeSet as RS
-import KMC.SymbolicSST
-import KMC.Theories
-import KMC.OutputTerm
-import Debug.Trace
+import           KMC.SymbolicSST
+import           KMC.Theories
 
 type KleenexAction = ActionExpr Int Word8 [Word8]
 type KleenexActionMu a = Mu BitInputTerm KleenexAction a
