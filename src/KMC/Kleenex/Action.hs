@@ -88,12 +88,12 @@ actionConstruct qf (Seq e1 e2) = do
 
 fixAction :: KleenexAction -> EdgeAction Int (WithNull KleenexAction)
 fixAction (RegUpdate var atoms) = Inl $ M.singleton var $ map conv atoms
+  where
+    conv (FuncA f i) = FuncA (Inl f) i
+    conv (VarA v) = VarA v
+    conv (ConstA c) = ConstA c
 fixAction (ParseBits rs) = Inl $ M.singleton 0 [VarA 0, FuncA (Inl $ ParseBits rs) 0]
 fixAction a = Inr $ a
-
-conv (FuncA f i) = FuncA (Inl f) i
-conv (VarA var) = VarA var
-conv (ConstA c) = ConstA c
 
 genActionSST :: (Ord st, Enum st, Show st) => KleenexActionMu st -> SST st BitInputTerm (WithNull KleenexAction) Int
 genActionSST mu = sst
