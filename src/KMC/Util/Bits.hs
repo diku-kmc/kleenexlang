@@ -41,7 +41,6 @@ instance DoubleBits Word16 where
 instance DoubleBits Word32 where
     type Twice Word32 = Word64
     split = split' (zeroBits :: Word32)
-
              
 packCombine :: (DoubleBits b) => b -> [b] -> [Twice b]
 packCombine _ []           = []
@@ -51,7 +50,6 @@ packCombine end [w1]       = [combine (w1, end)]
 unpackSplit :: (DoubleBits b) => [Twice b] -> [b]
 unpackSplit = concatMap ((\(x,y) -> [x,y]) . split)
 
-               
 word8toWord16 :: (Word8, Word8) -> Word16
 word8toWord16 = combine
 word16toWord8 :: Word16 -> (Word8, Word8)
