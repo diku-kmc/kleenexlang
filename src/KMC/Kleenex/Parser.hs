@@ -10,20 +10,15 @@ import           Data.ByteString (ByteString, unpack)
 import           Data.Hashable
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8)
-import qualified Data.Map as M
-import           Data.Word
 import           Text.Parsec hiding (parseTest)
-import           Text.Parsec.Prim (runParser)
 import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 import           Numeric (readHex)
 
 import           KMC.Kleenex.Action
 import           KMC.SymbolicSST (Atom(..), ActionExpr(..))
-import           KMC.OutputTerm ((:+:)(..))
 import           KMC.Syntax.Config
-import           KMC.Syntax.External (Regex, unparse)
+import           KMC.Syntax.External (Regex)
 import           KMC.Syntax.Parser (anchoredRegexP)
-import           KMC.Util.List (foldr1ifEmpty)
 
 -- | Change the type of a state in a parser.
 changeState :: forall m s u v a . (Functor m, Monad m)
@@ -228,17 +223,17 @@ actionP :: KleenexParser (KleenexAction)
 actionP = do skipped
              ident <- kleenexIdentifier
              let reg = varToInt $ fromIdent ident
-             try (overwrite reg) <|> concat reg
+             try (overwrite reg) <|> concatAction reg
     where
         regs = VarA . varToInt . fromIdent <$> kleenexIdentifier
-        const = ConstA . unpack . encodeString <$> kleenexConstant
+        constant = ConstA . unpack . encodeString <$> kleenexConstant
         overwrite reg = do
-            skipAround $ string "<-"
-            actions <- choice [regs, const] `sepEndBy1` skipped
+            _ <- skipAround $ string "<-"
+            actions <- choice [regs, constant] `sepEndBy1` skipped
             return $ RegUpdate reg actions
-        concat reg = do
-            skipAround $ string "+="
-            actions <- choice [regs, const] `sepEndBy1` skipped
+        concatAction reg = do
+            _ <- skipAround $ string "+="
+            actions <- choice [regs, constant] `sepEndBy1` skipped
             return $ RegUpdate reg (VarA reg : actions)
 
 parseKleenex :: String -- ^ Input string
@@ -273,7 +268,3 @@ parseTest' p input
                        print err
                        fail ""
         Right x  -> return x
-
-pf = parseTest (kleenex <* eof)
-pf' = parseTest' (kleenex <* eof)
-
