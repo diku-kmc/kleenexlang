@@ -56,10 +56,10 @@ codeFixedWidthEnumSized :: forall b. (Enum b, Bounded b) =>
                            Int -- ^ Size of domain
                         -> Int -- ^ Value
                         -> [b]
-codeFixedWidthEnumSized size ndata = map toEnum $ codeFixedWidth base width ndata
+codeFixedWidthEnumSized size' ndata = map toEnum $ codeFixedWidth base width ndata
     where
       base = fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1
-      width = bitWidth base size
+      width = bitWidth base size'
 
 -- | Decode a value encoded as digits in a given base
 decode :: (Num a) => a   -- ^ Base
