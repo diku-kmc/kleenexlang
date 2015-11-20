@@ -59,16 +59,3 @@ word16toWord8 = split
 
 castWord :: (Enum a, Enum b) => a -> b
 castWord = toEnum . fromEnum
-
-
-------------------------------------------------------------
--- Tests
-
-test1 = check (toEnum 10) (toEnum 255 :: Word8)
-test2 = check (toEnum 0) (toEnum 1 :: Word8)
-test3 = check (toEnum 1) (toEnum 0 :: Word8)
-test4 = check (toEnum 123) (toEnum 123123 :: Word32)
-test5 = check (toEnum 6534) (toEnum 1235 :: Word16) 
-
-check :: (DoubleBits b) => b -> b -> Bool
-check w1 w2 = split (combine (w1, w2)) == (w1, w2)
