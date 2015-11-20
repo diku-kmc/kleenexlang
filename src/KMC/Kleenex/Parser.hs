@@ -1,9 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TemplateHaskell #-}
 module KMC.Kleenex.Parser where
 
-import           Control.Applicative ((<$>), (<*>), (<*), (*>), (<$))
 import           Control.Monad.Identity (Identity)
 import           Data.Char
 import           Data.ByteString (ByteString, unpack)
@@ -109,10 +107,10 @@ escapedChar = satisfy (not . mustBeEscaped)
               <|> escaped
     where
       mustBeEscaped c = c `elem` map snd cr
-      escaped = char '\\' >> (try $ choice (map escapedChar cr) <|> hexcode)
-      escapedChar (code, replacement) = replacement <$ char code
+      escaped = char '\\' >> (try $ choice (map aux cr) <|> hexcode)
+      aux (code, replacement) = replacement <$ char code
       cr = [('\\', '\\'), ('"', '"'), ('n', '\n'), ('t', '\t')]
-      hexcode = do char 'x'
+      hexcode = do _ <- char 'x'
                    x <- count 2 hexDigit
                    return . chr . fst . head . readHex $ x
 
@@ -141,7 +139,7 @@ skipped1 :: KleenexParser ()
 skipped1 = ignore $ many1 (choice [ws, comment])
     where ws = ignore $ many1 space
 
-
+comment :: KleenexParser ()
 comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
     where
       singleLine = (try $ char '/') >> manyTill anyChar (ignore newline <|> eof)
@@ -164,7 +162,7 @@ kleenexTerm = skipAround kleenexExpr
       table = [
           [ Prefix (schar '~' >> return Ignore <?> "Ignored"),
             Prefix (try $ do ident <- many lower
-                             char '@'
+                             _ <- char '@'
                              return $ (\term -> Action (PushOut (varToInt ident)) term `Seq` Action PopOut One)) ],
           -- Use the postfix function below to allow multiple stacked postfix
           -- operators without the need for parentheses around all subterms.
@@ -183,7 +181,7 @@ kleenexTerm = skipAround kleenexExpr
       braces = between (schar '{') (schar '}')
       number = fmap read (many1 digit) <?> "an integer literal"
       range = braces $ try (do n <- optionMaybe number
-                               schar ','
+                               _ <- schar ','
                                m <- optionMaybe number
                                return $ Range n m)
                    <|> do n <- number
