@@ -5,8 +5,6 @@
 {-# LANGUAGE GADTs #-}
 module KMC.OutputTerm where
 
-import Control.Monad (liftM, liftM2)
-
 import KMC.Theories
 import KMC.Coding
 
@@ -50,15 +48,6 @@ instance (Function f, Function g) => Function (f :*: g) where
     isConst (_ :*: _)      = Nothing
     inDom (x, y) (f :*: g) = (x `inDom` f) && (y `inDom` g)
     domain (f :*: g) = zip (domain f) (domain g)
-
-instance (Function f) => Function (Maybe f) where
-    type Dom (Maybe f) = Maybe (Dom f)
-    type Rng (Maybe f) = Maybe (Rng f)
-    eval f x  = liftM2 eval f x
-    isConst f = liftM isConst f
-    inDom x f = maybe False id $ liftM2 inDom x f
-    domain (Just f) = map Just (domain f)
-    domain Nothing  = []
    
 instance (Monoid b) => Function (NullFun a b) where
     type Dom (NullFun a b) = a
