@@ -18,7 +18,7 @@ import           KMC.Coding (codeFixedWidthEnumSized, decodeEnum)
 import           KMC.Expression
 import           KMC.Kleenex.Action
 import qualified KMC.Kleenex.Parser as H
-import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..), NullFun(..))
+import           KMC.OutputTerm (Const(..), InList(..), Ident(..), (:+:)(..))
 import           KMC.RangeSet (singleton, complement, rangeSet, union, RangeSet, size)
 import           KMC.Syntax.External (Regex (..), unparse)
 import           KMC.Theories (top)

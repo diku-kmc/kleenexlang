@@ -60,8 +60,8 @@ addStates fst = do
       where
         skipN x = foldr (const succ) x [1 .. S.size (fstS fst) - 1]
 
-addNullEdges :: FST st pred (NullFun a b)
-             -> Construct st pred (func :+: (NullFun a b)) ()
+addNullEdges :: FST st pred (Const a b)
+             -> Construct st pred (func :+: (Const a b)) ()
 addNullEdges fst = modify $ \s -> s {
                      edges = edges s ++ map chg (edgesToList (fstE fst))
                    }
@@ -76,7 +76,7 @@ addEdge q lbl q' = modify $ \s -> s { edges = (q, lbl, q'):edges s }
 
 construct' :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
            => Pos -> st -> Mu pred func st
-           -> Construct st pred (func :+: (NullFun a b)) st
+           -> Construct st pred (func :+: (Const (Dom func) (Rng func))) st
 construct' _ _ (Var q) = return q
 construct' curPos qf (Loop e) = mfix (construct (L:curPos) qf . e)
 construct' curPos qf (RW p f e) = do
@@ -105,7 +105,7 @@ construct' curPos qf (Seq e1 e2) = do
 
 construct :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
           => Pos -> st -> Mu pred func st
-          -> Construct st pred (func :+: (NullFun a b)) st
+          -> Construct st pred (func :+: (Const (Dom func) (Rng func))) st
 construct curPos qf e = do
   ms <- gets marks
   if curPos `S.member` ms then
@@ -138,7 +138,7 @@ connectTo states to = mapM_ (\from -> addEdge from (Right mempty) to) states
 -- empty a normal FST will be produced.
 fromMuWithDFA :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
               => Marked
-              -> Mu pred func st -> FST st pred (func :+: (NullFun a b))
+              -> Mu pred func st -> FST st pred (func :+: (Const (Dom func) (Rng func)))
 fromMuWithDFA ms e =
   let (qin, cs) = runState (construct [] (toEnum 0) e)
                            (ConstructState { edges     = []
@@ -153,6 +153,6 @@ fromMuWithDFA ms e =
          }
 
 fromMu :: (Predicate pred, Enum st, Ord st, Monoid (Rng func)) =>
-          Mu pred func st -> FST st pred (func :+: (NullFun a b))
+          Mu pred func st -> FST st pred (func :+: (Const (Dom func) (Rng func)))
 fromMu = fromMuWithDFA S.empty
 

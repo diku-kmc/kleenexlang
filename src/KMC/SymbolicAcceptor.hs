@@ -7,7 +7,7 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 import           KMC.SymbolicFST
-import           KMC.OutputTerm (NullFun(..))
+import           KMC.OutputTerm
 
 -- | An `Acceptor` is a finite automaton, i.e., a machine that either
 -- accepts its input or fails.  It could equivalently be formulated
@@ -156,7 +156,7 @@ isDFAPrefixFree (DFA dfa) = all hasNoOutgoing (S.toList $ accF dfa)
     where
       hasNoOutgoing q = not $ M.member q $ dfaForward (accE dfa)
     
-dfaAsFST :: (Enum st, Ord st) => DFA st pred -> FST st pred (NullFun a b)
+dfaAsFST :: (Enum st, Ord st, Monoid b) => DFA st pred -> FST st pred (Const a b)
 dfaAsFST (DFA dfa) = 
     FST { fstS = accS dfa
         , fstE = edgeSet 
@@ -167,8 +167,8 @@ dfaAsFST (DFA dfa) =
       toMap   = M.fromListWith (++)
       edges   = dfaEdgesToList (accE dfa)
       edgeSet =
-          OrderedEdgeSet { eForward  = toMap [ (q, [(p, NullFun, q')]) | (q, p, q') <- edges ]
-                         , eBackward = toMap [ (q', [(p, NullFun, q)]) | (q, p, q') <- edges ]
+          OrderedEdgeSet { eForward  = toMap [ (q, [(p, Const mempty, q')]) | (q, p, q') <- edges ]
+                         , eBackward = toMap [ (q', [(p, Const mempty, q)]) | (q, p, q') <- edges ]
                          , eForwardEpsilon  = M.empty
                          , eBackwardEpsilon = M.empty
                          }

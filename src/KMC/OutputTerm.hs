@@ -12,10 +12,9 @@ data Enumerator e dom rng = Enumerator e deriving (Eq, Ord, Show)
 data Join f rng = Join [f] deriving (Eq, Ord, Show)
 data Const dom rng = Const rng deriving (Eq, Ord, Show)
 data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
-data NullFun a b = NullFun deriving (Eq, Ord, Show)
 data f :*: g = f :*: g deriving (Eq, Ord, Show)
 
-type WithNull f = f :+: (NullFun (Dom f) (Rng f))
+type WithNull f = f :+: (Const (Dom f) (Rng f))
              
 instance (Function f, Function g) => Function (f :*: g) where
     type Dom (f :*: g) = (Dom f, Dom g)
@@ -24,14 +23,6 @@ instance (Function f, Function g) => Function (f :*: g) where
     isConst (_ :*: _)      = Nothing
     inDom (x, y) (f :*: g) = (x `inDom` f) && (y `inDom` g)
     domain (f :*: g) = zip (domain f) (domain g)
-   
-instance (Monoid b) => Function (NullFun a b) where
-    type Dom (NullFun a b) = a
-    type Rng (NullFun a b) = b
-    eval NullFun _  = mempty
-    isConst NullFun = Just mempty
-    inDom _ NullFun = True
-    domain NullFun  = []
 
 instance (Enum a, Bounded a) => Function (Ident a) where
   type Dom (Ident a) = a

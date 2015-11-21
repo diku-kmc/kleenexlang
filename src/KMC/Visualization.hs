@@ -30,20 +30,12 @@ import           KMC.Util.Bits
 class Pretty a where
   pretty :: a -> String
 
-instance Pretty (NullFun a b) where
-  pretty NullFun = [chr 949]
-  -- Unicode point 949 is 'GREEK SMALL LETTER EPSILON'
+instance Pretty (InList (Ident Word8)) where
+    pretty (InList _) = "COPY"
 
-instance Pretty KleenexOutTerm where
-    pretty l = case l of
-                 Inl (InList _) -> "COPY"
-                 Inr (Const []) -> "\"\""
-                 Inr (Const ws) -> "\"" ++ map toChar [ws] ++ "\""
-
-
-instance (Pretty f) => Pretty (f :+: (NullFun a b)) where
-    pretty (Inl x)       = pretty x
-    pretty (Inr NullFun) = pretty NullFun
+instance (Pretty f, Pretty b) => Pretty (f :+: (Const a b)) where
+    pretty (Inl x)         = pretty x
+    pretty (Inr (Const c)) = pretty c
 
 instance (Eq a, Pretty a) => Pretty (RangeSet a) where
   pretty rs | [(l,h)] <- ranges rs, l == h = pretty l
