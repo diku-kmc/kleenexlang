@@ -137,3 +137,7 @@ lookupIndex i (RangeSet ((l, h):rs)) =
   else
     lookupIndex (i - (fromEnum h - fromEnum l + 1)) (RangeSet rs)
 lookupIndex _ _ = error "index out of bounds"
+
+instance (Bounded a) => Bounded (RangeSet a) where
+   maxBound = singleton maxBound
+   minBound = singleton minBound

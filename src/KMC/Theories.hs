@@ -135,10 +135,6 @@ instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
     lte = RS.isSubsetOf
     eq = (==)
 
-instance (Bounded a) => Bounded (RangeSet a) where
-   maxBound = RS.singleton maxBound
-   minBound = RS.singleton minBound
-
 instance (Boolean a, Boolean b) => Boolean (a, b) where
     top = (top, top)
     bot = (bot, bot)
