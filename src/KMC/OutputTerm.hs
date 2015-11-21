@@ -14,30 +14,8 @@ data Const dom rng = Const rng deriving (Eq, Ord, Show)
 data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
 data NullFun a b = NullFun deriving (Eq, Ord, Show)
 data f :*: g = f :*: g deriving (Eq, Ord, Show)
-             
-data o :>: f = o :>: f deriving (Eq, Ord, Show)
-data f :<: o = f :<: o deriving (Eq, Ord, Show)
-
-type Pre f = Rng f :>: f
-type Post f = f :<: Rng f
 
 type WithNull f = f :+: (NullFun (Dom f) (Rng f))
-
-instance (Monoid (Rng f), Function f, o ~ Rng f) => Function (o :>: f) where
-    type Dom (o :>: f) = Dom f
-    type Rng (o :>: f) = Rng f
-    eval (o :>: f) x = o `mappend` eval f x
-    isConst (o :>: f) = fmap (mappend o) $ isConst f
-    inDom x (_ :>: f) = x `inDom` f
-    domain (_ :>: f) = domain f
-
-instance (Monoid (Rng f), Function f, o ~ Rng f) => Function (f :<: o) where
-    type Dom (f :<: o) = Dom f
-    type Rng (f :<: o) = Rng f
-    eval (f :<: o) x  = eval f x `mappend` o
-    isConst (f :<: o) = fmap (flip mappend o) $ isConst f
-    inDom x (f :<: _) = x `inDom` f
-    domain (f :<: _) = domain f
              
 instance (Function f, Function g) => Function (f :*: g) where
     type Dom (f :*: g) = (Dom f, Dom g)
