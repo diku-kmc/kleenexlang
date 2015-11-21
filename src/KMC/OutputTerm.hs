@@ -5,9 +5,7 @@
 {-# LANGUAGE GADTs #-}
 module KMC.OutputTerm where
 
-import Control.Applicative hiding (Const)
 import Control.Monad (liftM, liftM2)
-import Data.Monoid
 
 import KMC.Theories
 import KMC.Coding
@@ -52,7 +50,6 @@ instance (Function f, Function g) => Function (f :*: g) where
     isConst (_ :*: _)      = Nothing
     inDom (x, y) (f :*: g) = (x `inDom` f) && (y `inDom` g)
     domain (f :*: g) = zip (domain f) (domain g)
-
 
 instance (Function f) => Function (Maybe f) where
     type Dom (Maybe f) = Maybe (Dom f)
