@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
 module KMC.Kleenex.Parser where
 
 import           Control.Monad.Identity (Identity)
