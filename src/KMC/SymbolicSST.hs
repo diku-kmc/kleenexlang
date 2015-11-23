@@ -6,18 +6,18 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 module KMC.SymbolicSST
-(UpdateString(..)
-,UpdateStringFunc(..)
+(UpdateString
+,UpdateStringFunc
 ,Atom(..)
-,EdgeAction(..)
-,EdgeSet(..)
+,EdgeAction
+,EdgeSet
 ,ActionExpr(..)
 ,constUpdateStringFunc
 ,normalizeUpdateStringFunc
 ,evalUpdateStringFunc
 ,SST(..)
 ,construct
-,RegisterUpdate(..)
+,RegisterUpdate
 ,eForwardLookup
 ,sstOut
 ,edgesToList
@@ -34,7 +34,6 @@ import           Control.Applicative
 import qualified Data.Map.Strict as M
 import           Data.Monoid
 import qualified Data.Set as S
-import           Data.Word
 
 import qualified KMC.RangeSet as RS
 import           KMC.Coding
@@ -55,7 +54,7 @@ type EdgeSet st pred func var = M.Map st [([pred], EdgeAction var func, st)]
 type EdgeAction var func = RegisterUpdate var func :+: ActionExpr var (Dom func) (Rng func)
 data ActionExpr var dom rng = PushOut var
                             | PopOut
-                            | RegUpdate var [Atom var (ActionExpr var dom rng)]
+                            | RegUpdate var [Either var rng]
                             | ParseBits (RS.RangeSet dom)
                             | OutputConst rng
     deriving (Ord, Show, Eq)

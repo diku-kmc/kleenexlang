@@ -175,7 +175,7 @@ kleenexPrimTerm = skipAround elms
                    <?> "Action"
       output     = do ident <- skipAround (char '!' *> kleenexIdentifier)
                       let buf = fromIdent ident
-                      return $ Action (RegUpdate 0 [VarA 0, VarA (varToInt buf)]) One
+                      return $ Action (RegUpdate 0 [Left 0, Left (varToInt buf)]) One
                    <?> "OutputTerm"
 
 encodeString :: String -> ByteString
@@ -190,8 +190,8 @@ actionP = do skipped
              let reg = varToInt $ fromIdent ident
              try (overwrite reg) <|> concatAction reg
     where
-        regs = VarA . varToInt . fromIdent <$> kleenexIdentifier
-        constant = ConstA . unpack . encodeString <$> kleenexConstant
+        regs = Left . varToInt . fromIdent <$> kleenexIdentifier
+        constant = Right . unpack . encodeString <$> kleenexConstant
         overwrite reg = do
             _ <- skipAround $ string "<-"
             actions <- choice [regs, constant] `sepEndBy1` skipped
@@ -199,7 +199,7 @@ actionP = do skipped
         concatAction reg = do
             _ <- skipAround $ string "+="
             actions <- choice [regs, constant] `sepEndBy1` skipped
-            return $ RegUpdate reg (VarA reg : actions)
+            return $ RegUpdate reg (Left reg : actions)
 
 parseKleenex :: String -- ^ Input string
              -> Either String Kleenex

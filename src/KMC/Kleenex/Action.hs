@@ -2,7 +2,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
---{-# LANGUAGE MultiParamTypeClasses #-}
 
 module KMC.Kleenex.Action where
 
@@ -89,9 +88,8 @@ actionConstruct qf (Seq e1 e2) = do
 fixAction :: KleenexAction -> EdgeAction Int (WithConst KleenexAction)
 fixAction (RegUpdate var atoms) = Inl $ M.singleton var $ map conv atoms
   where
-    conv (FuncA f i) = FuncA (Inl f) i
-    conv (VarA v) = VarA v
-    conv (ConstA c) = ConstA c
+    conv (Left v) = VarA v
+    conv (Right c) = ConstA c
 fixAction (ParseBits rs) = Inl $ M.singleton 0 [VarA 0, FuncA (Inl $ ParseBits rs) 0]
 fixAction a = Inr $ a
 
