@@ -2,13 +2,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 module KMC.FSTConstruction
-(Mu(..)
-,fromMu
+(fromMu
 ,fromMuWithDFA
-,fresh
-,addEdge
-,Construct(..)
-,ConstructState(..)
 ,edgesFromList)
 where
 
