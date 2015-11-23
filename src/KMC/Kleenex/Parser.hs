@@ -18,22 +18,6 @@ import           KMC.Syntax.Config
 import           KMC.Syntax.External (Regex)
 import           KMC.Syntax.Parser (anchoredRegexP)
 
--- | Change the type of a state in a parser.
-changeState :: forall m s u v a . (Functor m, Monad m)
-            => (u -> v) -> (v -> u) -> ParsecT s u m a -> ParsecT s v m a
-changeState forward backward = mkPT . transform . runParsecT
-  where
-    --mapState :: forall u v . (u -> v) -> State s u -> State s v
-    mapState f st = st { stateUser = f (stateUser st) }
-    --mapReply :: forall u v . (u -> v) -> Reply s u a -> Reply s v a
-    mapReply f (Ok a st err) = Ok a (mapState f st) err
-    mapReply _ (Error e) = Error e
-    --
-    fmap3 = fmap . fmap . fmap
-    --transform :: (State s u -> m (Consumed (m (Reply s u a))))
-    --          -> (State s v -> m (Consumed (m (Reply s v a))))
-    transform p st = fmap3 (mapReply forward) (p (mapState backward st))
-
 -- | An Identifier is a String that always starts with a lower-case char.
 newtype Identifier = Identifier { fromIdent :: String } deriving (Eq, Ord, Show)
 
@@ -59,16 +43,7 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
                  | One
   deriving (Eq, Ord, Show)
 
-type HPState = ()
-
-hpInitState :: HPState
-hpInitState = ()
-
-type KleenexParser a = Parsec String HPState a
-
-
-withHPState :: Parsec s () a -> Parsec s HPState a
-withHPState p = getState >>= \hps -> changeState (const hps) (const ()) p
+type KleenexParser a = Parsec String () a
 
 separator :: KleenexParser ()
 separator = spaceOrTab <|> ignore (try (lookAhead newline))
@@ -182,7 +157,7 @@ kleenexTerm = skipAround kleenexExpr
                           return $ Range (Just n) (Just n)
 
 -- | Combine postfix operators and allow sequences (e.g., /a/*+?)
-postfix :: KleenexParser (a -> a) -> Operator Char HPState a
+postfix :: KleenexParser (a -> a) -> Operator Char () a
 postfix p = Postfix . chainl1 p $ return (flip (.))
 
 kleenexPrimTerm :: KleenexParser KleenexTerm
@@ -208,8 +183,7 @@ encodeString :: String -> ByteString
 encodeString = encodeUtf8 . T.pack
 
 regexP :: KleenexParser Regex
-regexP = snd <$> (withHPState $
-                  anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "/", rep_freespacing = False })
+regexP = snd <$> (anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "/", rep_freespacing = False })
 
 actionP :: KleenexParser (KleenexAction)
 actionP = do skipped
@@ -231,7 +205,7 @@ actionP = do skipped
 parseKleenex :: String -- ^ Input string
              -> Either String Kleenex
 parseKleenex str =
-    case runParser (kleenex <* eof) hpInitState "" str of
+    case runParser (kleenex <* eof) () "" str of
       Left err -> Left (show err)
       Right h -> Right h
 
@@ -250,12 +224,12 @@ stateParseTest st p input
         Right x  -> print x
 
 parseTest :: (Show a) => KleenexParser a -> String -> IO ()
-parseTest = stateParseTest hpInitState
+parseTest = stateParseTest ()
 
 parseTest' :: (Stream s Identity t)
-               => Parsec s HPState (Kleenex) -> s -> IO (Kleenex)
+               => Parsec s () (Kleenex) -> s -> IO (Kleenex)
 parseTest' p input
-    = case runParser p hpInitState "" input of
+    = case runParser p () "" input of
         Left err -> do putStr "parse error at "
                        print err
                        fail ""
