@@ -268,7 +268,7 @@ x := /a/
 kp_test13 :: (TestName, IO TS.Result)
 kp_test13 = "Sanity check #1" <@>
     let p = [strQ|main := "a" /b/|]
-        e = HP.Kleenex [HP.mkIdent "main"] [HP.HA (HP.mkIdent "main", HP.Seq (HP.Constant "a") (HP.RE (R.Chr 'b')))]
+        e = HP.Kleenex [HP.Identifier "main"] [HP.HA (HP.Identifier "main", HP.Seq (HP.Constant "a") (HP.RE (R.Chr 'b')))]
     in assertProgramIs p e
 
 kp_test14 :: (TestName, IO TS.Result)
@@ -277,13 +277,13 @@ kp_test14 = "Sanity check #2" <@>
 r:= /A/
 q:= /B/ "B" p
 |]
-        e = HP.Kleenex [ HP.mkIdent "main" ]
-                       [ HP.HA (HP.mkIdent "main", HP.Sum (HP.Seq (HP.Constant "a") (HP.Var (HP.mkIdent "q")))
-                                                       (HP.Seq (HP.Constant "b") (HP.Var (HP.mkIdent "r"))))
-                       , HP.HA (HP.mkIdent "r", HP.RE (R.Chr 'A'))
-                       , HP.HA (HP.mkIdent "q", HP.Seq (HP.RE (R.Chr 'B'))
+        e = HP.Kleenex [ HP.Identifier "main" ]
+                       [ HP.HA (HP.Identifier "main", HP.Sum (HP.Seq (HP.Constant "a") (HP.Var (HP.Identifier "q")))
+                                                       (HP.Seq (HP.Constant "b") (HP.Var (HP.Identifier "r"))))
+                       , HP.HA (HP.Identifier "r", HP.RE (R.Chr 'A'))
+                       , HP.HA (HP.Identifier "q", HP.Seq (HP.RE (R.Chr 'B'))
                                                        (HP.Seq (HP.Constant "B")
-                                                               (HP.Var (HP.mkIdent "p"))))
+                                                               (HP.Var (HP.Identifier "p"))))
                        ]
     in assertProgramIs p e
 
@@ -291,8 +291,8 @@ kp_test15 :: (TestName, IO TS.Result)
 kp_test15 = "Sanity check #3" <@>
     let p = [strQ|main := (((/a/* | /b/? | ~/c/+)*)+)?
 |]
-        e = HP.Kleenex [HP.mkIdent "main"] [
-            HP.HA (HP.mkIdent "main",
+        e = HP.Kleenex [HP.Identifier "main"] [
+            HP.HA (HP.Identifier "main",
                 HP.Question $ HP.Plus $ HP.Star $
                     HP.Sum (HP.Star $ HP.RE (R.Chr 'a')) $
                     HP.Sum (HP.Question $ HP.RE (R.Chr 'b')) $
@@ -304,8 +304,8 @@ kp_test15 = "Sanity check #3" <@>
 kp_sanity4 :: (TestName, IO TS.Result)
 kp_sanity4 = "Sanity check #4" <@>
              let p = [strQ|main := ~(/a/*)|]
-                 e = HP.Kleenex [HP.mkIdent "main"] [
-                      HP.HA (HP.mkIdent "main",
+                 e = HP.Kleenex [HP.Identifier "main"] [
+                      HP.HA (HP.Identifier "main",
                             HP.Ignore $ HP.Star $ HP.RE $ (R.Chr 'a'))
                      ]
             in
@@ -314,8 +314,8 @@ kp_sanity4 = "Sanity check #4" <@>
 kp_one1 :: (TestName, IO TS.Result)
 kp_one1 = "One constructor #1" <@>
           let p = [strQ|main := 1 | (/a/ | 1)|]
-              e = HP.Kleenex [HP.mkIdent "main"] [
-                   HP.HA (HP.mkIdent "main",
+              e = HP.Kleenex [HP.Identifier "main"] [
+                   HP.HA (HP.Identifier "main",
                          HP.Sum HP.One (HP.Sum (HP.RE $ R.Chr 'a') HP.One))
                   ]
           in
