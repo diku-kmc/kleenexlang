@@ -78,7 +78,7 @@ assertProgramIs prog expected =
         else return $ TS.Fail $ "[ " ++ show p ++ "] != [ " ++ show expected ++ "]"
       Left e  -> return $ TS.Fail e
 
-assertMarksAre :: String -> Marked -> IO TS.Result
+assertMarksAre :: String -> Marks -> IO TS.Result
 assertMarksAre prog marks =
     case (testKleenex prog) of
       (Right ((_, marks'):_)) -> if marks' == marks

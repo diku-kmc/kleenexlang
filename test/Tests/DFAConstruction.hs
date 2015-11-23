@@ -28,7 +28,7 @@ import           KMC.Util.List
 import           Tests.TestUtils
 
 type TestPred = RangeSet Word8
-type TestFunc = WithNull KleenexOutTerm
+type TestFunc = WithConst KleenexOutTerm
 type TestFST  = FST Int TestPred TestFunc
 type TestSST  = SST.SST (Maybe (Tree Var Int)) TestPred TestFunc Var
 type W8String = [Word8]

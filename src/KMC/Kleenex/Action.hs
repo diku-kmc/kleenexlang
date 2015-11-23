@@ -56,7 +56,7 @@ addEdge :: (Ord st) => st -> [pred] -> EdgeAction var func -> st
 addEdge q m o q' = modify $ \s -> s { edges = M.insertWith (++) q [(m, o, q')] (edges s) }
 
 actionConstruct :: (Enum st, Ord st, Monoid (Rng KleenexAction))
-             => st -> Mu BitInputTerm KleenexAction st -> Construct st BitInputTerm (WithNull KleenexAction) Int st
+             => st -> Mu BitInputTerm KleenexAction st -> Construct st BitInputTerm (WithConst KleenexAction) Int st
 actionConstruct _ (Var q) = return q
 actionConstruct qf (Loop e) = mfix (actionConstruct qf . e)
 actionConstruct qf (RW p f e) = do
@@ -86,7 +86,7 @@ actionConstruct qf (Seq e1 e2) = do
   q2 <- actionConstruct qf e2
   actionConstruct q2 e1
 
-fixAction :: KleenexAction -> EdgeAction Int (WithNull KleenexAction)
+fixAction :: KleenexAction -> EdgeAction Int (WithConst KleenexAction)
 fixAction (RegUpdate var atoms) = Inl $ M.singleton var $ map conv atoms
   where
     conv (FuncA f i) = FuncA (Inl f) i
@@ -95,7 +95,7 @@ fixAction (RegUpdate var atoms) = Inl $ M.singleton var $ map conv atoms
 fixAction (ParseBits rs) = Inl $ M.singleton 0 [VarA 0, FuncA (Inl $ ParseBits rs) 0]
 fixAction a = Inr $ a
 
-genActionSST :: (Ord st, Enum st, Show st) => KleenexActionMu st -> SST st BitInputTerm (WithNull KleenexAction) Int
+genActionSST :: (Ord st, Enum st, Show st) => KleenexActionMu st -> SST st BitInputTerm (WithConst KleenexAction) Int
 genActionSST mu = sst
     where
         (qin, cs) = runState (actionConstruct (toEnum 0) mu)

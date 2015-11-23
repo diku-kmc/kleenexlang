@@ -14,7 +14,7 @@ data Const dom rng = Const rng deriving (Eq, Ord, Show)
 data f :+: g = Inl f | Inr g deriving (Eq, Ord, Show)
 data f :*: g = f :*: g deriving (Eq, Ord, Show)
 
-type WithNull f = f :+: (Const (Dom f) (Rng f))
+type WithConst f = f :+: (Const (Dom f) (Rng f))
              
 instance (Function f, Function g) => Function (f :*: g) where
     type Dom (f :*: g) = (Dom f, Dom g)

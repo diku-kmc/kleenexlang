@@ -153,7 +153,7 @@ data Transducers delta where
                    , Pretty f, Pretty delta, Ord delta, Enum delta
                    , Bounded delta, Show delta
                    )
-                   => [FST Int (RangeSet Word8) (WithNull f)] -> Transducers delta
+                   => [FST Int (RangeSet Word8) (WithConst f)] -> Transducers delta
 
 -- | Existential type representing determinized transducers that can be compiled.
 data DetTransducers delta where
@@ -162,7 +162,7 @@ data DetTransducers delta where
                       , Bounded delta, Pretty delta, Show delta
                       )
                      =>
-                     [SST Int (RangeSet Word8) (WithNull f) Int] -> DetTransducers delta
+                     [SST Int (RangeSet Word8) (WithConst f) Int] -> DetTransducers delta
 
 transducerSize :: Transducers delta -> Int
 transducerSize (Transducers fsts) = sum $ map (S.size . fstS) fsts
@@ -363,7 +363,7 @@ main = runSubcommand
        , subcommand "visualize" visualize
        ]
 
-fstFromKleenex :: Bool -> String -> [FST Int (RangeSet Word8) (WithNull KleenexOutTerm)]
+fstFromKleenex :: Bool -> String -> [FST Int (RangeSet Word8) (WithConst KleenexOutTerm)]
 fstFromKleenex constructDFA str =
     case parseKleenex str of
          Left e -> error e
@@ -375,7 +375,7 @@ fstFromKleenex constructDFA str =
                            fromMu t
 
 bytecodeFstFromKleenex :: Bool -> String ->
-                          [FST Int (RangeSet Word8) (WithNull (BitOutputTerm Word8 Word8))]
+                          [FST Int (RangeSet Word8) (WithConst (BitOutputTerm Word8 Word8))]
 bytecodeFstFromKleenex suppressBits str =
   case parseKleenex str of
     Left e -> error e
