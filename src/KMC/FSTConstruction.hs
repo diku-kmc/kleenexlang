@@ -13,7 +13,6 @@ module KMC.FSTConstruction
 where
 
 import           Control.Monad.State
-import           Data.Monoid (Monoid, mempty)
 import qualified Data.Set as S
 
 import           KMC.Expression
@@ -22,8 +21,6 @@ import           KMC.SymbolicAcceptor
 import           KMC.SymbolicFST
 import           KMC.Theories
 import           KMC.OutputTerm
-import           KMC.DFAConstruction
-
 
 data ConstructState st pred func =
   ConstructState { edges     :: [Edge st pred func]
