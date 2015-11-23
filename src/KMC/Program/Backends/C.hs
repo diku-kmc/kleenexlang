@@ -20,8 +20,6 @@ import           KMC.Coding
 import           KMC.Program.IL
 import           KMC.Util.Heredoc
 
-import KMC.SSTCompiler
-
 {- Utility functions -}
 -- | Chunk a list into list of lists of length n, starting from the left. The
 -- last list in the result may be shorter than n.
