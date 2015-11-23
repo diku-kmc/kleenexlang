@@ -135,7 +135,7 @@ kleenexToSimpleMu initVar (H.Kleenex _ ass) = SMLoop $ evalState (go [initVar] (
 --      (a) E = ~l ~r     --> E' = ~(l r)
 --      (b) E = ~l | ~r   --> E' = ~(l | r)
 --      (c) E = (~e)*     --> E' = ~(e*)
-findSuppressedSubterms :: SimpleMu -> Marked
+findSuppressedSubterms :: SimpleMu -> Marks
 findSuppressedSubterms = go [] S.empty
     where
       addIfBoth cp marks =
@@ -160,7 +160,7 @@ findSuppressedSubterms = go [] S.empty
             SMRegex _  -> marked
 
 -- | Find the locations of subterms that contain no actions.
-findActionfreeSubterms :: SimpleMu -> Marked
+findActionfreeSubterms :: SimpleMu -> Marks
 findActionfreeSubterms = M.keysSet . M.filter id . findFix M.empty
     where
         -- | Fix-point iterate until we know which recursive subterms
@@ -194,7 +194,7 @@ findActionfreeSubterms = M.keysSet . M.filter id . findFix M.empty
 
 -- | Find the locations of subterms that are both suppressed, and contain no actions.
 --   (i.e. can be safely ignored)
-findActionfreeSuppressedSubterms :: SimpleMu -> Marked
+findActionfreeSuppressedSubterms :: SimpleMu -> Marks
 findActionfreeSuppressedSubterms sm = go [] S.empty False sm
     where
         afs = findActionfreeSubterms sm
@@ -269,7 +269,7 @@ kleenexToActionMuTerm :: H.Kleenex -> Bool -> [KleenexActionMu a]
 kleenexToActionMuTerm k@(H.Kleenex is terms) suppressBits =
     map (\i -> simpleMuToActionMuTerm [] False suppressBits $ kleenexToSimpleMu i k) is
 
-kleenexToMuTerm :: H.Kleenex -> [(KleenexMu a, Marked)]
+kleenexToMuTerm :: H.Kleenex -> [(KleenexMu a, Marks)]
 kleenexToMuTerm k@(H.Kleenex is h) = map f is
     where
       f i = let sm = kleenexToSimpleMu i k
@@ -317,7 +317,7 @@ regexToMuTerm o re =
        LazyRange _ _ _ -> error "Lazy ranges not yet supported"
 
 
-testKleenex :: String -> Either String [(KleenexMu a, Marked)]
+testKleenex :: String -> Either String [(KleenexMu a, Marks)]
 testKleenex s = either Left (Right . kleenexToMuTerm) (H.parseKleenex s)
 
 --- Kleenex with actions translation
@@ -378,7 +378,7 @@ repeatRegex' :: Bool -> Int -> Regex -> KleenexActionMu a
 repeatRegex' ign n re = foldr Seq Accept (replicate n (regexToActionMuTerm ign re))
 
 
-testSimple :: String -> Either String [(SimpleMu, Marked)]
+testSimple :: String -> Either String [(SimpleMu, Marks)]
 testSimple s = either Left (Right . g) (H.parseKleenex s)
     where
       g k@(H.Kleenex is _) = map (f k) is

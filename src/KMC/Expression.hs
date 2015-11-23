@@ -42,4 +42,4 @@ showMu Accept = "Accept"
 -- | Denote positions in mu expressions
 data Dir = L | R deriving (Eq, Ord, Show)
 type Pos = [Dir]
-type Marked = S.Set Pos
+type Marks = S.Set Pos

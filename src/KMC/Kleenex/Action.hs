@@ -38,7 +38,7 @@ data ConstructState st pred func var =
   ConstructState { edges     :: EdgeSet st pred func var
                  , nextState :: st
                  , states    :: S.Set st
-                 , marks     :: Marked
+                 , marks     :: Marks
                  }
 
 type Construct st pred func var = State (ConstructState st pred func var)

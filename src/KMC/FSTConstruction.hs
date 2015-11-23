@@ -21,7 +21,7 @@ data ConstructState st pred func =
   ConstructState { edges     :: [Edge st pred func]
                  , nextState :: st
                  , states    :: S.Set st
-                 , marks     :: Marked
+                 , marks     :: Marks
                  }
 
 type Construct st pred func = State (ConstructState st pred func)
@@ -126,10 +126,10 @@ connectTo :: (Monoid (Rng func)) => [st] -> st -> Construct st pred func ()
 connectTo states to = mapM_ (\from -> addEdge from (Right mempty) to) states
 
 -- | Constructs an FST from the given mu-term but uses a DFA construction on
--- all subterms at the positions in the given `Marked` set.  If the set is
+-- all subterms at the positions in the given `Marks` set.  If the set is
 -- empty a normal FST will be produced.
 fromMuWithDFA :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-              => Marked
+              => Marks
               -> Mu pred func st -> FST st pred (func :+: (Const (Dom func) (Rng func)))
 fromMuWithDFA ms e =
   let (qin, cs) = runState (construct [] (toEnum 0) e)
