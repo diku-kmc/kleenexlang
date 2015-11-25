@@ -20,9 +20,7 @@ where
 import Control.Monad.Trans
 import Control.Monad.Identity
 import Control.Monad.State
-import Control.Applicative
 import Data.Maybe (catMaybes)
-import Data.Monoid
 
 data Tree w a = Tip { tOutput :: w, tValue :: a }
               | Fork { tOutput :: w

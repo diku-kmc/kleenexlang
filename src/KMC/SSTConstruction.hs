@@ -4,8 +4,6 @@ module KMC.SSTConstruction where
 
 import           Control.Monad.State
 import           Data.Maybe (maybeToList, isJust)
-import           Data.Monoid
-import           Data.Functor ((<$>))
 import qualified Data.Set as S
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
@@ -24,7 +22,6 @@ instance PartialOrder Var where
         prefixOf _ _ = False
 
 {-- Closure monad --}
-
 
 -- | The closure monad models a computation consisting of concurrent threads
 -- with shared state executed in round-robin
