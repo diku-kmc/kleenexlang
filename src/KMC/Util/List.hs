@@ -1,7 +1,5 @@
 module KMC.Util.List where
 
-import Data.Functor ((<$>))
-    
 lcp :: (Eq a) => Maybe [a] -> Maybe [a] -> Maybe [a]
 lcp Nothing y = y
 lcp x Nothing = x
@@ -37,4 +35,3 @@ foldr1ifEmpty f _ l  = foldr1 f l
 alternate :: [a] -> [a] -> [a]
 alternate [] _      = []
 alternate (x:xs) ys = x : alternate ys xs
-

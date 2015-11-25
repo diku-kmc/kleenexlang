@@ -44,13 +44,6 @@ data KleenexTerm = Constant ByteString -- ^ A constant output.
 
 type KleenexParser a = Parsec String () a
 
-separator :: KleenexParser ()
-separator = spaceOrTab <|> ignore (try (lookAhead newline))
-
--- Parse one space or tab character.
-spaceOrTab :: KleenexParser ()
-spaceOrTab = ignore (char ' ' <|> char '\t')
-
 ignore :: Parsec s u a -> Parsec s u ()
 ignore p = p >> return ()
 

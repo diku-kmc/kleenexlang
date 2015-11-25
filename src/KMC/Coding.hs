@@ -1,15 +1,13 @@
 {-# LANGUAGE Rank2Types, ScopedTypeVariables #-}
 module KMC.Coding
     (bitWidth
+    ,boundedSize
     ,codeFixedWidth
     ,codeFixedWidthEnum
     ,codeFixedWidthEnumSized
     ,decode
-    ,decodeEnum
-    ,decodeRangeSet)
+    ,decodeEnum)
 where
-
-import KMC.RangeSet
 
 -- | Compute the number of digits required to fit n values in a word of digits of a given base
 bitWidth :: Int -- ^ Base
@@ -19,7 +17,13 @@ bitWidth base n = go 0
     where
       go w | base^w >= n = w
            | otherwise   = go (w+1)
-  
+
+-- | Get the size of a bounded domain.
+boundedSize :: forall b. (Bounded b, Enum b)
+               => b   -- ^ Dummy argument. Not evaluated
+               -> Int -- ^ Size of domain
+boundedSize _ = fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1
+      
 -- | Code an integral value as a big-endian sequence of digits in an arbitrary base.
 codeFixedWidth :: Int   -- ^ Base
                -> Int   -- ^ Number of digits
@@ -75,6 +79,3 @@ decodeEnum :: forall a b. (Enum b, Bounded b, Enum a, Num a) => [b] -> a
 decodeEnum ds = decode base (map (toEnum . fromEnum) ds)
     where
       base = toEnum (fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1)
-
-decodeRangeSet :: (Enum a, Enum b, Bounded b) => RangeSet a -> b -> a
-decodeRangeSet rs b = lookupIndex (fromEnum b) rs
