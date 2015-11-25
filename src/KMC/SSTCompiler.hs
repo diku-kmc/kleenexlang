@@ -8,7 +8,6 @@
 module KMC.SSTCompiler where
 
 import           Control.Monad.Reader
-import           Control.Applicative ((<$>), (<*>), pure)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -241,8 +240,8 @@ elimIdTables prog = prog { progTables = rest
       isIdTable = all cmp . zip [0..] . tblTable
       cmp (ix, sym) = ix == (decodeEnum sym :: Integer)
       elimTables = map (instrElim (M.keys idTables))
-      instrElim tids (IfI exp block) = IfI exp (elimTables block)
-      instrElim tids (NextI min max block) = NextI min max (elimTables block)
+      instrElim _ (IfI expr block) = IfI expr (elimTables block)
+      instrElim _ (NextI min' max' block) = NextI min' max' (elimTables block)
       instrElim tids ins@(AppendTblI bid tid i) =
           if tid `elem` tids
           then AppendSymI bid i
