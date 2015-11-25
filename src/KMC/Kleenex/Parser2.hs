@@ -47,9 +47,9 @@ parens = between (symbol "(") (symbol ")")
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
 
--- | An identifier is one or more alphanumeric symbols
+-- | An identifier is one or more alphanumeric symbols, first symbol cannot be a number
 identifier :: Parser String
-identifier = many1 (alphaNum <|> oneOf "_-")
+identifier = (:) <$> letter <*> many (alphaNum <|> oneOf "_-")
 
 -- | A positive integer literal
 integer :: Parser Int
@@ -172,8 +172,9 @@ termP = buildExpressionParser table atomP
 -- | Parse a term "atom" - that is, a term that does not require parsing term operators.
 atomP :: Parser Term
 atomP = termPos $ choice
-        [ -- Identifiers overlap with register names and declarations, so we need lookahead.
-          Var      <$> try (identifierP <* notFollowedBy (string ":=" <|> string "@"))
+        [ One      <$  symbol "1"
+          -- Identifiers overlap with register names and declarations, so we need lookahead.
+        , Var      <$> try (identifierP <* notFollowedBy (string ":=" <|> string "@"))
         , Constant <$> constantP
           -- Trailing slash is parsed as a "symbol" to consume white space
         , RE       <$> between (char '/') (symbol "/") regexP
