@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module KMC.OutputTerm where
 
 import KMC.Theories
@@ -8,6 +9,8 @@ import KMC.Coding
 
 data Ident a = Ident deriving (Eq, Ord, Show)
 data InList f = InList f deriving (Eq, Ord, Show)
+data InLeft f b = InLeft f deriving (Eq, Ord, Show)
+data InRight a f = InRight f deriving (Eq, Ord, Show)
 data Enumerator e dom rng = Enumerator e deriving (Eq, Ord, Show)
 data Join f rng = Join [f] deriving (Eq, Ord, Show)
 data Const dom rng = Const rng deriving (Eq, Ord, Show)
@@ -40,6 +43,22 @@ instance (Function f) => Function (InList f) where
   inDom x (InList f) = inDom x f
   domain (InList f) = domain f
 
+instance (Function f) => Function (InLeft f b) where
+  type Dom (InLeft f b) = Dom f
+  type Rng (InLeft f b) = Either (Rng f) b
+  eval (InLeft f) x = Left (eval f x)
+  isConst (InLeft f) = Left <$> isConst f
+  inDom x (InLeft f) = inDom x f
+  domain (InLeft f) = domain f
+
+instance (Function f) => Function (InRight a f) where
+  type Dom (InRight a f) = Dom f
+  type Rng (InRight a f) = Either a (Rng f)
+  eval (InRight f) x = Right (eval f x)
+  isConst (InRight f) = Right <$> isConst f
+  inDom x (InRight f) = inDom x f
+  domain (InRight f) = domain f
+
 instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   type Dom (Join f rng) = Dom f
   type Rng (Join f rng) = rng
@@ -68,7 +87,7 @@ instance Function (Const dom rng) where
   inDom _ _ = True
   domain (Const _) = []
 
-instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Function (Enumerator e dom rng) where
+instance (Enumerable e dom, Enum rng, Bounded rng, Enum dom) => Function (Enumerator e dom rng) where
   type Dom (Enumerator e dom rng) = dom
   type Rng (Enumerator e dom rng) = [rng]
   eval (Enumerator e) x = codeFixedWidthEnumSized (size e) (indexOf x e)
@@ -78,4 +97,3 @@ instance (Enumerable e dom, Enum rng, Bounded rng, Num dom, Enum dom) => Functio
                                Nothing
   inDom x (Enumerator e) = member x e
   domain (Enumerator e)  = [lookupIndex i e | i <- [0 .. size e]]
-

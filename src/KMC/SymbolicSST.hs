@@ -58,6 +58,8 @@ data ActionExpr var dom rng = PushOut var
                             | ParseBits (RS.RangeSet dom)
                             | OutputConst rng
     deriving (Ord, Show, Eq)
+decodeRangeSet :: (Enum a, Enum b, Bounded b) => RS.RangeSet a -> b -> a
+decodeRangeSet rs b = RS.lookupIndex (fromEnum b) rs
 
 instance (rng ~ [dom], Enum dom, Bounded dom) => Function (ActionExpr var dom rng) where
     type Dom (ActionExpr var dom rng) = dom

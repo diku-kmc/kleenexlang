@@ -27,6 +27,11 @@ import           KMC.SymbolicAcceptor
 import           KMC.Theories
 import           KMC.Util.Bits
 
+import KMC.FSTConstruction2
+instance (Pretty e, Pretty dom, Pretty digit) => Pretty (CodeFunc e dom digit) where
+  pretty (CodeArg e) = pretty e
+  pretty (CodeConst bs) = concatMap pretty bs
+  
 class Pretty a where
   pretty :: a -> String
 
