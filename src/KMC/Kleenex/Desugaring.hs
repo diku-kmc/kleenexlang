@@ -55,7 +55,8 @@ decl t = do
 
 lookupIdent :: MonadReader DesugarContext m => Ident -> m RIdent
 lookupIdent ident =
-  asks (M.lookup ident . dcIdents) >>= maybe (error $ "lookupIdent: invariant broken") return
+  asks (M.lookup ident . dcIdents)
+  >>= maybe (error $ "lookupIdent invariant broken: " ++ fromIdent ident) return
 
 --------------------------------
 -- Regular expression desugaring
