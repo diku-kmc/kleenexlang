@@ -103,7 +103,7 @@ usFunctions (_:xs) = usFunctions xs
 -- | Tabulate a function. It is assumed that the codomain is a set of
 -- bit-vectors with pairwise equal length.
 tabulate :: (Function t,Enum (Dom t),Bounded (Dom t)
-            ,Rng t ~ [delta], Show (Dom t))
+            ,Rng t ~ [delta])
          => t -> Table delta
 tabulate f = Table bitTable bitSize
   where
@@ -112,15 +112,11 @@ tabulate f = Table bitTable bitSize
     eval' x | inDom x f = eval f x
             | otherwise = []
 
-look :: (Ord k) => M.Map k a -> k -> a
-look m k = case M.lookup k m of
-                Just v -> v
-                Nothing -> error $ "Nøgle ikke fundet: "
 -- | Compile a single variable update into a sequence of instructions.
 -- The following is assumed:
 --   (1) Variable updates are linear (non-copying)
 --   (2) Within the block of updates, the updated buffer is not live. (I.e., it is safe to modify it)
-compileAssignment :: (Ord var, Show var, Ord func, Rng func ~ [delta], Ord delta) =>
+compileAssignment :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
                      var                       -- ^ Variable to be updated
                   -> UpdateStringFunc var func -- ^ Update function
                   -> EnvReader st var func delta (Block delta)
@@ -130,7 +126,7 @@ compileAssignment var atoms = do
         | var == var' -> mapM conv atoms'
     _                 -> (:) <$> (ResetI <$> bid) <*> (mapM conv atoms)
   where
-    bid = look <$> (asks bmap) <*> pure var
+    bid = (M.!) <$> (asks bmap) <*> pure var
     conv (VarA var')     = ConcatI    <$> bid <*> ((M.!) <$> asks bmap <*> pure var')
     conv (ConstA deltas) = AppendI    <$> bid <*> ((M.!) <$> asks cmap <*> pure deltas)
     conv (FuncA f i)     = AppendTblI <$> bid <*> ((M.!) <$> asks tmap <*> pure f) <*> pure i
@@ -159,16 +155,16 @@ orderAssignments ru
       fv (VarA v:xs) = v:fv xs
       fv (_:xs) = fv xs
 
-compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta], Ord delta, Show var) =>
+compileRegisterUpdate :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
                       RegisterUpdate var func   -- ^ Register update
                       -> EnvReader st var func delta (Block delta)
 compileRegisterUpdate rup = 
   liftM concat $ mapM (uncurry compileAssignment) $ orderAssignments rup
 
-compileTransitions :: (Ord st, Ord var, Ord pred, Ord func, Ord delta, Show var
+compileTransitions :: (Ord st, Ord var, Ord pred, Ord func, Ord delta
                       ,Rng func ~ [delta], PredicateListToExpr pred) =>
                       Int
-                   -> KVTree pred (EdgeAction var func, st) -- ^ Transitions
+                   -> KVTree pred (RegisterUpdate var func, st) -- ^ Transitions
                    -> EnvReader st var func delta (Block delta)
 compileTransitions i (BranchT action tests) = do
   testBlock <- forM tests $ \(ps, ts') ->
@@ -178,32 +174,15 @@ compileTransitions i (BranchT action tests) = do
                    block]
   actionBlock <- case action of
                     Nothing -> return []
-                    Just (Inl upd, st') -> do
+                    Just (upd, st') -> do
                         bid <- (M.! st') <$> asks smap
                         block <- compileRegisterUpdate upd
                         return $ block ++ [ConsumeI i, GotoI bid]
-                    Just (Inr (PushOut var), st') -> do
-                        bid <- (M.! st') <$> asks smap
-                        bufid <- (M.! var) <$> asks bmap
-                        return [ResetI bufid, ChangeOut bufid, GotoI bid]
-                    Just (Inr PopOut, st') -> do
-                        bid <- (M.! st') <$> asks smap
-                        return [RestoreOut, GotoI bid]
-                    Just (Inr (OutputConst const), st') -> do
-                        bid <- (M.! st') <$> asks smap
-                        var <- asks outvar
-                        bufid <- (M.! var) <$> asks bmap
-                        cid <- (M.! const) <$> asks cmap
-                        return [ConsumeI i, AppendI bufid cid, GotoI bid]
-                    Just (Inr (ParseBits rs), st') -> do
-                        return $ error "ParseBits"
-                    Just (Inr (RegUpdate var atoms), st') -> do
-                        return $ error "RegUpdate"
   return $ concat testBlock ++ actionBlock
 
-compileState :: (Ord st, Ord var, Ord pred, Ord func, Ord delta, Show var
+compileState :: (Ord st, Ord var, Ord pred, Ord func, Ord delta
                 ,Rng func ~ [delta], PredicateListToExpr pred) =>
-                [([pred], EdgeAction var func, st)] -- ^ Transitions
+                [([pred], RegisterUpdate var func, st)] -- ^ Transitions
              -> Maybe (UpdateString var [delta])        -- ^ Final action
              -> EnvReader st var func delta (Block delta)
 compileState trans fin = do
@@ -224,13 +203,13 @@ compileState trans fin = do
   transitions <- compileTransitions 0 (kvtree [ (ps, (upd, st')) | (ps, upd, st') <- trans ])
   return $ assignments ++ transitions ++ [FailI]
 
-constants :: (Ord delta, Rng func ~ [delta], Show delta) =>
-             [(st, pred, EdgeAction var func, st)]
+constants :: (Ord delta, Rng func ~ [delta]) =>
+             [(st, pred, RegisterUpdate var func, st)]
           -> [UpdateString var [delta]]
           -> S.Set [delta]
-constants trans fins = S.unions [tconsts, fconsts, aconsts]
+constants trans fins = S.unions [tconsts, fconsts]
     where tconsts = S.fromList $ do
-                      (_, _, Inl ru, _) <- trans
+                      (_, _, ru, _) <- trans
                       usf <- M.elems ru
                       ConstA c <- usf
                       return c
@@ -238,10 +217,6 @@ constants trans fins = S.unions [tconsts, fconsts, aconsts]
           fconsts = S.fromList $ do
                       us <- fins
                       Right c <- us
-                      return c
-
-          aconsts = S.fromList $ do
-                      (_, _, Inr (OutputConst c), _) <- trans
                       return c
 
 data Env st var func delta = Env
@@ -277,7 +252,7 @@ elimIdTables prog = prog { progTables = rest
 compileAutomaton :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta
     , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
-    , PredicateListToExpr pred, Show (Dom func), Show var, Show delta) =>
+    , PredicateListToExpr pred) =>
     SST st pred func var
     -> Program delta
 compileAutomaton sst =
@@ -306,7 +281,7 @@ compileAutomaton sst =
     -- update string function in every transition.
     allFunctions =
       S.toList $ S.unions
-        [ S.fromList (usFunctions us) | (_, Inl upd, _) <- concat $ M.elems $ sstE sst
+        [ S.fromList (usFunctions us) | (_, upd, _) <- concat $ M.elems $ sstE sst
                                       , us <- M.elems upd ]
 
     funcRel :: [(func, TableId, Table delta)]
