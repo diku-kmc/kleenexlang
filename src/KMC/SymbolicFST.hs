@@ -63,10 +63,35 @@ flipEdges es = OrderedEdgeSet {eForward = eBackward es
                               ,eForwardEpsilon = eBackwardEpsilon es
                               ,eBackwardEpsilon = eForwardEpsilon es}
 
+-- | Get the underlying list representation of an ordered edge set
 edgesToList :: OrderedEdgeSet q pred func -> [(q, Either (pred, func) (Rng func), q)]
-edgesToList es =
-  [ (q, Left (a,b), q') | (q, xs) <- M.toList (eForward es), (a,b,q') <- xs ]
-  ++ [ (q, Right y, q') | (q, xs) <- M.toList (eForwardEpsilon es), (y, q') <- xs ]
+edgesToList es = symEdgesToList (eForward es) ++ epsEdgesToList (eForwardEpsilon es)
+
+-- | Get the list representation of only the symbol edges in an ordered edge set
+symEdgesToList :: M.Map q [(pred, func, q)] -> [(q, Either (pred, func) (Rng func), q)]
+symEdgesToList es = [ (q, Left (a,b), q') | (q, xs) <- M.toList es, (a,b,q') <- xs ]
+
+-- | Get the list representation of only the epsilon edges in an ordered edge set
+epsEdgesToList :: M.Map q [(Rng func, q)] -> [(q, Either (pred, func) (Rng func), q)]
+epsEdgesToList es = [ (q, Right y, q') | (q, xs) <- M.toList es, (y, q') <- xs ]
+
+-- | Map four functions over the edges in an FST. Symbol edges may be turned
+-- into epsilon edges and vice versa.
+mapEdges :: (Ord q)
+         => (q -> [(pred1,func1,q)] -> [(pred2,func2,q)])
+         -> (q -> [(pred1,func1,q)] -> [(Rng func2, q)])
+         -> (q -> [(Rng func1, q)] -> [(pred2,func2,q)])
+         -> (q -> [(Rng func1, q)] -> [(Rng func2, q)])
+         -> FST q pred1 func1 -> FST q pred2 func2
+mapEdges symsym symeps epssym epseps fst' =
+  fst' { fstE = edgesFromList (symEdges1 ++ symEdges2 ++ epsEdges1 ++ epsEdges2) }
+  where
+    esym = eForward $ fstE fst'
+    eeps = eForwardEpsilon $ fstE fst'
+    symEdges1 = symEdgesToList $ M.mapWithKey symsym $ esym
+    symEdges2 = symEdgesToList $ M.mapWithKey epssym $ eeps
+    epsEdges1 = epsEdgesToList $ M.mapWithKey symeps $ esym
+    epsEdges2 = epsEdgesToList $ M.mapWithKey epseps $ eeps
 
 evalEdges :: (Ord st
              ,Function func
