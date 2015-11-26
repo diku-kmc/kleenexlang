@@ -16,18 +16,23 @@ import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8, Word16)
 
-import           KMC.Kleenex.Lang
-import           KMC.Kleenex.Action
-import           KMC.OutputTerm
+import           KMC.Kleenex.Actions
+import           KMC.Kleenex.Syntax hiding (Ident)
 import           KMC.RangeSet
 import           KMC.SSTConstruction
+import           KMC.SymbolicAcceptor
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
-import           KMC.SymbolicAcceptor
 import           KMC.Theories
 import           KMC.Util.Bits
 
-import KMC.FSTConstruction2
+import           KMC.FSTConstruction2
+
+instance Pretty RegAction where
+  pretty Push    = "<push>"
+  pretty (Pop r) = "<pop." ++ show (fromRegIdent r) ++ ">"
+  pretty (Write r) = "<wr." ++ show (fromRegIdent r) ++ ">"
+
 instance (Pretty e, Pretty dom, Pretty digit) => Pretty (CodeFunc e dom digit) where
   pretty (CodeArg e) = pretty e
   pretty (CodeConst bs) = concatMap pretty bs
@@ -35,12 +40,9 @@ instance (Pretty e, Pretty dom, Pretty digit) => Pretty (CodeFunc e dom digit) w
 class Pretty a where
   pretty :: a -> String
 
-instance Pretty (InList (Ident Word8)) where
-    pretty (InList _) = "COPY"
-
-instance (Pretty f, Pretty b) => Pretty (f :+: (Const a b)) where
-    pretty (Inl x)         = pretty x
-    pretty (Inr (Const c)) = pretty c
+instance Pretty c => Pretty (CopyFunc a c) where
+  pretty CopyArg = "COPY"
+  pretty (CopyConst c) = pretty c
 
 instance (Eq a, Pretty a) => Pretty (RangeSet a) where
   pretty rs | [(l,h)] <- ranges rs, l == h = pretty l
@@ -72,12 +74,6 @@ instance Pretty Var where
 instance Pretty a => Pretty [a] where
   pretty = concatMap pretty
 
-instance (Pretty p, Pretty a) => Pretty (Join (Const dom a :+: Enumerator p dom rng) [rng]) where
-  pretty (Join xs) = concatMap aux xs
-      where
-        aux (Inl (Const x)) = pretty x
-        aux (Inr (Enumerator p)) = "{" ++ pretty p ++ "}"
-
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) where
   pretty (VarA v) = "(" ++ pretty v ++ ")"
   pretty (ConstA x) = pretty x
@@ -85,26 +81,6 @@ instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) 
 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate var func) where
   pretty m = "[" ++ intercalate "\\l," [ pretty v ++ ":=" ++ pretty f | (v,f) <- M.toList m ] ++ "]"
-
-instance (Bounded a, Enum a) => Pretty (Const x [a]) where
-    pretty (Const []) = "SKIP"
-    pretty (Const ws) = "\"" ++ map toChar [ws] ++ "\""
-
-instance (Pretty var, Pretty rng, Pretty dom) => Pretty (ActionExpr var dom rng) where
-    pretty (ParseBits _)   = "BITS!"
-    pretty (RegUpdate var atoms) = pretty var ++ ":=" ++ pretty atoms
-    pretty (PushOut v)     = "push outbuf " ++ pretty v
-    pretty (PopOut)        = "pop outbuf"
-    pretty (OutputConst c) = pretty c
-
-instance (Pretty a, Pretty var, Pretty dom, Pretty rng) => Pretty (a :+: ActionExpr var dom rng) where
-  pretty (Inl x) = "(" ++ pretty x ++ ")"
-  pretty (Inr y) = pretty y
-
-instance (Pretty var, Pretty b, Pretty dom, Pretty rng) => Pretty (ActionExpr var dom rng :+: b) where
-  pretty (Inl x) = "(" ++ pretty x ++ ")"
-  pretty (Inr y) = pretty y
-
 
 fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]
