@@ -20,7 +20,6 @@ import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Syntax hiding (Ident)
 import           KMC.RangeSet
 import           KMC.SSTConstruction
-import           KMC.SymbolicAcceptor
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
 import           KMC.Theories
@@ -110,35 +109,6 @@ formatFSTEdge (_, _, l) =
   case l of
     Left (p, f)  -> [ GV.textLabel $ pack (pretty p ++ "/" ++ pretty f) ]
     Right l' -> [ GV.textLabel $ pack ("ε/" ++ pretty l') ]
-
-dfaToDot :: (Ord st, Pretty pred)
-         => DFA st pred -> GV.DotGraph st
-dfaToDot (DFA dfa) = GV.graphElemsToDot params nodes edges
-    where
-      params = GV.nonClusteredParams
-               { GV.globalAttributes = fstGlobalAttrs
-               , GV.fmtNode = formatNode (\q -> S.member q (accF dfa)) (== unSingle (accI dfa))
-               , GV.fmtEdge = formatDFAEdge
-               }
-      nodes = map (\x -> (x,x)) (S.toList (accS dfa))
-      edges = [ (q, q', p) | (q, p, q') <- dfaEdgesToList (accE dfa) ]
-      formatDFAEdge (_, _, p) = [ GV.textLabel $ pack $ pretty p ]
-
-nfaToDot :: (Ord st, Pretty pred)
-         => NFA st pred -> GV.DotGraph st
-nfaToDot (NFA nfa) = GV.graphElemsToDot params nodes edges
-    where
-      params = GV.nonClusteredParams
-               { GV.globalAttributes = fstGlobalAttrs
-               , GV.fmtNode = formatNode (flip S.member (accF nfa)) (flip S.member (accI nfa))
-               , GV.fmtEdge = formatNFAEdge
-               }
-      nodes = map (\x -> (x,x)) (S.toList (accS nfa))
-      edges = [ (q, q', p) | (q, p, q') <- nfaEdgesToList (accE nfa) ]
-      -- Unicode point 949 is 'GREEK SMALL LETTER EPSILON'
-      formatNFAEdge (_, _, Nothing) = [ GV.textLabel $ pack $ [chr 949] ]
-      formatNFAEdge (_, _, Just p)  = [ GV.textLabel $ pack $ pretty p ]
-
 
 fstToDot :: (Ord st, Pretty pred, Pretty (Rng func), Pretty func)
          => FST st pred func -> GV.DotGraph st
