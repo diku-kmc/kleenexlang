@@ -14,7 +14,7 @@ import           Control.Concurrent (forkIO)
 import           Data.Char (chr, isPrint)
 import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
-import           Data.Word (Word8, Word16)
+import           Data.Word (Word8)
 
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Syntax hiding (Ident)
@@ -23,7 +23,6 @@ import           KMC.SSTConstruction
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
 import           KMC.Theories
-import           KMC.Util.Bits
 
 import           KMC.FSTConstruction2
 
@@ -59,10 +58,6 @@ instance (Eq a, Pretty a) => Pretty (RangeSet a) where
 instance Pretty Word8 where
   pretty a = let c = chr $ fromEnum a
              in if isPrint c then [c] else '\\':show a
-
-instance Pretty Word16 where
-    pretty a = let (c1, c2) = split a :: (Word8, Word8)
-               in pretty c1 ++ pretty c2
 
 instance Pretty Bool where
   pretty False = "0"
