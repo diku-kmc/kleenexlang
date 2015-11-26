@@ -24,7 +24,7 @@ import           KMC.SymbolicFST
 import           KMC.SymbolicSST
 import           KMC.Theories
 
-import           KMC.FSTConstruction2
+import           KMC.FSTConstruction
 
 class Pretty a where
   pretty :: a -> String

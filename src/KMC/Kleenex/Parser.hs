@@ -1,228 +1,214 @@
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Parser where
+module KMC.Kleenex.Parser(parseKleenex, parseKleenexFromFile) where
 
 import           Control.Monad.Identity (Identity)
+import           Data.ByteString (ByteString)
+import           Data.ByteString.Char8 (pack)
 import           Data.Char
-import           Data.ByteString (ByteString, unpack)
-import           Data.Hashable
-import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
-import           Text.Parsec hiding (parseTest)
-import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
-import           Numeric (readHex)
-
-import           KMC.Kleenex.Action
-import           KMC.SymbolicSST (Atom(..), ActionExpr(..))
-import           KMC.Syntax.Config
-import           KMC.Syntax.External (Regex)
+import qualified KMC.Kleenex.Syntax as S
+import           KMC.Kleenex.Syntax hiding (Term,Decl,Prog)
+import           KMC.Syntax.Config (fancyRegexParser, RegexParserConfig(..))
 import           KMC.Syntax.Parser (anchoredRegexP)
+import           Numeric (readHex)
+import           Text.Parsec
+import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
--- | An Identifier is a String that always starts with a lower-case char.
-newtype Identifier = Identifier { fromIdent :: String } deriving (Eq, Ord, Show)
+type Parser = ParsecT [Char] () Identity
 
--- | A Kleenex program is a list of assignments.
-data Kleenex            = Kleenex [Identifier] [KleenexAssignment] deriving (Eq, Ord, Show)
+----------------------
+-- Lexing
+----------------------
 
--- | Assigns the term to the name.
-data KleenexAssignment  = HA (Identifier, KleenexTerm)
-    deriving (Eq, Ord, Show)
+-- | Discard result of a parser
+skip :: Parser a -> Parser ()
+skip p = p *> pure ()
 
--- | The terms describe how regexps are mapped to strings.
-data KleenexTerm = Constant ByteString -- ^ A constant output.
-                 | RE Regex
-                 | Var Identifier
-                 | Seq KleenexTerm KleenexTerm
-                 | Sum KleenexTerm KleenexTerm
-                 | Star KleenexTerm
-                 | Plus KleenexTerm
-                 | Question KleenexTerm
-                 | Range (Maybe Int) (Maybe Int) KleenexTerm
-                 | Ignore KleenexTerm -- ^ Suppress any output from the subterm.
-                 | Action KleenexAction KleenexTerm
-                 | One
-  deriving (Eq, Ord, Show)
+-- | Skip whitespace, including singleline and multiline comments
+whiteSpace :: Parser ()
+whiteSpace = skipMany (simpleSpace <|> singleLineComment <|> multiLineComment)
+  where
+    singleLineComment = skip (try (string "//") *> manyTill anyChar newline)
+    multiLineComment = skip (try (string "/*") *> manyTill anyChar (try (string "*/")))
+    simpleSpace = skipMany1 (satisfy isSpace) <?> ""
 
-type KleenexParser a = Parsec String () a
+-- | A lexeme is a token followed by white space
+lexeme :: Parser a -> Parser a
+lexeme p = p <* whiteSpace
 
-ignore :: Parsec s u a -> Parsec s u ()
-ignore p = p >> return ()
+-- | Either parse a complete symbol, or fail and consume nothing. Consumes trailing whitespace.
+symbol :: String -> Parser ()
+symbol = lexeme . try . skip . string
 
-skipAround :: KleenexParser a -> KleenexParser a
-skipAround = between skipped skipped
+-- | Surround parser by parentheses with interleaved white space
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
 
-parens :: KleenexParser a -> KleenexParser a
-parens = between (char '(') (char ')')
+-- | Surround parser by brackets with interleaved white space
+brackets :: Parser a -> Parser a
+brackets = between (symbol "[") (symbol "]")
 
--- | Identifiers are only allowed to start with lower-case characters.
-kleenexIdentifier :: KleenexParser Identifier
-kleenexIdentifier = Identifier <$>
-                  ((:) <$> legalStartChar <*> many legalChar)
-                  <?> "identifier"
+-- | An identifier is one or more alphanumeric symbols, first symbol cannot be a number
+identifier :: Parser String
+identifier = (:) <$> letter <*> many (alphaNum <|> oneOf "_-")
+
+-- | A positive integer literal
+integer :: Parser Int
+integer = read <$> many1 digit <?> "positive integer"
+
+-- | A register identifier must begin with lowercase
+regIdentifier :: Parser String
+regIdentifier = (:) <$> lower <*> many (alphaNum <|> oneOf "_-")
+
+-- | Mapping of escape codes to their underlying character
+escapeCodes :: [(Char, Char)]
+escapeCodes = [('\\', '\\')
+              ,('"', '"')
+              ,('n', '\n')
+              ,('t', '\t')
+              ,('v', '\v')
+              ,('r', '\r')
+              ,('f', '\f')]
+
+-- | A single escape sequence
+escapedChar :: Parser Char
+escapedChar = char '\\' *> try (simpleEscape <|> hexcodeEscape <?> "escape sequence")
     where
-      legalStartChar = lower
-      legalChar = upper <|> lower <|> digit <|> oneOf "_-"
+      simpleEscape =
+        choice [ replacement <$ char code | (code, replacement) <- escapeCodes ]
+      hexcodeEscape = decodeHex <$> (char 'x' *> count 2 hexDigit)
+      decodeHex = chr . fst . head . readHex
 
--- | Parses a character or an escaped double quote.
-escapedChar :: Parsec String s Char
-escapedChar = satisfy (not . mustBeEscaped)
-              <|> escaped
-    where
-      mustBeEscaped c = c `elem` map snd cr
-      escaped = char '\\' >> (try $ choice (map aux cr) <|> hexcode)
-      aux (code, replacement) = replacement <$ char code
-      cr = [('\\', '\\'), ('"', '"'), ('n', '\n'), ('t', '\t')]
-      hexcode = do _ <- char 'x'
-                   x <- count 2 hexDigit
-                   return . chr . fst . head . readHex $ x
+-- | A (possibly empty) sequence of verbatim symbols
+stringConstant :: Parser String
+stringConstant = many (noneOf ['"', '\\'] <|> escapedChar)
 
--- | A "constant" is a string enclosed in quotes.
-kleenexConstant :: KleenexParser String
-kleenexConstant = (char '"') *> (many escapedChar) <* (char '"')
-                <?> "string constant"
+------------------
+-- Parsing
+------------------
 
-kleenexBecomesToken :: KleenexParser ()
-kleenexBecomesToken = skipAround (string ":=" >> return ())
+-- Specialize the metadata of the AST to a pair of source positions
+-- denoting the start and end of a given construct in the source text.
+type Term = S.Term (SourcePos, SourcePos)
+type Decl = S.Decl (SourcePos, SourcePos)
+type Prog = S.Prog (SourcePos, SourcePos)
 
-kleenexAssignment :: KleenexParser KleenexAssignment
-kleenexAssignment = do
-  ident <- kleenexIdentifier
-  kleenexBecomesToken
-  term <- kleenexTerm
-  return $ HA (ident, term)
+---------------------
+---- Helper functions
+---------------------
 
-varToInt :: String -> Int
-varToInt = abs . hash
+-- | Parse a value which may depend on its position in the source text.
+pos :: Parser ((SourcePos, SourcePos) -> a) -> Parser a
+pos p = do
+  pos1 <- getPosition
+  f <- p
+  pos2 <- getPosition
+  return $ f (pos1, pos2)
 
-skipped :: KleenexParser ()
-skipped = ignore $ many skipped1
+-- | Wrap position metadata around the result of a term parser
+termPos :: Parser Term -> Parser Term
+termPos p = pos (p >>= return . flip TermInfo)
 
-skipped1 :: KleenexParser ()
-skipped1 = ignore $ many1 (choice [ws, comment])
-    where ws = ignore $ many1 space
+-- | Like termPos, but for a Term-valued function.
+termPos1 :: Parser (a -> Term) -> Parser (a -> Term)
+termPos1 p = pos (p >>= \f -> return (\i x -> TermInfo i (f x)))
 
-comment :: KleenexParser ()
-comment = ignore $ try (char '/' >> (singleLine <|> multiLine))
-    where
-      singleLine = (try $ char '/') >> manyTill anyChar (ignore newline <|> eof)
-      multiLine  = char '*' >> manyTill anyChar (try $ string "*/")
+-- | Like termPos1, but for a function with two arguments.
+termPos2 :: Parser (a -> b -> Term) -> Parser (a -> b -> Term)
+termPos2 p = pos (p >>= \f -> return (\i x y -> TermInfo i (f x y)))
 
-parsePipeline :: KleenexParser [Identifier]
-parsePipeline = string "start:" *> skipped *> kleenexIdentifier `sepBy1` (try $ skipAround (string ">>"))
+-- | Like termPos, but for declarations
+declPos :: Parser Decl -> Parser Decl
+declPos p = pos (p >>= return . flip DeclInfo)
 
-kleenex :: KleenexParser (Kleenex)
-kleenex = do
-    idents <- skipped *> (try parsePipeline <|> return [Identifier "main"])
-    assignments <- skipped *> (kleenexAssignment `sepEndBy` skipped)
-    return $ Kleenex idents assignments
+--------------------
+---- Kleenex parsers
+--------------------
+-- Parsers ending in "P" consume trailing white space
 
-kleenexTerm :: KleenexParser KleenexTerm
-kleenexTerm = skipAround kleenexExpr
-    where
-      kleenexExpr = buildExpressionParser table $ skipAround (kleenexPrimTerm <|> parens kleenexTerm)
-      schar = skipAround . char
-      table = [
-          [ Prefix (schar '~' >> return Ignore <?> "Ignored"),
-            Prefix (try $ do ident <- many lower
-                             _ <- char '@'
-                             return $ (\term -> Action (PushOut (varToInt ident)) term `Seq` Action PopOut One)) ],
-          -- Use the postfix function below to allow multiple stacked postfix
-          -- operators without the need for parentheses around all subterms.
-          [ postfix $ choice [ (schar '*' >> return Star <?> "Star")
-                             , (schar '?' >> return Question <?> "Question")
-                             , (schar '+' >> return Plus <?> "Plus")
-                             , range <?> "Range"
-                             ]
-          ],
-          [ Infix   (skipped >> notFollowedBy (char '|') >> return Seq) AssocRight
-          ],
-          [ Infix   (schar '|' >> return Sum) AssocRight
-          ]
+-- | Parse an identifier
+identifierP :: Parser Ident
+identifierP = Ident <$> lexeme identifier
+              <?> "nonterminal"
+
+-- | Parse a register identifier
+regIdentifierP :: Parser RegIdent
+regIdentifierP = RegIdent <$> lexeme regIdentifier
+              <?> "register"
+
+-- | Parse a constant
+constantP :: Parser ByteString
+constantP = pack <$> lexeme (between (char '"') (char '"') stringConstant)
+            <?> "string constant"
+
+-- | Parse a term
+termP :: Parser Term
+termP = buildExpressionParser table atomP
+  where
+    table =
+      [ [ Prefix (SuppressOutput <$ symbol "~")
+          -- backtracking lookahead necessary since register identifiers overlap with nonterminals
+        , Prefix (RedirectReg <$> try (RegIdent <$> regIdentifier <* char '@'))
         ]
+      , [ postfix
+            (termPos1 (choice [ Star     <$ symbol "*"
+                              , Question <$ symbol "?"
+                              , Plus     <$ symbol "+"
+                              , rangeP
+                              ] <?> "repetition operator"))
+        ]
+      , [ Infix (termPos2 $ Seq <$ notFollowedBy (char '|')) AssocRight ]
+      , [ Infix (termPos2 $ Sum <$ symbol "|") AssocRight ]
+      ]
 
-      braces = between (schar '{') (schar '}')
-      number = fmap read (many1 digit) <?> "an integer literal"
-      range = braces $ try (do n <- optionMaybe number
-                               _ <- schar ','
-                               m <- optionMaybe number
-                               return $ Range n m)
-                   <|> do n <- number
-                          return $ Range (Just n) (Just n)
+    -- {m,n} or {m,} or {,n} or {m}
+    rangeP = char '{'
+             *> choice [ try (Range <$> optionMaybe integer <* char ',' <*> optionMaybe integer)
+                       , (\n -> Range (Just n) (Just n)) <$> integer ]
+             <* symbol "}"
 
--- | Combine postfix operators and allow sequences (e.g., /a/*+?)
-postfix :: KleenexParser (a -> a) -> Operator Char () a
-postfix p = Postfix . chainl1 p $ return (flip (.))
+    -- Treat sequence of postfix operators as single operator. E.g. /a/*+?
+    postfix p = Postfix $ chainl1 p (pure (flip (.)))
 
-kleenexPrimTerm :: KleenexParser KleenexTerm
-kleenexPrimTerm = skipAround elms
-    where
-      elms = choice [one, re, identifier, constant, action, output]
-      one        = const One <$> (char '1')
-                   <?> "One"
-      constant   = Constant . encodeString <$> kleenexConstant
-                   <?> "Constant"
-      re         = RE  <$> between (char '/') (char '/') regexP
-                   <?> "RE"
-      identifier = Var <$> try (kleenexIdentifier <* notFollowedBy kleenexBecomesToken)
-                   <?> "Var"
-      action     = Action <$> between (char '[') (char ']') actionP <*> (return One)
-                   <?> "Action"
-      output     = do ident <- skipAround (char '!' *> kleenexIdentifier)
-                      let buf = fromIdent ident
-                      return $ Action (RegUpdate 0 [Left 0, Left (varToInt buf)]) One
-                   <?> "OutputTerm"
+-- | Parse a term "atom" - that is, a term that does not require parsing term operators.
+atomP :: Parser Term
+atomP = termPos $ choice
+        [ One      <$  symbol "1"
+          -- Identifiers overlap with register names and declarations, so we need lookahead.
+        , Var      <$> try (identifierP <* notFollowedBy (string ":=" <|> string "@"))
+        , Constant <$> constantP
+          -- Trailing slash is parsed as a "symbol" to consume white space
+        , RE       <$> between (char '/') (symbol "/") regexP
+        , WriteReg <$  char '!' <*> regIdentifierP
+        , brackets registerUpdateP
+        , parens termP
+        ]
+  where
+    regexP = snd <$> (anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "/"
+                                                        , rep_freespacing = False })
+    registerUpdateP = do
+      ident <- regIdentifierP
+      choice [ UpdateReg ident <$ symbol "<-" <*> updateAtomsP
+             , UpdateReg ident <$ symbol "+=" <*> ((Left ident:) <$> updateAtomsP)
+             ]
+    updateAtomsP = many1 ((Left <$> regIdentifierP) <|> (Right <$> constantP))
 
-encodeString :: String -> ByteString
-encodeString = encodeUtf8 . T.pack
+progP :: Parser Prog
+progP = Kleenex <$ whiteSpace <*> pipelineP <*> many1 declP
+  where
+    declP     = declPos (S.Decl <$> identifierP <* symbol ":=" <*> termP)
+    pipelineP = try (symbol "start:") *> identifierP `sepBy1` (symbol ">>")
+                <|> pure [Ident "main"]
 
-regexP :: KleenexParser Regex
-regexP = snd <$> (anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "/", rep_freespacing = False })
 
-actionP :: KleenexParser (KleenexAction)
-actionP = do skipped
-             ident <- kleenexIdentifier
-             let reg = varToInt $ fromIdent ident
-             try (overwrite reg) <|> concatAction reg
-    where
-        regs = Left . varToInt . fromIdent <$> kleenexIdentifier
-        constant = Right . unpack . encodeString <$> kleenexConstant
-        overwrite reg = do
-            _ <- skipAround $ string "<-"
-            actions <- choice [regs, constant] `sepEndBy1` skipped
-            return $ RegUpdate reg actions
-        concatAction reg = do
-            _ <- skipAround $ string "+="
-            actions <- choice [regs, constant] `sepEndBy1` skipped
-            return $ RegUpdate reg (Left reg : actions)
+------------
+-- Interface
+------------
 
-parseKleenex :: String -- ^ Input string
-             -> Either String Kleenex
-parseKleenex str =
-    case runParser (kleenex <* eof) () "" str of
-      Left err -> Left (show err)
-      Right h -> Right h
+-- | Parse a string as a Kleenex program
+parseKleenex :: String -> Either ParseError Prog
+parseKleenex = runParser (progP <* eof) () "<input string>"
 
-parseKleenexFile :: FilePath -> IO (Either String Kleenex)
-parseKleenexFile fp = readFile fp >>= return . parseKleenex
-
------------------------------------------------------------------
------------------------------------------------------------------
-
-stateParseTest :: (Stream s Identity t, Show a)
-               => u -> Parsec s u a -> s -> IO ()
-stateParseTest st p input
-    = case runParser p st "" input of
-        Left err -> do putStr "parse error at "
-                       print err
-        Right x  -> print x
-
-parseTest :: (Show a) => KleenexParser a -> String -> IO ()
-parseTest = stateParseTest ()
-
-parseTest' :: (Stream s Identity t)
-               => Parsec s () (Kleenex) -> s -> IO (Kleenex)
-parseTest' p input
-    = case runParser p () "" input of
-        Left err -> do putStr "parse error at "
-                       print err
-                       fail ""
-        Right x  -> return x
+-- | Parse a file as a Kleenex program
+parseKleenexFromFile :: FilePath -> IO (Either ParseError Prog)
+parseKleenexFromFile fp =
+  readFile fp >>= return . runParser (progP <* eof) () fp

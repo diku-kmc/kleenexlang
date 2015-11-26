@@ -4,7 +4,7 @@
 {-# LANGUAGE GADTs #-}
 module KMC.Program.IL where
 
-import KMC.Coding (decodeEnum)
+import KMC.Util.Coding (decodeEnum)
 import qualified Data.Map as M
 
 -- | A representation of a full tabulation of a function 'f' with an enumerable
