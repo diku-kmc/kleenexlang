@@ -25,7 +25,6 @@ instance (Function f, Function g) => Function (f :*: g) where
     eval (f :*: g) (x, y)  = (eval f x, eval g y)
     isConst (_ :*: _)      = Nothing
     inDom (x, y) (f :*: g) = (x `inDom` f) && (y `inDom` g)
-    domain (f :*: g) = zip (domain f) (domain g)
 
 instance (Enum a, Bounded a) => Function (Ident a) where
   type Dom (Ident a) = a
@@ -33,7 +32,6 @@ instance (Enum a, Bounded a) => Function (Ident a) where
   eval Ident = id
   isConst Ident = Nothing
   inDom _ _ = True
-  domain Ident = [minBound .. maxBound]
 
 instance (Function f) => Function (InList f) where
   type Dom (InList f) = Dom f
@@ -41,7 +39,6 @@ instance (Function f) => Function (InList f) where
   eval (InList f) x = [eval f x]
   isConst (InList f) = (:[]) <$> isConst f
   inDom x (InList f) = inDom x f
-  domain (InList f) = domain f
 
 instance (Function f) => Function (InLeft f b) where
   type Dom (InLeft f b) = Dom f
@@ -49,7 +46,6 @@ instance (Function f) => Function (InLeft f b) where
   eval (InLeft f) x = Left (eval f x)
   isConst (InLeft f) = Left <$> isConst f
   inDom x (InLeft f) = inDom x f
-  domain (InLeft f) = domain f
 
 instance (Function f) => Function (InRight a f) where
   type Dom (InRight a f) = Dom f
@@ -57,7 +53,6 @@ instance (Function f) => Function (InRight a f) where
   eval (InRight f) x = Right (eval f x)
   isConst (InRight f) = Right <$> isConst f
   inDom x (InRight f) = inDom x f
-  domain (InRight f) = domain f
 
 instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   type Dom (Join f rng) = Dom f
@@ -65,7 +60,6 @@ instance (Function f, Monoid rng, Rng f ~ rng) => Function (Join f rng) where
   eval (Join fs) x = mconcat $ map (flip eval x) fs
   isConst (Join fs) = mconcat <$> mapM isConst fs
   inDom x (Join fs) = all (inDom x) fs
-  domain (Join fs) = mconcat $ map domain fs
 
 instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :+: g) where
   type Dom (f :+: g) = Dom f
@@ -76,8 +70,6 @@ instance (Function f, Function g, Dom f ~ Dom g, Rng f ~ Rng g) => Function (f :
   isConst (Inr g) = isConst g
   inDom x (Inl f) = inDom x f
   inDom x (Inr g) = inDom x g
-  domain (Inl f) = domain f
-  domain (Inr g) = domain g
 
 instance Function (Const dom rng) where
   type Dom (Const dom rng) = dom
@@ -85,7 +77,6 @@ instance Function (Const dom rng) where
   eval (Const x) = const x
   isConst (Const x) = Just x
   inDom _ _ = True
-  domain (Const _) = []
 
 instance (Enumerable e dom, Enum rng, Bounded rng, Enum dom) => Function (Enumerator e dom rng) where
   type Dom (Enumerator e dom rng) = dom
@@ -96,4 +87,3 @@ instance (Enumerable e dom, Enum rng, Bounded rng, Enum dom) => Function (Enumer
                            else
                                Nothing
   inDom x (Enumerator e) = member x e
-  domain (Enumerator e)  = [lookupIndex i e | i <- [0 .. size e]]

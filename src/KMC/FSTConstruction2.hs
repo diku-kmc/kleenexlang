@@ -61,8 +61,6 @@ instance (Enum dom, Bounded dom, Enum digit, Bounded digit, Enumerable enum dom)
   isConst (CodeConst y) = Just y
   inDom x (CodeArg p) = member x p
   inDom _ (CodeConst _) = True
---  domain (CodeArg p) = [lookupIndex i p | i <- [0 .. size p - 1]]
---  domain (CodeConst _) = [minBound .. maxBound]
 
 instance (Enum digit, Bounded digit, Enumerable enum c)
          => Function (DecodeFunc enum digit (Either c x)) where
@@ -84,11 +82,6 @@ instance (Enum digit, Bounded digit, Enumerable enum c)
         (pre,rest) = splitAt w code
     in (decodeEnum pre < size enum) && inDom rest (DecodeArg enums :: DecodeFunc enum digit (Either c x))
   inDom _ (DecodeConst _) = True
---  domain (DecodeArg []) = [[]]
---  domain (DecodeArg (enum:enums)) =
---    [ codeFixedWidthEnumSized (size enum) i ++ rest | i <- [0 .. size enum - 1]
---                                                    , rest <- domain (DecodeArg enums) ]
---  domain (DecodeConst _) = error "cannot compute infinite domain"
 
 instance Function (CopyFunc a [Either a x]) where
   type Dom (CopyFunc a [Either a x]) = a
