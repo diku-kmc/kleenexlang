@@ -53,7 +53,7 @@ instance Pretty c => Pretty (CopyFunc a c) where
   pretty (CopyConst c) = pretty c
 
 instance (Eq a, Pretty a) => Pretty (RangeSet a) where
-  pretty rs | [(l,h)] <- ranges rs, l == h = pretty l
+  pretty rs | [(l,h)] <- ranges rs, l == h = "[" ++ pretty l ++ "]"
   pretty rs =
     "[" ++ intercalate "," [ pretty l ++ "-" ++ pretty h | (l,h) <- ranges rs ] ++ "]"
 
@@ -80,7 +80,8 @@ instance Pretty Var where
   pretty (KMC.SSTConstruction.Var xs) = "x" ++ concatMap show xs
 
 instance Pretty a => Pretty [a] where
-  pretty = concatMap pretty
+  pretty [] = "ε"
+  pretty xs = concatMap pretty xs
 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) where
   pretty (VarA v) = "(" ++ pretty v ++ ")"
@@ -107,8 +108,8 @@ formatFSTEdge :: (Ord st, Pretty pred, Pretty delta, Pretty func)
               -> GA.Attributes
 formatFSTEdge (_, _, l) =
   case l of
-    Left (p, f)  -> [ GV.textLabel $ pack (pretty p ++ " / " ++ pretty f) ]
-    Right l' -> [ GV.textLabel $ pack ("/ " ++ pretty l') ]
+    Left (p, f)  -> [ GV.textLabel $ pack (pretty p ++ "/" ++ pretty f) ]
+    Right l' -> [ GV.textLabel $ pack ("ε/" ++ pretty l') ]
 
 dfaToDot :: (Ord st, Pretty pred)
          => DFA st pred -> GV.DotGraph st
