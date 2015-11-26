@@ -3,7 +3,16 @@
 {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
-module KMC.FSTConstruction2 where
+module KMC.FSTConstruction2
+       (Transducer,ActionMachine,OracleMachine
+       ,CodeInputLab(..)
+       ,CodeFunc(..)
+       ,DecodeFunc(..)
+       ,CopyFunc(..)
+       ,constructTransducer
+       ,action
+       ,oracle)
+       where
 
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
@@ -14,16 +23,14 @@ import           KMC.RangeSet (RangeSet)
 import           KMC.SymbolicFST
 import           KMC.Theories
 
-type FSTState = [RIdent]
+type Transducer st sigma act
+  = FST st (RangeSet sigma) (CopyFunc sigma [Either sigma act])
 
-type Transducer sigma act
-  = FST FSTState (RangeSet sigma) (CopyFunc sigma [Either sigma act])
+type ActionMachine st sigma act digit
+  = FST st (CodeInputLab digit) (DecodeFunc (RangeSet sigma) digit (Either sigma act))
 
-type ActionMachine sigma act digit
-  = FST FSTState (CodeInputLab digit) (DecodeFunc (RangeSet sigma) digit (Either sigma act))
-
-type OracleMachine sigma digit
-  = FST FSTState (RangeSet sigma) (CodeFunc (RangeSet sigma) sigma digit)
+type OracleMachine st sigma digit
+  = FST st (RangeSet sigma) (CodeFunc (RangeSet sigma) sigma digit)
 
 -----------------------------------------------------------
 -- Predicate and function types for symbolic representation
@@ -98,7 +105,7 @@ instance Function (CopyFunc a [Either a x]) where
 
 -- | Converts a Kleenex program with outputs in the input alphabet adjoined with
 -- extra effect symbols to a transducer.
-constructTransducer :: RProg sigma (Either sigma act) -> RIdent -> Transducer sigma act
+constructTransducer :: RProg sigma (Either sigma act) -> RIdent -> Transducer [RIdent] sigma act
 constructTransducer rprog initial =
   FST { fstS = allStates
       , fstE = edgesFromList allTransitions
@@ -137,9 +144,9 @@ constructTransducer rprog initial =
 -- | Get the underlying action machine for a transducer. This is obtained by
 -- removing input labels on symbol transitions; and adding bit code inputs to
 -- epsilon transitions.
-action :: forall sigma act digit.
-          (Enum sigma, Bounded sigma, Ord sigma, Enum digit, Bounded digit)
-       => Transducer sigma act -> ActionMachine sigma act digit
+action :: forall st sigma act digit.
+          (Ord st, Enum sigma, Bounded sigma, Ord sigma, Enum digit, Bounded digit)
+       => Transducer st sigma act -> ActionMachine st sigma act digit
 action = mapEdges symsym symeps epssym epseps
   where
     digitSize = boundedSize (undefined :: digit)
@@ -159,8 +166,9 @@ action = mapEdges symsym symeps epssym epseps
 -- | Get the underlying oracle for a transducer. This is obtained by removing
 -- output labels on symbol transitions; and adding bit code outputs to every
 -- non-deterministic transition.
-oracle :: forall sigma act digit. (Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit)
-       => Transducer sigma act -> OracleMachine sigma digit
+oracle :: forall st sigma act digit.
+          (Ord st, Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit)
+       => Transducer st sigma act -> OracleMachine st sigma digit
 oracle = mapEdges symsym symeps epssym epseps
   where
     symsym _q ts = [ (p, f, q') | (p, CopyArg, q') <- ts
