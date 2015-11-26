@@ -11,7 +11,6 @@ import           Control.Monad.Reader
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import           KMC.Util.Coding
 import           KMC.Program.IL
 import qualified KMC.RangeSet as RS
 import           KMC.SymbolicSST
