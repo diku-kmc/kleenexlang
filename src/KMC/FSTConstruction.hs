@@ -1,150 +1,197 @@
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances #-}
 module KMC.FSTConstruction
-(fromMu
-,fromMuWithDFA
-,edgesFromList)
-where
+       (Transducer,ActionMachine,OracleMachine
+       ,CodeInputLab(..)
+       ,CodeFunc(..)
+       ,DecodeFunc(..)
+       ,CopyFunc(..)
+       ,constructTransducer
+       ,action
+       ,oracle)
+       where
 
-import           Control.Monad.State
+import qualified Data.Map as M
+import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
-
-import           KMC.Expression
-import           KMC.DFAConstruction
-import           KMC.SymbolicAcceptor
+import           KMC.Util.Coding
+import           KMC.Kleenex.Syntax hiding (Ident)
+import           KMC.RangeSet (RangeSet)
 import           KMC.SymbolicFST
 import           KMC.Theories
-import           KMC.OutputTerm
 
-data ConstructState st pred func =
-  ConstructState { edges     :: [Edge st pred func]
-                 , nextState :: st
-                 , states    :: S.Set st
-                 , marks     :: Marks
-                 }
+type Transducer st sigma act
+  = FST st (RangeSet sigma) (CopyFunc sigma [Either sigma act])
 
-type Construct st pred func = State (ConstructState st pred func)
+type ActionMachine st sigma act digit
+  = FST st (CodeInputLab digit) (DecodeFunc (RangeSet sigma) digit (Either sigma act))
 
-fresh :: (Enum st, Ord st) => Construct st pred func st
-fresh = do
-  q <- gets nextState
-  modify $ \s -> s { nextState = succ q
-                   , states    = S.insert q (states s)
-                   }
-  return q
+type OracleMachine st sigma digit
+  = FST st (RangeSet sigma) (CodeFunc (RangeSet sigma) sigma digit)
 
-undoFresh :: (Enum st, Ord st) => Construct st pred func ()
-undoFresh = do
-  last <- gets nextState
-  modify $ \s -> s { nextState = pred last
-                   , states    = S.delete last (states s)
-                   }
+-----------------------------------------------------------
+-- Predicate and function types for symbolic representation
+-----------------------------------------------------------
 
-addStates :: (Enum st, Ord st) => FST st pred a -> Construct st pred func st
-addStates fst = do
-  q <- gets nextState
-  let newNext = skipN q
-  modify $ \s -> s { nextState = newNext
-                   , states = (fstS fst) `S.union` states s
-                   }
-  return newNext
-      where
-        skipN x = foldr (const succ) x [1 .. S.size (fstS fst) - 1]
+-- | Data type representing input labels for action machines.
+data CodeInputLab b = InputConst [b]  -- ^ Read exactly this constant
+                    | InputAny Int    -- ^ Read this number of symbols
 
-addNullEdges :: FST st pred (Const a b)
-             -> Construct st pred (func :+: (Const a b)) ()
-addNullEdges fst = modify $ \s -> s {
-                     edges = edges s ++ map chg (edgesToList (fstE fst))
-                   }
-    where
-      chg (q, Left (p, f), q') = (q, Left (p, Inr f), q')
---      chg (q, r, q')     = (q, r, q') -- case never happens
+-- | Represents functions which code values as fixed-width codes in an arbitrary
+-- base. The functions may also ignore their arguments and return a constant
+-- code.
+data CodeFunc enum dom digit = CodeArg enum | CodeConst [digit]
+  deriving (Eq)
 
-addEdge :: st -> Either (pred, func) (Rng func) -> st
-        -> Construct st pred func ()
-addEdge q lbl q' = modify $ \s -> s { edges = (q, lbl, q'):edges s }
+-- | Represents functions which decode fixed-width codes into sequences of
+-- elements. That is, the code of one element may be followed by the code of
+-- another, or the code sequence can be empty. The functions may also ignore
+-- their arguments and return a constant result sequence.
+data DecodeFunc enum digit c = DecodeArg [enum] | DecodeConst [c]
 
+-- | Represents functions which inject their argument into the range type. The
+-- functions may also ignore their argument and return a constant.
+data CopyFunc a c = CopyArg | CopyConst c
 
-construct' :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-           => Pos -> st -> Mu pred func st
-           -> Construct st pred (func :+: (Const (Dom func) (Rng func))) st
-construct' _ _ (Var q) = return q
-construct' curPos qf (Loop e) = mfix (construct (L:curPos) qf . e)
-construct' curPos qf (RW p f e) = do
-  q' <- construct curPos qf e
-  q <- fresh
-  addEdge q (Left (p, Inl f)) q'
-  return q
-construct' curPos qf (W d e) = do
-  q' <- construct curPos qf e
-  q <- fresh
-  addEdge q (Right d) q'
-  return q
-construct' curPos qf (Alt e1 e2) = do
-  q1 <- construct (L:curPos) qf e1
-  q2 <- construct (R:curPos) qf e2
-  q <- fresh
-  addEdge q (Right mempty) q1
-  addEdge q (Right mempty) q2
-  return q
-construct' _ qf Accept = return qf
-construct' curPos qf (Seq e1 e2) = do
-  -- Note that we /first/ construct the right-hand side!
-  q2 <- construct (R:curPos) qf e2
-  construct (L:curPos) q2 e1
+instance (Enum dom, Bounded dom, Enum digit, Bounded digit, Enumerable enum dom)
+         => Function (CodeFunc enum dom digit) where
+  type Dom (CodeFunc enum dom digit) = dom
+  type Rng (CodeFunc enum dom digit) = [digit]
+  eval (CodeArg p) x = codeFixedWidthEnumSized (size p) (indexOf x p)
+  eval (CodeConst y) _ = y
+  isConst (CodeArg p) = if size p == 1 then
+                          Just $ eval (CodeArg p) (lookupIndex 0 p)
+                        else
+                          Nothing
+  isConst (CodeConst y) = Just y
+  inDom x (CodeArg p) = member x p
+  inDom _ (CodeConst _) = True
 
+instance (Enum digit, Bounded digit, Enumerable enum c)
+         => Function (DecodeFunc enum digit (Either c x)) where
+  type Dom (DecodeFunc enum digit (Either c x)) = [digit]
+  type Rng (DecodeFunc enum digit (Either c x)) = [Either c x]
+  eval (DecodeArg []) code | null code = []
+                           | otherwise = error "non-empty code"
+  eval (DecodeArg (enum:enums) :: DecodeFunc enum digit (Either c x)) code =
+    let w = bitWidth (boundedSize (undefined :: digit)) (size enum)
+        (pre,rest) = splitAt w code
+    in (Left (lookupIndex (decodeEnum pre) enum))
+       :(eval (DecodeArg enums :: DecodeFunc enum digit (Either c x)) rest)
+  eval (DecodeConst y) _ = y
+  isConst (DecodeArg _) = Nothing
+  isConst (DecodeConst y) = Just y
+  inDom code (DecodeArg []) = null code
+  inDom code (DecodeArg (enum:enums) :: DecodeFunc enum digit (Either c x)) =
+    let w = bitWidth (boundedSize (undefined :: digit)) (size enum)
+        (pre,rest) = splitAt w code
+    in (decodeEnum pre < size enum) && inDom rest (DecodeArg enums :: DecodeFunc enum digit (Either c x))
+  inDom _ (DecodeConst _) = True
 
-construct :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-          => Pos -> st -> Mu pred func st
-          -> Construct st pred (func :+: (Const (Dom func) (Rng func))) st
-construct curPos qf e = do
-  ms <- gets marks
-  if curPos `S.member` ms then
-      do
-        q <- fresh
-        let dfa = enumerateDFAStatesFrom q $ mergeEdges $
-                  minimizeDFA $ dfaFromMu e
-        if isDFAPrefixFree dfa then
-            do
-              let dfaFST = dfaAsFST dfa
-              -- Add all the "null edges" from the DFA
-              addNullEdges dfaFST
-              -- Connect the final states of the DFA to the current final state.
-              connectTo (S.toList (fstF dfaFST)) qf
-              -- Add the states and increment the state counter to avoid clashes.
-              addStates dfaFST
-              -- The new final state is the initial state of the DFA.
-              return (fstI dfaFST)
-        else
-            -- Otherwise it is unsound to use the DFA, so don't.
-            undoFresh >> construct' curPos qf e
-  else
-      construct' curPos qf e
+instance Function (CopyFunc a [Either a x]) where
+  type Dom (CopyFunc a [Either a x]) = a
+  type Rng (CopyFunc a [Either a x]) = [Either a x]
+  eval CopyArg x = [Left x]
+  eval (CopyConst y) _ = y
+  isConst CopyArg = Nothing
+  isConst (CopyConst y) = Just y
+  inDom _ _ = True
 
-connectTo :: (Monoid (Rng func)) => [st] -> st -> Construct st pred func ()
-connectTo states to = mapM_ (\from -> addEdge from (Right mempty) to) states
+---------------------------------------------
+-- Construction of action and oracle machines
+---------------------------------------------
 
--- | Constructs an FST from the given mu-term but uses a DFA construction on
--- all subterms at the positions in the given `Marks` set.  If the set is
--- empty a normal FST will be produced.
-fromMuWithDFA :: (Predicate pred, Enum st, Ord st, Monoid (Rng func))
-              => Marks
-              -> Mu pred func st -> FST st pred (func :+: (Const (Dom func) (Rng func)))
-fromMuWithDFA ms e =
-  let (qin, cs) = runState (construct [] (toEnum 0) e)
-                           (ConstructState { edges     = []
-                                           , nextState = toEnum 1
-                                           , states    = S.singleton (toEnum 0)
-                                           , marks     = ms
-                                           })
-  in FST { fstS = states cs
-         , fstE = edgesFromList (edges cs)
-         , fstI = qin
-         , fstF = S.singleton (toEnum 0)
-         }
+-- | Converts a Kleenex program with outputs in the input alphabet adjoined with
+-- extra effect symbols to a transducer.
+constructTransducer :: RProg sigma (Either sigma act) -> RIdent -> Transducer [RIdent] sigma act
+constructTransducer rprog initial =
+  FST { fstS = allStates
+      , fstE = edgesFromList allTransitions
+      , fstI = [initial]
+      , fstF = S.singleton []
+      }
+  where
+    (allStates, allTransitions) = go (S.singleton [initial]) S.empty []
+    go ws states trans
+      | S.null ws                         = (states, trans)
+      | (q, ws') <- S.deleteFindMin ws, S.member q states
+                                          = go ws' states trans
+      | ([], ws') <- S.deleteFindMin ws   = go ws' (S.insert [] states) trans
+      | (i:is, ws') <- S.deleteFindMin ws =
+          let states' = S.insert (i:is) states in
+          case getDecl i of
+          RConst y      ->
+            let q' = follow is
+            in go (S.insert q' ws') states' ((i:is, Right [y], q'):trans)
+          RRead p False ->
+            let q' = follow is
+            in go (S.insert q' ws') states' ((i:is, Left (p, CopyConst []), q'):trans)
+          RRead p True  ->
+            let q' = follow is
+            in go (S.insert q' ws') states'((i:is, Left (p, CopyArg), q'):trans)
+          RSeq js       ->
+            let q' = follow (js ++ is)
+            in go (S.insert q' ws') states' ((i:is, Right [], q'):trans)
+          RSum js       ->
+            let qs' = [follow (j:is) | j <- js]
+                -- Indexed epsilons are implicitly represented by the transition order
+                trans' = [(i:is, Right [], q') | q' <- qs']
+            in go (S.union (S.fromList qs') ws') states' (trans' ++ trans)
+      | otherwise = error "impossible"
 
-fromMu :: (Predicate pred, Enum st, Ord st, Monoid (Rng func)) =>
-          Mu pred func st -> FST st pred (func :+: (Const (Dom func) (Rng func)))
-fromMu = fromMuWithDFA S.empty
+    -- Optimization: Reduce number of generated states by contracting
+    -- non-deterministic edges with no output. This is done by "skipping" states
+    -- whose head nonterminal is declared to be a Seq term, or an RSum with only
+    -- one successor.
+    follow [] = []
+    follow (i:is) =
+      case getDecl i of
+      RSeq js -> follow (js ++ is)
+      RSum [j] -> follow (j:is)
+      _ -> i:is
 
+    getDecl i =
+      fromMaybe (error $ "internal error: identifier without declaration: " ++ show i)
+        $ M.lookup i (rprogDecls rprog)
+
+-- | Get the underlying action machine for a transducer. This is obtained by
+-- removing input labels on symbol transitions; and adding bit code inputs to
+-- epsilon transitions.
+action :: forall st sigma act digit.
+          (Ord st, Enum sigma, Bounded sigma, Ord sigma, Enum digit, Bounded digit)
+       => Transducer st sigma act -> ActionMachine st sigma act digit
+action = mapEdges symsym symeps epssym epseps
+  where
+    digitSize = boundedSize (undefined :: digit)
+
+    symsym _q ts = [ (InputAny w, DecodeArg [p],q') | (p,CopyArg,q') <- ts
+                                                    , size p > 1
+                                                    , let w = bitWidth digitSize (size p) ]
+    symeps _q ts = [ (y, q') | (_p,CopyConst y,q') <- ts ]
+                   ++ [ ([], q') | (p, CopyArg, q') <- ts, size p <= 1 ]
+    epssym _q [_t] = []
+    epssym _q ts   = let n = length ts
+                     in [ (InputConst (codeFixedWidthEnumSized n ix), DecodeConst y, q')
+                        | (y,q') <- ts | ix <- [0..] ]
+    epseps _q [t]  = [t]
+    epseps _q _    = []
+
+-- | Get the underlying oracle for a transducer. This is obtained by removing
+-- output labels on symbol transitions; and adding bit code outputs to every
+-- non-deterministic transition.
+oracle :: forall st sigma act digit.
+          (Ord st, Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit)
+       => Transducer st sigma act -> OracleMachine st sigma digit
+oracle = mapEdges symsym symeps epssym epseps
+  where
+    symsym _q ts = [ (p, f, q') | (p, CopyArg, q') <- ts
+                                , let f = if size p > 1 then CodeArg p else CodeConst [] ]
+                   ++ [ (p, CodeConst [], q') | (p, CopyConst _, q') <- ts ]
+    symeps _q _ts = []
+    epssym _q _ts = []
+    epseps _q [(_y, q')] = ([([], q')])
+    epseps _q ts = let n = length ts
+                   in [ (codeFixedWidthEnumSized n ix, q') | ([], q') <- ts | ix <- [0..] ]
