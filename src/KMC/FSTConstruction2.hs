@@ -103,6 +103,8 @@ instance Function (CopyFunc a [Either a x]) where
 -- Construction of action and oracle machines
 ---------------------------------------------
 
+-- | Converts a Kleenex program with outputs in the input alphabet adjoined with
+-- extra effect symbols to a transducer.
 constructTransducer :: RProg sigma (Either sigma act) -> RIdent -> Transducer sigma act
 constructTransducer rprog initial =
   FST { fstS = allStates
@@ -139,6 +141,9 @@ constructTransducer rprog initial =
       fromMaybe (error $ "internal error: identifier without declaration: " ++ show i)
         $ M.lookup i (rprogDecls rprog)
 
+-- | Get the underlying action machine for a transducer. This is obtained by
+-- removing input labels on symbol transitions; and adding bit code inputs to
+-- epsilon transitions.
 action :: forall sigma act digit.
           (Enum sigma, Bounded sigma, Ord sigma, Enum digit, Bounded digit)
        => Transducer sigma act -> ActionMachine sigma act digit
@@ -158,6 +163,9 @@ action = mapEdges symsym symeps epssym epseps
     epseps _q [t]  = [t]
     epseps _q _    = []
 
+-- | Get the underlying oracle for a transducer. This is obtained by removing
+-- output labels on symbol transitions; and adding bit code outputs to every
+-- non-deterministic transition.
 oracle :: forall sigma act digit. (Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit)
        => Transducer sigma act -> OracleMachine sigma digit
 oracle = mapEdges symsym symeps epssym epseps
