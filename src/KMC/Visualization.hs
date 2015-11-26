@@ -28,17 +28,25 @@ import           KMC.Util.Bits
 
 import           KMC.FSTConstruction2
 
+class Pretty a where
+  pretty :: a -> String
+
 instance Pretty RegAction where
   pretty Push    = "<push>"
   pretty (Pop r) = "<pop." ++ show (fromRegIdent r) ++ ">"
   pretty (Write r) = "<wr." ++ show (fromRegIdent r) ++ ">"
 
 instance (Pretty e, Pretty dom, Pretty digit) => Pretty (CodeFunc e dom digit) where
-  pretty (CodeArg e) = pretty e
+  pretty (CodeArg e) = "CODE(" ++ pretty e ++ ")"
   pretty (CodeConst bs) = concatMap pretty bs
-  
-class Pretty a where
-  pretty :: a -> String
+
+instance Pretty b => Pretty (CodeInputLab b) where
+  pretty (InputAny k) = "ANY(" ++ show k ++")"
+  pretty (InputConst bs) = pretty bs
+
+instance (Pretty c) => Pretty (DecodeFunc enum digit c) where
+  pretty (DecodeArg _) = "DECODE"
+  pretty (DecodeConst c) = pretty c
 
 instance Pretty c => Pretty (CopyFunc a c) where
   pretty CopyArg = "COPY"
