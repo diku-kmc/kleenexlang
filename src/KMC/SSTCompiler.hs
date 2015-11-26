@@ -5,14 +5,13 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module KMC.SSTCompiler where
+module KMC.SSTCompiler(compileAutomaton) where
 
 import           Control.Monad.Reader
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import           KMC.Coding
-import           KMC.OutputTerm
 import           KMC.Program.IL
 import qualified KMC.RangeSet as RS
 import           KMC.SymbolicSST
@@ -77,21 +76,6 @@ lcp xs | null xs || any (null . fst) xs = ([], xs)
                (h:p, xs')
            else
                ([], xs)
-
--- | The output functions of FSTs generated from Mu-expressions are a strict
--- subset of the update string functions of SSTs. We can therefore "join" any
--- UpdateStringFunc over an FST function over some generic function to an
--- UpdateStringFunc over just the generic function.
-flattenFSTFunc :: Rng func ~ [delta] =>
-                  UpdateStringFunc var (Join (Const t [delta] :+: func) [delta])
-                  -> UpdateStringFunc var func
-flattenFSTFunc = normalizeUpdateStringFunc . concatMap norm
-    where
-      norm (VarA v) = [VarA v]
-      norm (ConstA c) = [ConstA c]
-      norm (FuncA (Join xs) i) = map (normJoin i) xs
-      normJoin _ (Inl (Const xs)) = ConstA xs
-      normJoin i (Inr e) = FuncA e i
 
 -- | List of function occurrences in an UpdateStringFunc
 usFunctions :: UpdateStringFunc var func -> [func]
@@ -226,27 +210,6 @@ data Env st var func delta = Env
     , outvar :: var                     -- ^ Designated output variable
     }
 type EnvReader st var func delta = Reader (Env st var func delta)
-
--- | Optimize a program by removing all tables that implement the identity
--- function and replace all lookups in them with a special instruction,
--- denoting that the current input character in the runtime should be output
--- or appended.
-elimIdTables :: (Bounded delta, Enum delta) => Program delta -> Program delta
-elimIdTables prog = prog { progTables = rest
-                         , progBlocks = M.map elimTables $ progBlocks prog
-                         }
-    where
-      (idTables, rest) = M.partition isIdTable $ progTables prog
-      isIdTable = all cmp . zip [0..] . tblTable
-      cmp (ix, sym) = ix == (decodeEnum sym :: Integer)
-      elimTables = map (instrElim (M.keys idTables))
-      instrElim _ (IfI expr block) = IfI expr (elimTables block)
-      instrElim _ (NextI min' max' block) = NextI min' max' (elimTables block)
-      instrElim tids ins@(AppendTblI bid tid i) =
-          if tid `elem` tids
-          then AppendSymI bid i
-          else ins
-      instrElim _ ins = ins
 
 compileAutomaton :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta

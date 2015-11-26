@@ -4,6 +4,7 @@
 {-# LANGUAGE GADTs #-}
 module KMC.Program.IL where
 
+import KMC.Coding (decodeEnum)
 import qualified Data.Map as M
 
 -- | A representation of a full tabulation of a function 'f' with an enumerable
@@ -72,3 +73,29 @@ data Program delta =
   deriving (Eq, Show)
 
 type Pipeline delta gamma = Either [Program delta] [(Program delta, Program gamma)]
+
+
+-----------------------------------------------------
+-- Program transformations and post-SST optimizations
+-----------------------------------------------------
+
+-- | Optimize a program by removing all tables that implement the identity
+-- function and replace all lookups in them with a special instruction,
+-- denoting that the current input character in the runtime should be output
+-- or appended.
+elimIdTables :: (Bounded delta, Enum delta) => Program delta -> Program delta
+elimIdTables prog = prog { progTables = rest
+                         , progBlocks = M.map elimTables $ progBlocks prog
+                         }
+    where
+      (idTables, rest) = M.partition isIdTable $ progTables prog
+      isIdTable = all cmp . zip [0..] . tblTable
+      cmp (ix, sym) = ix == (decodeEnum sym :: Integer)
+      elimTables = map (instrElim (M.keys idTables))
+      instrElim _ (IfI expr block) = IfI expr (elimTables block)
+      instrElim _ (NextI min' max' block) = NextI min' max' (elimTables block)
+      instrElim tids ins@(AppendTblI bid tid i) =
+          if tid `elem` tids
+          then AppendSymI bid i
+          else ins
+      instrElim _ ins = ins
