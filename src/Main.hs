@@ -24,7 +24,6 @@ import           KMC.Bitcoder
 import           KMC.FSTConstruction hiding (Var)
 import           KMC.Kleenex.Lang (KleenexOutTerm, kleenexToMuTerm, kleenexToActionMuTerm)
 import           KMC.Kleenex.Parser (parseKleenex)
-import           KMC.Kleenex.Action
 import           KMC.Program.Backends.C (CType(..), compileProgram)
 import           KMC.RangeSet (RangeSet)
 import           KMC.SSTCompiler (elimIdTables, compileAutomaton)

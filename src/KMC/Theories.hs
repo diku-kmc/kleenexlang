@@ -75,7 +75,7 @@ class Function t where
   eval    :: t -> Dom t -> Rng t
   isConst :: t -> Maybe (Rng t)
   inDom   :: Dom t -> t -> Bool
-  domain  :: t -> [Dom t]
+--  domain  :: t -> [Dom t]
 
 {----------------------------------------------------------------------}
 {- Partial orders                                                     -}
@@ -159,12 +159,3 @@ instance (Eq a) => PartialOrder (Prefix a) where
           prefixOf [] _ = True
           prefixOf (x:l) (y:r) = (x == y) && prefixOf l r
           prefixOf _ _ = False
-
-instance (Function f) => Function (Maybe f) where
-    type Dom (Maybe f) = Maybe (Dom f)
-    type Rng (Maybe f) = Maybe (Rng f)
-    eval f x  = eval <$> f <*> x
-    isConst f = isConst <$> f
-    inDom x f = maybe False id $ (inDom <$> x <*> f)
-    domain (Just f) = map Just (domain f)
-    domain Nothing  = []
