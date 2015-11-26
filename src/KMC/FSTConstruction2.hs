@@ -122,20 +122,35 @@ constructTransducer rprog initial =
       | (i:is, ws') <- S.deleteFindMin ws =
           let states' = S.insert (i:is) states in
           case getDecl i of
-          RConst y -> go (S.insert is ws') states' ((i:is, Right [y], is):trans)
+          RConst y      ->
+            let q' = follow is
+            in go (S.insert q' ws') states' ((i:is, Right [y], q'):trans)
           RRead p False ->
-            go (S.insert is ws') states' ((i:is, Left (p, CopyConst []), is):trans)
-          RRead p True ->
-            go (S.insert is ws') states'((i:is, Left (p, CopyArg), is):trans)
-          RSeq js ->
-            let q' = js ++ is
+            let q' = follow is
+            in go (S.insert q' ws') states' ((i:is, Left (p, CopyConst []), q'):trans)
+          RRead p True  ->
+            let q' = follow is
+            in go (S.insert q' ws') states'((i:is, Left (p, CopyArg), q'):trans)
+          RSeq js       ->
+            let q' = follow (js ++ is)
             in go (S.insert q' ws') states' ((i:is, Right [], q'):trans)
-          RSum js ->
-            let qs' = [j:is | j <- js]
+          RSum js       ->
+            let qs' = [follow (j:is) | j <- js]
                 -- Indexed epsilons are implicitly represented by the transition order
                 trans' = [(i:is, Right [], q') | q' <- qs']
             in go (S.union (S.fromList qs') ws') states' (trans' ++ trans)
       | otherwise = error "impossible"
+
+    -- Optimization: Reduce number of generated states by contracting
+    -- non-deterministic edges with no output. This is done by "skipping" states
+    -- whose head nonterminal is declared to be a Seq term, or an RSum with only
+    -- one successor.
+    follow [] = []
+    follow (i:is) =
+      case getDecl i of
+      RSeq js -> follow (js ++ is)
+      RSum [j] -> follow (j:is)
+      _ -> i:is
 
     getDecl i =
       fromMaybe (error $ "internal error: identifier without declaration: " ++ show i)
