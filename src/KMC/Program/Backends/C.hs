@@ -36,8 +36,8 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String
-progTemplate buString tablesString declsString infoString initString progStrings withActions =
+progTemplate :: String -> String -> String -> String -> String -> [String] -> String
+progTemplate buString tablesString declsString infoString initString progStrings =
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
@@ -313,8 +313,9 @@ prettyInstr buftype tbltype prog instr phase =
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
                           rbrace
     ConsumeI i         -> text "consume" <> parens (int i) <> semi
-    ChangeOut bid      -> text "pushoutbuf" <> parens (buf bid) <> semi
-    RestoreOut         -> text "popoutbuf()" <> semi
+    PushI              -> text "stack_push()" <> semi
+    PopI bid           -> text "stack_pop" <> parens (buf bid) <> semi
+    WriteI bid         -> text "stack_write" <> parens (buf bid) <> semi
 
 appendSpan :: BufferId -> TableId -> Int -> Block delta -> Maybe (Int, Block delta)
 appendSpan bid tid i is =
@@ -344,7 +345,7 @@ appendSymSpan bid i is =
 
 -- | Pretty print a list of instructions.
 prettyBlock :: (Enum delta, Bounded delta) => CType -> CType -> Program delta -> Block delta -> Int -> Doc
-prettyBlock buftype tbltype prog is phase = go is
+prettyBlock buftype tbltype prog instrs phase = go instrs
   where
     go [] = empty
     go (app@(AppendSymI bid i):is) =
@@ -519,15 +520,14 @@ programsToC buftype pipeline =
                     Right progs -> concat $ zipWith combine progs [1,3..]
     combine (p,a) i = [prettyProg buftype tbltype p i, prettyProg buftype tbltype a (i+1)]
 
-renderCProg :: String -> Bool -> CProg -> String
-renderCProg compInfo withActions cprog =
+renderCProg :: String -> CProg -> String
+renderCProg compInfo cprog =
   progTemplate (render $ cBufferUnit cprog)
                (render $ cTables cprog)
                (render $ cDeclarations cprog)
                compInfo
                (render $ cInit cprog)
                (map render $ cProg cprog)
-               withActions
 
 ccVersion :: FilePath -> IO String
 ccVersion comp = do
@@ -552,10 +552,7 @@ compileProgram :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
 compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPath wordAlign = do
   cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
-  let withActions = case pipeline of
-                      Left  _ -> False
-                      Right _ -> True
-  let cstr = renderCProg info withActions . programsToC buftype $ pipeline
+  let cstr = renderCProg info . programsToC buftype $ pipeline
   let sourceLineCount = length (lines cstr)
   case cCodeOutPath of
     Nothing -> return ()

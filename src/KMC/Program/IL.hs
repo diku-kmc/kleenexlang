@@ -55,8 +55,13 @@ data Instr delta =
   | GotoI      BlockId                  -- ^ goto b
   | NextI      Int Int (Block delta)    -- ^ if (!getChars(min,max)) { ... }
   | ConsumeI   Int                      -- ^ next += i
-  | ChangeOut  BufferId                 -- ^ change the output buffer to buf, push old one to the stack
-  | RestoreOut                          -- ^ pop to the previous output buffer
+    -- Buffer stack operations
+  | PushI                               -- ^ push new empty buffer to stack
+  | PopI BufferId                       -- ^ pop buffer at top of stack and save
+                                        -- it in the specified buffer variable
+  | WriteI BufferId                     -- ^ write the contents of the given
+                                        -- buffer to the buffer at the top of
+                                        -- the stack.
   deriving (Eq, Ord, Show)
 
 type Block delta = [Instr delta]
