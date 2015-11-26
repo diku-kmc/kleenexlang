@@ -44,6 +44,7 @@ data CodeInputLab b = InputConst [b]  -- ^ Read exactly this constant
 -- base. The functions may also ignore their arguments and return a constant
 -- code.
 data CodeFunc enum dom digit = CodeArg enum | CodeConst [digit]
+  deriving (Eq)
 
 -- | Represents functions which decode fixed-width codes into sequences of
 -- elements. That is, the code of one element may be followed by the code of
@@ -188,6 +189,7 @@ oracle = mapEdges symsym symeps epssym epseps
   where
     symsym _q ts = [ (p, f, q') | (p, CopyArg, q') <- ts
                                 , let f = if size p > 1 then CodeArg p else CodeConst [] ]
+                   ++ [ (p, CodeConst [], q') | (p, CopyConst _, q') <- ts ]
     symeps _q _ts = []
     epssym _q _ts = []
     epseps _q [(_y, q')] = ([([], q')])
