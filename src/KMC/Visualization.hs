@@ -19,12 +19,14 @@ import           Data.Word (Word8)
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Syntax hiding (Ident)
 import           KMC.RangeSet
-import           KMC.SSTConstruction
+import           KMC.Determinization
 import           KMC.SymbolicFST
 import           KMC.SymbolicSST
 import           KMC.Theories
 
-import           KMC.FSTConstruction
+import           KMC.SymbolicFST.OracleMachine
+import           KMC.SymbolicFST.ActionMachine
+import           KMC.SymbolicFST.Transducer
 
 class Pretty a where
   pretty :: a -> String
@@ -71,7 +73,7 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Right y) = pretty y
 
 instance Pretty Var where
-  pretty (KMC.SSTConstruction.Var xs) = "x" ++ concatMap show xs
+  pretty (KMC.Determinization.Var xs) = "x" ++ concatMap show xs
 
 instance Pretty a => Pretty [a] where
   pretty [] = "ε"

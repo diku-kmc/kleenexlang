@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.SSTConstruction where
+module KMC.Determinization where
 
 import           Control.Monad.State
 import           Data.Maybe (maybeToList, isJust)
