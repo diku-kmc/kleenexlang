@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ParallelListComp #-}
-module KMC.SymbolicSST.ActionSST(actionToSST) where
+module KMC.SymbolicSST.ActionSST(ActionSST, actionToSST) where
 
 import           Data.Functor.Identity
 import qualified Data.Map as M
@@ -22,7 +22,8 @@ deterministic SST with only one register. Register effects adjoined to the
 output alphabet can also be interpreted as SST actions.
 -}
 
-type ActionSST st digit sigma = SST st (CodeInputLab digit) (DecodeFunc (RangeSet sigma) digit (Identity sigma))
+type ActionSST st digit sigma var
+  = SST st (CodeInputLab digit) (DecodeFunc (RangeSet sigma) digit (Identity sigma)) var
 
 actionToSST :: forall st sigma digit.
                (Ord st, Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit)
