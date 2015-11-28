@@ -26,7 +26,7 @@ type Transducer st sigma act
 -- functions may also ignore their argument and return a constant.
 data CopyFunc a c = CopyArg | CopyConst c
 
-instance Function (CopyFunc a [Either a x]) where
+instance (Enum a, Bounded a) => Function (CopyFunc a [Either a x]) where
   type Dom (CopyFunc a [Either a x]) = a
   type Rng (CopyFunc a [Either a x]) = [Either a x]
   eval CopyArg x = [Left x]
@@ -34,6 +34,7 @@ instance Function (CopyFunc a [Either a x]) where
   isConst CopyArg = Nothing
   isConst (CopyConst y) = Just y
   inDom _ _ = True
+  domain _ = [minBound .. maxBound]
 
 ---------------------------------------------
 -- Construction of action and oracle machines

@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
@@ -24,13 +25,32 @@ type ActionMachine st sigma act digit
 -- | Data type representing input labels for action machines.
 data CodeInputLab b = InputConst [b]  -- ^ Read exactly this constant
                     | InputAny Int    -- ^ Read this number of symbols
+  deriving (Eq, Ord)
 
 -- | Represents functions which decode fixed-width codes into sequences of
 -- elements. That is, the code of one element may be followed by the code of
 -- another, or the code sequence can be empty. The functions may also ignore
 -- their arguments and return a constant result sequence.
 data DecodeFunc enum digit c = DecodeArg [enum] | DecodeConst [c]
-  deriving (Show)
+  deriving (Eq, Ord)
+
+-- | inDom implementation common to both instances of DecodeFunc
+decodeInDom :: forall enum digit c rng.
+               (Enum digit, Bounded digit, Enumerable enum c) => [digit] -> DecodeFunc enum digit rng -> Bool
+decodeInDom code (DecodeArg []) = null code
+decodeInDom code (DecodeArg (enum:enums)) =
+  let w = bitWidth (boundedSize (undefined :: digit)) (size enum)
+      (pre,rest) = splitAt w code
+  in (decodeEnum pre < size enum) && decodeInDom rest (DecodeArg enums)
+decodeInDom _ (DecodeConst _) = True
+
+-- | domain implementation common to both instances of DecodeFunc
+decodeDom :: (Enum digit, Bounded digit, Enumerable enum c) => DecodeFunc enum digit rng -> [[digit]]
+decodeDom (DecodeArg []) = [[]]
+decodeDom (DecodeArg (enum:enums)) =
+  [ codeFixedWidthEnumSized (size enum) i ++ rest
+    | i <- [0 .. size enum - 1], rest <- decodeDom (DecodeArg enums) ]
+decodeDom (DecodeConst _) = error "cannot compute infinite domain"
 
 -- | Instance which injects the decoded result into a sum type (Either)
 instance (Enum digit, Bounded digit, Enumerable enum c)
@@ -47,12 +67,8 @@ instance (Enum digit, Bounded digit, Enumerable enum c)
   eval (DecodeConst y) _ = y
   isConst (DecodeArg _) = Nothing
   isConst (DecodeConst y) = Just y
-  inDom code (DecodeArg []) = null code
-  inDom code (DecodeArg (enum:enums) :: DecodeFunc enum digit (Either c x)) =
-    let w = bitWidth (boundedSize (undefined :: digit)) (size enum)
-        (pre,rest) = splitAt w code
-    in (decodeEnum pre < size enum) && inDom rest (DecodeArg enums :: DecodeFunc enum digit (Either c x))
-  inDom _ (DecodeConst _) = True
+  inDom = decodeInDom
+  domain = decodeDom
 
 -- | Function instance for DecodeFunc which just returns its result without
 -- injecting it into a larger type. The identity functor is necessary in the
@@ -71,12 +87,8 @@ instance (Enum digit, Bounded digit, Enumerable enum c)
   eval (DecodeConst y) _ = map runIdentity y
   isConst (DecodeArg _) = Nothing
   isConst (DecodeConst y) = Just (map runIdentity y)
-  inDom code (DecodeArg []) = null code
-  inDom code (DecodeArg (enum:enums) :: DecodeFunc enum digit (Identity c)) =
-    let w = bitWidth (boundedSize (undefined :: digit)) (size enum)
-        (pre,rest) = splitAt w code
-    in (decodeEnum pre < size enum) && inDom rest (DecodeArg enums :: DecodeFunc enum digit (Identity c))
-  inDom _ (DecodeConst _) = True
+  inDom = decodeInDom
+  domain = decodeDom
 
 ------------------------------
 -- Action machine construction

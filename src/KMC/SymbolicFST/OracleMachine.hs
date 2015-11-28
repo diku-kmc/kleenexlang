@@ -35,7 +35,8 @@ instance (Enum dom, Bounded dom, Enum digit, Bounded digit, Enumerable enum dom)
   isConst (CodeConst y) = Just y
   inDom x (CodeArg p) = member x p
   inDom _ (CodeConst _) = True
-
+  domain (CodeArg p) = [lookupIndex i p | i <- [0 .. size p - 1]]
+  domain (CodeConst _) = [minBound .. maxBound]
 
 -----------------------------
 -- Oracle macine construction

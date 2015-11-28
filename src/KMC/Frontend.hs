@@ -6,16 +6,16 @@ import           Control.Monad
 import           Data.Hash.MD5 (md5s, Str(..))
 import           Data.Time (NominalDiffTime,getCurrentTime, diffUTCTime)
 import           Data.Word (Word8)
-import           KMC.FSTConstruction (Transducer, ActionMachine, OracleMachine, CodeFunc
-                                     ,constructTransducer
-                                     ,oracle,action)
+import           KMC.Determinization (sstFromFST)
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Desugaring
 import           KMC.Kleenex.Parser
 import           KMC.Kleenex.Syntax
 import qualified KMC.RangeSet as RS
-import           KMC.Determinization (sstFromFST)
 import qualified KMC.SymbolicFST as FST
+import           KMC.SymbolicFST.ActionMachine (ActionMachine, action)
+import           KMC.SymbolicFST.OracleMachine (OracleMachine, CodeFunc, oracle)
+import           KMC.SymbolicFST.Transducer (Transducer, constructTransducer)
 import           KMC.SymbolicSST (SST)
 import qualified KMC.SymbolicSST as SST
 import           System.Exit
