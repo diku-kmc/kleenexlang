@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 executable kexc
   default-extensions: TemplateHaskell
-  main-is:             Main.hs
+  main-is:             KMC/Frontend/CLI.hs
   -- other-modules:
   -- other-extensions:
   ghc-options: -O2
@@ -52,25 +52,29 @@ executable kexc
 test-suite test-kexc
   type:                detailed-0.9
   test-module:         Tests
-  other-modules:       KMC.Expression
-                     , KMC.RangeSet
-                     , KMC.OutputTerm
-                     , KMC.Coding
+  other-modules:       KMC.Frontend
+                     , KMC.Frontend.Options
                      , KMC.SymbolicSST
+                     , KMC.SymbolicSST.ActionSST
                      , KMC.SymbolicFST
-                     , KMC.SymbolicAcceptor
-                     , KMC.FSTConstruction
-                     , KMC.SSTConstruction
-                     , KMC.DFAConstruction
-                     , KMC.NFAConstruction
+                     , KMC.SymbolicFST.Transducer
+                     , KMC.SymbolicFST.OracleMachine
+                     , KMC.SymbolicFST.ActionMachine
+                     , KMC.Determinization
                      , KMC.TreeWriter
                      , KMC.Theories
                      , KMC.Kleenex.Parser
-                     , KMC.Kleenex.Lang
-                     , KMC.Kleenex.Action
-                     , KMC.Util.Set
+                     , KMC.Kleenex.Syntax
+                     , KMC.Kleenex.Desugaring
+                     , KMC.Kleenex.Actions
                      , KMC.Util.List
-                     , KMC.Util.Bits
+                     , KMC.Util.Coding
+                     , KMC.Util.Map
+                     , KMC.Util.Heredoc
+                     , KMC.Util.UTF8
+                     , KMC.RangeSet
+                     , KMC.Program.IL
+                     , KMC.Program.Backends.C
                      , Tests.TestUtils
                      , Tests.DFAConstruction
                      , Tests.KleenexParser

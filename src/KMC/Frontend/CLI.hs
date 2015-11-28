@@ -32,31 +32,33 @@ compileCmd mainOpts compileOpts args = do
   ou <- compileOracles mainOpts tu
 
   -- Generate Action machines
-  assts <- buildActionSSTs mainOpts args
+  au <- compileActionSSTs mainOpts tu
 
   -- Translate to C program
   let useWordAlignment = getCompileFlavor args == CompilingKleenex
   (ret, compileDuration) <- transducerToProgram mainOpts compileOpts
-                                                useWordAlignment srcName
-                                                srcMd5 ssts assts
+                                                useWordAlignment
+                                                (tuSourceName tu)
+                                                (tuSourceHash tu) ou au
 
   -- Output stats
   when (not $ optQuiet mainOpts) $ do
     let fmt t = let s = show (round . toRational $ 1000 * t :: Integer)
                 in replicate (8 - length s) ' ' ++ s
-    putStrLn $ "FST generation (ms)   : " ++ fmt fstGenDuration
-    putStrLn $ "SST generation (ms)   : " ++ fmt sstGenDuration
-    putStrLn $ "SST optimization (ms) : " ++ fmt sstOptDuration
-    putStrLn $ "code generation (ms)  : " ++ fmt compileDuration
-    putStrLn $ "total (ms)            : " ++ fmt (sum [fstGenDuration
-                                                      ,sstGenDuration
-                                                      ,sstOptDuration
-                                                      ,compileDuration])
+    putStrLn $ "Transducer generation (ms) : " ++ fmt (tuDuration tu)
+    putStrLn $ "Oracle SST generation (ms) : " ++ fmt (ouDuration ou)
+    putStrLn $ "Action SST generation (ms) : " ++ fmt (auDuration au)
+--    putStrLn $ "SST optimization (ms)      : " ++ fmt sstOptDuration
+    putStrLn $ "code generation (ms)       : " ++ fmt compileDuration
+    putStrLn $ "total (ms)                 : " ++ fmt (sum [tuDuration tu
+                                                           ,ouDuration ou
+                                                           ,auDuration au
+                                                           ,compileDuration])
   return ret
 
 
 visualizeCmd :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
-visualizeCmd mainOpts visOpts args = do undefined
+visualizeCmd _mainOpts _visOpts _args = do undefined
   {-
   let phase = optVisPhase visOpts
   checkArgs args
