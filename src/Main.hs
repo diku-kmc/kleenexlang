@@ -20,13 +20,12 @@ import           System.Exit (ExitCode(..), exitWith)
 import           System.FilePath (takeExtension)
 import           System.IO
 
-import           KMC.Bitcoder
 import           KMC.FSTConstruction hiding (Var)
-import           KMC.Kleenex.Lang (KleenexOutTerm, kleenexToMuTerm, kleenexToActionMuTerm)
 import           KMC.Kleenex.Parser (parseKleenex)
 import           KMC.Program.Backends.C (CType(..), compileProgram)
+import           KMC.Program.IL (elimIdTables)
 import           KMC.RangeSet (RangeSet)
-import           KMC.SSTCompiler (elimIdTables, compileAutomaton)
+import           KMC.SSTCompiler (compile)
 import           KMC.SSTConstruction (sstFromFST)
 import           KMC.SymbolicFST (FST, fstS)
 import qualified KMC.SymbolicFST as FST
@@ -36,7 +35,6 @@ import           KMC.Syntax.Config
 import           KMC.Syntax.Parser
 import           KMC.Theories
 import           KMC.Visualization
-import           KMC.OutputTerm
 
 data MainOptions =
     MainOptions

@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module KMC.SSTCompiler(compileAutomaton) where
+module KMC.SSTCompiler(compile) where
 
 import           Control.Monad.Reader
 import qualified Data.Map as M
@@ -210,13 +210,13 @@ data Env st var func delta = Env
     }
 type EnvReader st var func delta = Reader (Env st var func delta)
 
-compileAutomaton :: forall st var func pred delta.
+compile :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta
     , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
     , PredicateListToExpr pred) =>
     SST st pred func var
     -> Program delta
-compileAutomaton sst =
+compile sst =
   Program
   { progTables       = M.fromList [ (tid, tbl) | (_,tid,tbl) <- funcRel ]
   , progConstants    = swapMap (cmap env)

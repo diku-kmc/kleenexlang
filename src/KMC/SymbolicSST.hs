@@ -4,30 +4,32 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 module KMC.SymbolicSST
-(UpdateString
-,UpdateStringFunc
-,Atom(..)
-,EdgeSet
-,constUpdateStringFunc
-,normalizeUpdateStringFunc
-,evalUpdateStringFunc
-,SST(..)
-,construct
-,RegisterUpdate
-,eForwardLookup
-,sstOut
-,edgesToList
-,sstV
-,enumerateStates
-,enumerateVariables
-,optimize
-,run
-,flattenStream
-)
+       (UpdateString
+       ,UpdateStringFunc
+       ,Atom(..)
+       ,EdgeSet
+       ,SST(..)
+       ,RegisterUpdate
+       ,composeRegisterUpdate
+       ,constUpdateStringFunc
+       ,normalizeUpdateStringFunc
+       ,evalUpdateStringFunc
+       ,construct,construct'
+       ,eForwardLookup
+       ,sstOut
+       ,edgesToList
+       ,sstV
+       ,enumerateStates
+       ,enumerateVariables
+       ,optimize
+       ,run
+       ,flattenStream
+       )
 where
 import           Control.Applicative
 
 import qualified Data.Map.Strict as M
+import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
 
 import           KMC.Theories
@@ -108,6 +110,22 @@ normalizeUpdateStringFunc = go
 normalizeRegisterUpdate :: (Rng func ~ [delta]) => RegisterUpdate var func -> RegisterUpdate var func
 normalizeRegisterUpdate = M.map normalizeUpdateStringFunc
 
+composeRegisterUpdate :: (Ord var, Rng func ~ [delta])
+                      => RegisterUpdate var func -> RegisterUpdate var func -> RegisterUpdate var func
+composeRegisterUpdate kappa =
+  normalizeRegisterUpdate
+  . M.map subst
+  -- ensure that domain of left update is contained in the domain of the right
+  -- update. Every key that is in the left but not in the right is treated as an
+  -- identity update.
+  . ensure (M.keys kappa)
+  where
+    subst [] = []
+    subst (VarA v:us) = fromMaybe [VarA v] (M.lookup v kappa) ++ subst us
+    subst (x:us) = x:subst us
+
+    ensure vs kappa' = M.union kappa' (M.fromList [(v, [VarA v]) | v <- vs])
+
 normalizeUpdateString :: UpdateString var [delta] -> UpdateString var [delta]
 normalizeUpdateString = go
     where
@@ -134,6 +152,21 @@ construct qin es os =
     outf = M.fromListWith (error "Inconsistent output function: Same state has more than one update.")
     ru = normalizeRegisterUpdate
          . M.fromListWith (error "Inconsistent register update: Same variable updated more than once.")
+
+construct' :: (Ord st, Ord var, Rng func ~ [delta]) =>
+       st                                          -- ^ Initial state
+    -> [(st, [pred], RegisterUpdate var func, st)] -- ^ Edge set
+    -> [(st, [Either var [delta]])]                -- ^ Final outputs
+    -> SST st pred func var
+construct' qin es os =
+  SST
+  { sstS = S.fromList (qin:concat [ [q, q'] | (q, _, _, q') <- es ])
+  , sstE = edgesFromList [ (q, p, normalizeRegisterUpdate ru, q') | (q, p, ru, q') <- es ]
+  , sstI = qin
+  , sstF = outf [(q, normalizeUpdateString us) | (q, us) <- os]
+  }
+  where
+    outf = M.fromListWith (error "Inconsistent output function: Same state has more than one update.")
 
 {-- Analysis --}
 

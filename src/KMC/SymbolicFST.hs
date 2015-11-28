@@ -21,6 +21,12 @@ data FST q pred func =
   , fstF :: S.Set q
   }
 
+fstStateSize :: FST q pred func -> Int
+fstStateSize = S.size . fstS
+
+fstTransSize :: FST q pred func -> Int
+fstTransSize fst' = M.size (eForward (fstE fst')) + M.size (eForwardEpsilon (fstE fst'))
+
 type Edge q pred func = (q, Either (pred, func) (Rng func), q)
 
 data OrderedEdgeSet q pred func =

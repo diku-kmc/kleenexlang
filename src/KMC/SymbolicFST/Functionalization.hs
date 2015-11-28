@@ -1,7 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 module KMC.SymbolicFST.Functionalization where
 
-import           Data.Monoid
 import qualified Data.Set as S
 
 import           KMC.SymbolicFST

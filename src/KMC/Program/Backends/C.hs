@@ -16,7 +16,7 @@ import           System.IO
 import           System.Process
 import           Text.PrettyPrint
 
-import           KMC.Coding
+import           KMC.Util.Coding
 import           KMC.Program.IL
 import           KMC.Util.Heredoc
 
