@@ -14,7 +14,6 @@ notifications:
       on_success: change
       on_failure: always
 
-
 matrix:
   include:
     - env: CABALVER=1.22 GHCVER=7.10.1
@@ -29,7 +28,6 @@ matrix:
 # Explicitly ask for the new container-based infrastructure.
 sudo:
   false
-  
 
 # Note: the distinction between `before_install` and `install` is not
 #       important.
