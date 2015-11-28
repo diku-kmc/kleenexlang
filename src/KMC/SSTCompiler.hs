@@ -13,6 +13,7 @@ import qualified Data.Set as S
 
 import           KMC.Program.IL
 import qualified KMC.RangeSet as RS
+import           KMC.SymbolicFST.ActionMachine (CodeInputLab(..))
 import           KMC.SymbolicSST
 import           KMC.Theories
 import           KMC.Util.Map (swapMap)
@@ -49,6 +50,15 @@ instance (Eq a, Enum a) => PredicateListToExpr (RS.RangeSet a) where
                   | otherwise = AndE (LteE (ConstE $ fromEnum l) (SymE j))
                                      (LteE (SymE j) (ConstE $ fromEnum h))
 
+instance (Eq a, Enum a) => PredicateListToExpr (CodeInputLab a) where
+  predListToExpr xs i
+    | all (== InputAny 1) xs = TrueE
+    | all isConstDigit xs = CompareE i [ fromEnum b | InputConst [b] <- xs ]
+    | otherwise = error $ "input labels not normalized"
+    where
+      isConstDigit (InputConst [_]) = True
+      isConstDigit _ = False
+
 -- | Tree of tests and actions.
 data KVTree a b =
   BranchT (Maybe b) [([a], KVTree a b)]
@@ -84,15 +94,12 @@ usFunctions (_:xs) = usFunctions xs
 
 -- | Tabulate a function. It is assumed that the codomain is a set of
 -- bit-vectors with pairwise equal length.
-tabulate :: (Function t,Enum (Dom t),Bounded (Dom t)
-            ,Rng t ~ [delta])
+tabulate :: (Function t,Rng t ~ [delta])
          => t -> Table delta
 tabulate f = Table bitTable bitSize
   where
-    bitTable = map eval' [minBound .. maxBound]
+    bitTable = map (eval f) (domain f)
     bitSize = foldr max 0 (map length bitTable)
-    eval' x | inDom x f = eval f x
-            | otherwise = []
 
 -- | Compile a single variable update into a sequence of instructions.
 -- The following is assumed:
@@ -212,7 +219,7 @@ type EnvReader st var func delta = Reader (Env st var func delta)
 
 compile :: forall st var func pred delta.
     ( Bounded delta, Enum delta, Ord st, Ord var, Ord func, Ord pred, Ord delta
-    , Function func, Enum (Dom func), Bounded (Dom func), Rng func ~ [delta]
+    , Function func, Rng func ~ [delta]
     , PredicateListToExpr pred) =>
     SST st pred func var
     -> Program delta

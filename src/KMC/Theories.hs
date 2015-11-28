@@ -75,6 +75,7 @@ class Function t where
   eval    :: t -> Dom t -> Rng t
   isConst :: t -> Maybe (Rng t)
   inDom   :: Dom t -> t -> Bool
+  domain  :: t -> [Dom t]
 
 {----------------------------------------------------------------------}
 {- Partial orders                                                     -}
