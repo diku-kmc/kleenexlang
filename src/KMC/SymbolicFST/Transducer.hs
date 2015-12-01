@@ -15,8 +15,8 @@ import           KMC.RangeSet (RangeSet)
 import           KMC.SymbolicFST (FST(..), edgesFromList)
 import           KMC.Theories (Function(..))
 
-type Transducer st sigma act
-  = FST st (RangeSet sigma) (CopyFunc sigma [Either sigma act])
+type Transducer st sigma gamma
+  = FST st (RangeSet sigma) (CopyFunc sigma [gamma])
 
 -----------------------------------------------------------
 -- Predicate and function types for symbolic representation
@@ -25,6 +25,7 @@ type Transducer st sigma act
 -- | Represents functions which inject their argument into the range type. The
 -- functions may also ignore their argument and return a constant.
 data CopyFunc a c = CopyArg | CopyConst c
+  deriving (Eq, Ord)
 
 instance (Enum a, Bounded a) => Function (CopyFunc a [Either a x]) where
   type Dom (CopyFunc a [Either a x]) = a
@@ -40,9 +41,9 @@ instance (Enum a, Bounded a) => Function (CopyFunc a [Either a x]) where
 -- Construction of action and oracle machines
 ---------------------------------------------
 
--- | Converts a Kleenex program with outputs in the input alphabet adjoined with
--- extra effect symbols to a transducer.
-constructTransducer :: RProg sigma (Either sigma act) -> RIdent -> Transducer [RIdent] sigma act
+-- | Converts a Kleenex program to a transducer.
+constructTransducer
+  :: (Rng (CopyFunc a [b]) ~ [b]) => RProg a b -> RIdent -> Transducer [RIdent] a b
 constructTransducer rprog initial =
   FST { fstS = allStates
       , fstE = edgesFromList allTransitions
