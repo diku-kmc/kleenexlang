@@ -123,7 +123,7 @@ desugarTerm :: Bool        -- ^ Indicates if input symbols are to be written as 
 desugarTerm out t =
   case t of
   (Var ident)   -> lookupIdent ident
-  (Constant bs) -> mapM (decl . RConst . Left) (BS.unpack bs) >>= decl . RSeq
+  (Constant bs) -> mapM (decl . RConst . Left) (if out then BS.unpack bs else []) >>= decl . RSeq
   (RE e)        -> desugarRE out e
   (Seq _ _)     -> mapM (desugarTerm out) (flattenSeq t) >>= decl . RSeq
   (Sum _ _)     -> mapM (desugarTerm out) (flattenSum t) >>= decl . RSum
