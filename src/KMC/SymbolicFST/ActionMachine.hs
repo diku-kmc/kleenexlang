@@ -99,7 +99,7 @@ instance (Enum digit, Bounded digit, Enumerable enum c)
 -- epsilon transitions.
 action :: forall st sigma act digit.
           (Ord st, Enum sigma, Bounded sigma, Ord sigma, Enum digit, Bounded digit)
-       => Transducer st sigma act -> ActionMachine st sigma act digit
+       => Transducer st sigma (Either sigma act) -> ActionMachine st sigma act digit
 action = mapEdges symsym symeps epssym epseps
   where
     digitSize = boundedSize (undefined :: digit)

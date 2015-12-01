@@ -45,9 +45,10 @@ instance (Enum dom, Bounded dom, Enum digit, Bounded digit, Enumerable enum dom)
 -- | Get the underlying oracle for a transducer. This is obtained by removing
 -- output labels on symbol transitions; and adding bit code outputs to every
 -- non-deterministic transition.
-oracle :: forall st sigma act digit.
-          (Ord st, Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit)
-       => Transducer st sigma act -> OracleMachine st sigma digit
+oracle :: forall st sigma gamma digit.
+          (Ord st, Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit
+          ,Rng (CopyFunc sigma [gamma]) ~ [gamma])
+       => Transducer st sigma gamma -> OracleMachine st sigma digit
 oracle = mapEdges symsym symeps epssym epseps
   where
     symsym _q ts = [ (p, f, q') | (p, CopyArg, q') <- ts
