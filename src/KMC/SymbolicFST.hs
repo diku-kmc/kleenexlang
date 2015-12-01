@@ -1,6 +1,21 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.SymbolicFST where
+module KMC.SymbolicFST
+       (FST(..)
+       ,fstStateSize
+       ,fstTransSize
+       ,edgesFromList
+       ,fstEvalEpsilonEdges
+       ,fstAbstractEvalEdgesAll
+       ,coarsestPredicateSet
+       ,prefixTests
+       ,rightClosure,rightInputClosure
+       ,mapEdges
+       ,eForward,eBackward,eForwardEpsilon,eBackwardEpsilon
+       ,edgesToList
+       ,enumerateStates
+       ,run
+       ) where
 
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -52,6 +67,7 @@ edgesFromList es =
   , eBackwardEpsilon = M.fromListWith (++) [(q', [(y,q)]) | (q, Right y, q') <- es ]
   }
 
+{-
 unionEdges :: (Ord q) => OrderedEdgeSet q pred func
            -> OrderedEdgeSet q pred func
            -> OrderedEdgeSet q pred func
@@ -62,12 +78,15 @@ unionEdges es es' =
   , eForwardEpsilon = M.unionWith (++) (eForwardEpsilon es) (eForwardEpsilon es')
   , eBackwardEpsilon = M.unionWith (++) (eBackwardEpsilon es) (eBackwardEpsilon es')
   }
+-}
 
+{-
 flipEdges :: OrderedEdgeSet q pred func -> OrderedEdgeSet q pred func
 flipEdges es = OrderedEdgeSet {eForward = eBackward es
                               ,eBackward = eForward es
                               ,eForwardEpsilon = eBackwardEpsilon es
                               ,eBackwardEpsilon = eForwardEpsilon es}
+-}
 
 -- | Get the underlying list representation of an ordered edge set
 edgesToList :: OrderedEdgeSet q pred func -> [(q, Either (pred, func) (Rng func), q)]
@@ -125,17 +144,6 @@ abstractEvalEdgesAll (OrderedEdgeSet { eForward = me}) q p =
     Nothing -> []
     Just es -> [ (f, q') | (p', f, q') <- es, p `lte` p' ]
 
--- | If abstractEvalEdgesAny fst q phi == [(f1, q1) ..., (fn, qn)], then
---   for all qi there exists an a in [[phi]] such that q steps to qi reading a.
-abstractEvalEdgesAny :: (Ord st, PartialOrder pred, Boolean pred)
-                        =>
-                        OrderedEdgeSet st pred func
-                     -> st -> pred -> [(func, st)]
-abstractEvalEdgesAny (OrderedEdgeSet { eForward = me}) q p =
-  case M.lookup q me of
-    Nothing -> []
-    Just es -> [ (f, q') | (p', f, q') <- es, not $ (p `conj` p') `eq` bot ]
-
 evalEpsilonEdges :: (Ord st) => OrderedEdgeSet st pred func
                  -> st -> [(Rng func, st)]
 evalEpsilonEdges (OrderedEdgeSet { eForwardEpsilon = meps }) q =
@@ -156,11 +164,6 @@ fstAbstractEvalEdgesAll :: (Ord st
                            ,PartialOrder pred)
                           => FST st pred func -> st -> pred -> [(func, st)]
 fstAbstractEvalEdgesAll aut = abstractEvalEdgesAll (fstE aut)
-
-fstAbstractEvalEdgesAny :: (Ord st
-                           ,PartialOrder pred, Boolean pred)
-                          => FST st pred func -> st -> pred -> [(func, st)]
-fstAbstractEvalEdgesAny aut = abstractEvalEdgesAny (fstE aut)
 
 -- | Is the given state a non-deterministic choice state, or an input action
 -- state?
@@ -261,6 +264,7 @@ enumerateStates fst' =
     statesMap = M.fromList (zip (S.toList (fstS fst')) [toEnum 0..])
     aux q = statesMap M.! q
 
+{-
 accessibleStates :: (Ord q, PartialOrder pred, Boolean pred)
                  => OrderedEdgeSet q pred func -> S.Set q -> S.Set q
 accessibleStates es initialWS = go initialWS S.empty
@@ -289,6 +293,7 @@ trim fst' =
   where
     useful = S.intersection (accessibleStates (fstE fst') (S.singleton (fstI fst')))
                             (coaccessibleStates (fstE fst') (fstF fst'))
+-}
 
 {-- Simulation --}
 
