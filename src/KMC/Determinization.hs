@@ -195,9 +195,11 @@ consumeTreeMany fst' = go 0
       go _ [] tr = tr
       go i (p:ps) tr = go (i+1) ps (closureTreeFunc fst' (consumeTree fst' p i (closureTreeFunc fst' tr)))
 
-sstFromFST :: (Ord a, Eq delta, Eq func, Ord pred, PartialOrder pred, Function func,
-               Enumerable pred (Dom func), Rng func ~ [delta]) =>
-              FST a pred func -> Bool -> SST (PathTree Var a) pred func Var
+sstFromFST
+  :: (Eq func, Eq delta, Eq (Rng func), Ord a, Ord pred,
+      PartialOrder pred, Function func, Enumerable pred (Dom func),
+      Boolean pred, Rng func ~ [delta]) =>
+     FST a pred func -> Bool -> SST (PathTree Var a) pred func Var
 sstFromFST fst' singletonMode =
   construct initialState (specialize transitions) outputs
   where
