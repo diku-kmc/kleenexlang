@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -24,8 +25,15 @@ class Boolean b where
 
 -- | An effective Boolean algebra is a Boolean algebra whose elements can be
 -- interpreted as predicates on some domain.
-class Boolean b => SetLike b dom | b -> dom where
+class SetLike b dom | b -> dom where
   member :: dom -> b -> Bool
+
+-- | An effective Boolean algebra over lists is uniform if every set
+-- interpretation contains lists of equal length
+class SetLike b [a] => UniformListSet b a | b -> a where
+  -- | Get the uniform list length of all members of the set interpretation of
+  -- the given element
+  listLength :: b -> Int
 
 -- | An Enumerable is a set-like boolean algebra for which we can enumerate all
 -- members by consecutive non-negative integers.
