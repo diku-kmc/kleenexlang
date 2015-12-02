@@ -3,7 +3,7 @@ module Tests.Coding ( codingTests ) where
 import qualified Distribution.TestSuite as TS
 import           Test.QuickCheck
 
-import           KMC.Coding
+import           KMC.Util.Coding
 
 import           Tests.TestUtils
 
