@@ -38,7 +38,7 @@ type Valuation var delta       = M.Map var [delta]
 
 data Atom var func             = VarA var           -- ^ SST register variable
                                | ConstA (Rng func)  -- ^ Constant
-                               | FuncA func Int     -- ^ Function call: func(next[i])
+                               | FuncA func         -- ^ Function call: func(input[next...next + n])
 type UpdateStringFunc var func = [Atom var func]
 type UpdateString var rng      = [Either var rng]
 type RegisterUpdate var func   = M.Map var (UpdateStringFunc var func)
@@ -83,13 +83,13 @@ deriving instance (Ord var, Ord func, Ord (Rng func)) => Ord (Atom var func)
 deriving instance (Show st, Show pred, Show func, Show var, Show (Rng func), Show (Dom func))
              => Show (SST st pred func var)
 
-evalUpdateStringFunc :: (Function func, Rng func ~ [delta]) =>
-                        [Dom func] -> UpdateStringFunc var func -> UpdateString var [delta]
+evalUpdateStringFunc :: (Function func, Dom func ~ [sigma], Rng func ~ [delta]) =>
+                        [sigma] -> UpdateStringFunc var func -> UpdateString var [delta]
 evalUpdateStringFunc xs = normalizeUpdateString . map subst
     where
       subst (VarA v)   = Left v
       subst (ConstA y) = Right y
-      subst (FuncA f i)  = Right $ eval f (xs !! i)
+      subst (FuncA f)  = Right $ eval f xs
 
 constUpdateStringFunc :: UpdateString var (Rng func) -> UpdateStringFunc var func
 constUpdateStringFunc = map subst
@@ -105,7 +105,7 @@ normalizeUpdateStringFunc = go
       go (ConstA x:ConstA y:xs) = go (ConstA (x ++ y):xs)
       go (ConstA x:xs) = ConstA x:go xs
       go (VarA v:xs) = VarA v:go xs
-      go (FuncA f i:xs) = FuncA f i:go xs
+      go (FuncA f:xs) = FuncA f:go xs
 
 normalizeRegisterUpdate :: (Rng func ~ [delta]) => RegisterUpdate var func -> RegisterUpdate var func
 normalizeRegisterUpdate = M.map normalizeUpdateStringFunc
@@ -206,9 +206,9 @@ liftAbstractValuation rho = go
   where
     go [] = return (pure [])
     go (VarA v:xs) = liftA2 (++) <$> M.lookup v rho <*> go xs
-    go (FuncA f _:xs) = case isConst f of
-                        Nothing -> Just Ambiguous
-                        Just ys  -> liftA (ys++) <$> go xs
+    go (FuncA f:xs) = case isConst f of
+                      Nothing -> Just Ambiguous
+                      Just ys  -> liftA (ys++) <$> go xs
     go (ConstA ys:xs) = liftA (ys++) <$> go xs
 
 updateAbstractValuation :: (Ord var, Function func, Rng func ~ [delta]) =>
@@ -348,9 +348,9 @@ enumerateVariables sst =
     usfReplace as = do
       at <- as
       case at of
-        VarA v    -> [VarA (replace v)]
-        ConstA c  -> [ConstA c]
-        FuncA f i -> [FuncA f i]
+        VarA v   -> [VarA (replace v)]
+        ConstA c -> [ConstA c]
+        FuncA f  -> [FuncA f]
     usReplace as  = do
       at <- as
       case at of
@@ -373,11 +373,13 @@ valuate s (Right d:xs) = d ++ valuate s xs
 valuate s (Left v:xs) = maybe (error "valuate: Variable not in valuation") id (M.lookup v s)
                         ++ valuate s xs
 
-run :: forall var st pred func delta.
-        (Ord var, Ord st, SetLike pred (Dom func),
+run :: forall var st pred func sigma delta.
+        (Ord var, Ord st,
+         Dom func ~ [sigma],
+         SetLike pred sigma,
         Function func, Rng func ~ [delta])
     => SST st pred func var
-    -> [Dom func]
+    -> [sigma]
     -> Stream [delta]
 run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
     where
@@ -385,7 +387,7 @@ run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
 
       extractOutput s =
         case M.lookup outVar s of
-          Nothing -> error "Output variable not in valuation"
+          Nothing -> ([], M.insert outVar [] s)
           Just x -> (x, M.insert outVar [] s)
 
       go q s [] =
@@ -399,8 +401,8 @@ run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
         return $ Chunk out (go q' s' as')
 
       -- | Use backtracking to find longest matching transition
-      findTrans :: [Dom func] -> [([pred], RegisterUpdate var func, st)]
-                -> Maybe (RegisterUpdate var func, st, [Dom func], [Dom func])
+      findTrans :: [sigma] -> [([pred], RegisterUpdate var func, st)]
+                -> Maybe (RegisterUpdate var func, st, [sigma], [sigma])
       findTrans as ts =
         (do (a:as') <- pure as
             let ts' = [ (ps, upd, st') | (p:ps, upd, st') <- ts, member a p ]

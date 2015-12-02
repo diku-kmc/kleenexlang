@@ -40,6 +40,10 @@ instance (Pretty e, Pretty dom, Pretty digit) => Pretty (CodeFunc e dom digit) w
   pretty (CodeArg e) = "CODE(" ++ pretty e ++ ")"
   pretty (CodeConst bs) = concatMap pretty bs
 
+instance Pretty f => Pretty (EpsFunc f) where
+  pretty EpsFunc = "ϵ"
+  pretty (JustFunc f) = pretty f
+
 instance Pretty b => Pretty (CodeInputLab b) where
   pretty (InputAny k) = "ANY(" ++ show k ++")"
   pretty (InputConst bs) = pretty bs
@@ -82,7 +86,7 @@ instance Pretty a => Pretty [a] where
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) where
   pretty (VarA v) = "(" ++ pretty v ++ ")"
   pretty (ConstA x) = pretty x
-  pretty (FuncA f i) = "{" ++ pretty f ++ "(" ++ show i ++ ")}"
+  pretty (FuncA f) = "{" ++ pretty f ++ "}"
 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate var func) where
   pretty m = "[" ++ intercalate "\\l," [ pretty v ++ ":=" ++ pretty f | (v,f) <- M.toList m ] ++ "]"
