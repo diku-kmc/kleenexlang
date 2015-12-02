@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module KMC.SymbolicFST.ActionMachine
        (ActionMachine,CodeInputLab(..),  DecodeFunc(..), action)
        where
@@ -12,7 +13,7 @@ import Data.Functor.Identity
 import KMC.RangeSet (RangeSet)
 import KMC.SymbolicFST (FST, mapEdges)
 import KMC.SymbolicFST.Transducer (Transducer, CopyFunc(..))
-import KMC.Theories (Function(..), Enumerable(..))
+import KMC.Theories
 import KMC.Util.Coding
 
 type ActionMachine st sigma act digit
@@ -90,6 +91,14 @@ instance (Enum digit, Bounded digit, Enumerable enum c)
   inDom = decodeInDom
   domain = decodeDom
 
+instance (Eq b) => SetLike (CodeInputLab b) [b] where
+  member x (InputConst y) = x == y
+  member x (InputAny k) = length x == k
+
+instance (Eq b) => UniformListSet (CodeInputLab b) b where
+  listLength (InputConst y) = length y
+  listLength (InputAny k) = k
+
 ------------------------------
 -- Action machine construction
 ------------------------------
@@ -108,7 +117,8 @@ action = mapEdges symsym symeps epssym epseps
                                                     , size p > 1
                                                     , let w = bitWidth digitSize (size p) ]
     symeps _q ts = [ (y, q') | (_p,CopyConst y,q') <- ts ]
-                   ++ [ ([], q') | (p, CopyArg, q') <- ts, size p <= 1 ]
+                   ++ [ ([Left (lookupIndex 0 p)], q') | (p, CopyArg, q') <- ts
+                                                       , size p == 1 ]
     epssym _q [_t] = []
     epssym _q ts   = let n = length ts
                      in [ (InputConst (codeFixedWidthEnumSized n ix), DecodeConst y, q')
