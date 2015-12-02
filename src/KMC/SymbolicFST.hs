@@ -1,5 +1,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 module KMC.SymbolicFST
        (FST(..)
        ,fstStateSize
@@ -15,8 +16,10 @@ module KMC.SymbolicFST
        ,edgesToList
        ,enumerateStates
        ,run
+       ,runSequential
        ) where
 
+import           Control.Monad (guard)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -36,14 +39,14 @@ data FST q pred func =
   , fstF :: S.Set q
   }
 
-fstStateSize :: FST q pred func -> Int
-fstStateSize = S.size . fstS
-
-fstTransSize :: FST q pred func -> Int
-fstTransSize fst' = M.size (eForward (fstE fst')) + M.size (eForwardEpsilon (fstE fst'))
-
+-- | Type synonym for a transition. A transition is either labeled by a
+-- predicate and an output function; or it is labeled by an output string. This
+-- models a set of transitions between the two states where the output label may
+-- depend on the symbol being read; in the case of epsilon-transitions, a plain
+-- output string is provided.
 type Edge q pred func = (q, Either (pred, func) (Rng func), q)
 
+-- | An ordered edge set with fast reverse lookup.
 data OrderedEdgeSet q pred func =
   OrderedEdgeSet { eForward :: M.Map q [(pred,func,q)]
                  , eBackward :: M.Map q [(pred,func,q)]
@@ -58,6 +61,7 @@ deriving instance (Eq q, Eq pred, Eq func, Eq (Rng func)) => Eq (FST q pred func
 deriving instance (Ord q, Ord pred, Ord func, Ord (Rng func)) => Ord (FST q pred func)
 deriving instance (Show q, Show pred, Show func, Show (Rng func)) => Show (FST q pred func)
 
+-- | Construct an edge set from a list of edges
 edgesFromList :: (Ord q) => [Edge q pred func] -> OrderedEdgeSet q pred func
 edgesFromList es =
   OrderedEdgeSet
@@ -66,6 +70,14 @@ edgesFromList es =
   , eForwardEpsilon = M.fromListWith (++) [(q, [(y, q')]) | (q, Right y, q') <- es ]
   , eBackwardEpsilon = M.fromListWith (++) [(q', [(y,q)]) | (q, Right y, q') <- es ]
   }
+
+-- | Get the number of states in the FST
+fstStateSize :: FST q pred func -> Int
+fstStateSize = S.size . fstS
+
+-- | Get the number of transitions in the FST
+fstTransSize :: FST q pred func -> Int
+fstTransSize fst' = M.size (eForward (fstE fst')) + M.size (eForwardEpsilon (fstE fst'))
 
 {-
 unionEdges :: (Ord q) => OrderedEdgeSet q pred func
@@ -118,6 +130,8 @@ mapEdges symsym symeps epssym epseps fst' =
     epsEdges1 = epsEdgesToList $ M.mapWithKey symeps $ esym
     epsEdges2 = epsEdgesToList $ M.mapWithKey epseps $ eeps
 
+-- | Given an input symbol and a starting state, compute the concrete set of
+-- transitions from that state.
 evalEdges :: (Ord st
              ,Function func
              ,SetLike pred (Dom func))
@@ -132,6 +146,15 @@ evalEdges (OrderedEdgeSet { eForward = me }) q x =
           | member x p = [(eval f x, q')]
           | otherwise = []
 
+-- | Given a state, compute the concrete set of epsilon-transitions from that
+-- state.
+evalEpsilonEdges :: (Ord st) => OrderedEdgeSet st pred func
+                 -> st -> [(Rng func, st)]
+evalEpsilonEdges (OrderedEdgeSet { eForwardEpsilon = meps }) q =
+  case M.lookup q meps of
+    Nothing -> []
+    Just es -> es
+
 -- | If abstractEvalEdgesAll fst q phi == [(f1, q1), ..., (fn, qn)], then
 --   for all qi and for all a in [[phi]], q steps to qi reading a.
 abstractEvalEdgesAll :: (Ord st
@@ -144,22 +167,18 @@ abstractEvalEdgesAll (OrderedEdgeSet { eForward = me}) q p =
     Nothing -> []
     Just es -> [ (f, q') | (p', f, q') <- es, p `lte` p' ]
 
-evalEpsilonEdges :: (Ord st) => OrderedEdgeSet st pred func
-                 -> st -> [(Rng func, st)]
-evalEpsilonEdges (OrderedEdgeSet { eForwardEpsilon = meps }) q =
-  case M.lookup q meps of
-    Nothing -> []
-    Just es -> es
-
+-- | Like evalEpsilonEdges, but given an FST.
 fstEvalEpsilonEdges :: (Ord st) => FST st pred func -> st -> [(Rng func, st)]
 fstEvalEpsilonEdges aut = evalEpsilonEdges (fstE aut)
 
+-- | Like fstEvalEdges, but given an FST.
 fstEvalEdges :: (Ord st
                 ,Function func
                 ,SetLike pred (Dom func))
                 => FST st pred func -> st -> Dom func -> [(Rng func, st)]
 fstEvalEdges fst' q a = evalEdges (fstE fst') q a
 
+-- | Like abstractEvalEdgesAll, but given an FST.
 fstAbstractEvalEdgesAll :: (Ord st
                            ,PartialOrder pred)
                           => FST st pred func -> st -> pred -> [(func, st)]
@@ -173,6 +192,9 @@ isChoiceState fst' q =
     (True, True) -> error "Inconsistent FST - a state is both a choice and symbol state"
     (_, b)       -> b
 
+-- | Given a state set A (represented as a list), compute the coarsest predicate
+-- set obtained from the set
+-- { p | p is a predicate on a transition starting in q, q in A }
 coarsestPredicateSet :: (Boolean pred
                         ,PartialOrder pred
                         ,Ord st
@@ -202,6 +224,30 @@ rightClosure fst' = snd . go S.empty mempty
                       (vis, [])
                       xs
 
+---------------
+-- LCP analysis
+---------------
+
+-- | Compute the longest deterministic prefix for a pointed state set
+-- (A, q).
+ldp :: (Ord st, Ord pred, PartialOrder pred, Boolean pred) =>
+       FST st pred func -> S.Set st -> st -> [pred]
+ldp fst' = go
+    where
+      go ctx q =
+          case M.lookup q (eForward $ fstE fst') of
+            Just [(p,_,q')] | p `elem` (coarsestPredicateSet fst' $ S.toList ctx) ->
+                                p:go (stepAll fst' p ctx) q'
+            _ -> []
+
+-- | Given a set A and a predicate p, compute the set A' of states that can be reached via a
+-- transition from A labeled by a predicate containing p.
+stepAll :: (Ord st, PartialOrder pred) => FST st pred func -> pred -> S.Set st -> S.Set st
+stepAll fst' p = S.unions . map aux . S.toList
+    where
+      aux q = S.unions $ map (rightInputClosure fst' . snd)
+                       $ fstAbstractEvalEdgesAll fst' q p
+
 -- | Compute an unordered right closure without output on the input automaton of an FST
 rightInputClosure :: (Ord st) => FST st pred func -> st -> S.Set st
 rightInputClosure fst' = snd . go S.empty
@@ -217,24 +263,6 @@ rightInputClosure fst' = snd . go S.empty
                          in (vis'', S.union acc ys))
                      (vis, S.empty)
                      xs
-
-stepAll :: (Ord st, PartialOrder pred) => FST st pred func -> pred -> S.Set st -> S.Set st
-stepAll fst' p = S.unions . map aux . S.toList
-    where
-      aux q = S.unions $ map (rightInputClosure fst' . snd)
-                       $ fstAbstractEvalEdgesAll fst' q p
-
-{-- LCP analysis --}
-
-ldp :: (Ord st, Ord pred, PartialOrder pred, Boolean pred) =>
-       FST st pred func -> S.Set st -> st -> [pred]
-ldp fst' = go
-    where
-      go ctx q =
-          case M.lookup q (eForward $ fstE fst') of
-            Just [(p,_,q')] | p `elem` (coarsestPredicateSet fst' $ S.toList ctx) ->
-                                p:go (stepAll fst' p ctx) q'
-            _ -> []
 
 prefixTests :: (Boolean pred, PartialOrder pred, Ord st, Ord pred) =>
                FST st pred func
@@ -252,6 +280,7 @@ prefixTests fst' singletonMode states =
     entails (t:ts) (p:ps) = (t `eq` p) && (ts `entails` ps)
     entails [] (_:_) = False
 
+-- | Substitute state type by any enumerable type.
 enumerateStates :: (Ord st, Ord a, Enum a) => FST st pred func -> FST a pred func
 enumerateStates fst' =
   FST { fstS = S.fromList (M.elems statesMap)
@@ -295,20 +324,52 @@ trim fst' =
                             (coaccessibleStates (fstE fst') (fstF fst'))
 -}
 
-{-- Simulation --}
+-------------
+-- Simulation
+-------------
 
+-- | Simulate a non-deterministic FST with single-symbol predicates
 run :: (Function func
        ,SetLike pred (Dom func)
        ,Monoid (Rng func)
        ,Ord st)
        => FST st pred func -> [Dom func] -> [Rng func]
-run fst' = go S.empty (fstI fst')
-    where
-      go _ q [] =
-        [ mempty | S.member q (fstF fst') ]
-      go vis q w | isChoiceState fst' q =
-        [ mappend o o' | (o, q') <- fstEvalEpsilonEdges fst' q
-                       , not (S.member q' vis)
-                       , o' <- go (S.insert q' vis) q' w ]
-      go _ q (a:as) =
-        [ mappend o o' | (o, q') <- fstEvalEdges fst' q a, o' <- go S.empty q' as ]
+run fst' inp = do
+  (os, q') <- go [ ([o], q') | (o,q') <- rightClosure fst' (fstI fst') ] inp
+  guard (S.member q' (fstF fst'))
+  return (mconcat $ reverse os)
+  where
+    go s [] = s
+    go s (a:as) = go (close . step a $ s) as
+
+    close s = prune S.empty [ (o':os, q') | (os, q) <- s, (o', q') <- rightClosure fst' q ]
+
+    prune _   []        = []
+    prune vis ((os,q):s) | S.member q vis = prune vis s
+                         | otherwise      = (os,q):prune (S.insert q vis) s
+
+    step a s = [ (o':os, q') | (os, q) <- s, (o',q') <- fstEvalEdges fst' q a ]
+
+-- | Simulate a sequential machine with multi-symbol predicates
+runSequential :: (Function func
+                 ,Dom func ~ [a]
+                 ,UniformListSet pred a
+                 ,Monoid (Rng func)
+                 ,Ord st)
+              => FST st pred func -> [a] -> Maybe (Rng func)
+runSequential fst' = go (fstI fst')
+  where
+    go q [] = if S.member q (fstF fst') then Just mempty else Nothing
+    go q w | isChoiceState fst' q = do
+               [(o, q')] <- pure (fstEvalEpsilonEdges fst' q)
+               o' <- go q' w
+               return $ mappend o o'
+    go q w = do
+      ts <- M.lookup q (eForward $ fstE fst')
+      [(v, o, q')] <- pure [ (v, eval f u, q')
+                           | (p, f, q') <- ts
+                           , let n = listLength p
+                           , let (u,v) = splitAt n w
+                           , member u p ]
+      o' <- go q' v
+      return $ mappend o o'
