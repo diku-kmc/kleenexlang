@@ -67,6 +67,7 @@ quickTest prop = do
 -- | For debugging purposes.  Manually run a test case.
 runTest :: TS.Test -> IO TS.Result
 runTest (TS.Test t) = runTestInstance t
+runTest _ = error "not a test case"
 
 runTestInstance :: TS.TestInstance -> IO TS.Result
 runTestInstance test = TS.run test >>= go
