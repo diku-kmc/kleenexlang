@@ -29,7 +29,7 @@ import           System.FilePath (takeExtension)
 import           System.IO
 
 data TransducerUnit =
-  TransducerUnit { tuTransducers :: [Transducer Int Word8 RegAction]
+  TransducerUnit { tuTransducers :: [Transducer Int Word8 (Either Word8 RegAction)]
                  , tuSourceName  :: String
                  , tuSourceHash  :: String
                  , tuDuration    :: NominalDiffTime
