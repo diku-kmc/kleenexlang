@@ -89,7 +89,7 @@ lcp xs | null xs || any (null . fst) xs = ([], xs)
 -- | List of function occurrences in an UpdateStringFunc
 usFunctions :: UpdateStringFunc var func -> [func]
 usFunctions [] = []
-usFunctions (FuncA f _:xs) = f:usFunctions xs
+usFunctions (FuncA f:xs) = f:usFunctions xs
 usFunctions (_:xs) = usFunctions xs
 
 -- | Tabulate a function. It is assumed that the codomain is a set of
@@ -104,7 +104,8 @@ tabulate f = Table bitTable bitSize
 -- | Compile a single variable update into a sequence of instructions.
 -- The following is assumed:
 --   (1) Variable updates are linear (non-copying)
---   (2) Within the block of updates, the updated buffer is not live. (I.e., it is safe to modify it)
+--   (2) Within the block of updates, the updated buffer is not live.
+--       (I.e., no later update depends on it, so it is safe to modify it)
 compileAssignment :: (Ord var, Ord func, Rng func ~ [delta], Ord delta) =>
                      var                       -- ^ Variable to be updated
                   -> UpdateStringFunc var func -- ^ Update function
@@ -118,7 +119,7 @@ compileAssignment var atoms = do
     bid = (M.!) <$> (asks bmap) <*> pure var
     conv (VarA var')     = ConcatI    <$> bid <*> ((M.!) <$> asks bmap <*> pure var')
     conv (ConstA deltas) = AppendI    <$> bid <*> ((M.!) <$> asks cmap <*> pure deltas)
-    conv (FuncA f i)     = AppendTblI <$> bid <*> ((M.!) <$> asks tmap <*> pure f) <*> pure i
+    conv (FuncA f)       = AppendTblI <$> bid <*> ((M.!) <$> asks tmap <*> pure f) <*> (undefined {-i-})
 
 -- | Order assignments in a register update based on data dependencies. An
 -- assignment `a' should come before an assignment `b' if `a' uses the variable

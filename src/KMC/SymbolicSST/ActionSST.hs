@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module KMC.SymbolicSST.ActionSST(ActionSST, actionToSST) where
 
 import           Data.Functor.Identity
@@ -15,6 +16,7 @@ import           KMC.SymbolicFST (FST(..))
 import qualified KMC.SymbolicFST as FST
 import           KMC.SymbolicFST.ActionMachine (ActionMachine, CodeInputLab(..), DecodeFunc(..))
 import           KMC.SymbolicSST
+import           KMC.Theories
 
 {-
 Action machines are deterministic by construction, and thus may be seen as a
@@ -34,6 +36,9 @@ data ConstOrAnyLab b = ConstLab b -- ^ Read exactly this symbol
                      | AnyLab     -- ^ Read any symbol
   deriving (Eq, Ord)
 
+instance (Eq b) => SetLike (ConstOrAnyLab b) b where
+  member _ AnyLab = True
+  member x (ConstLab y) = x == y
 
 -----------------
 -- SST generation
@@ -119,6 +124,6 @@ next actM regs (q, h) = do
   let (us, q')     = followEps actM q''
   let (h'', kappa) = case f of
                      DecodeConst c -> interp regs h c
-                     DecodeArg es  -> (h, M.singleton h [VarA h, FuncA (DecodeArg es) 0])
+                     DecodeArg es  -> (h, M.singleton h [VarA h, FuncA (DecodeArg es)])
   let (h', kappa') = interp regs h'' us
   return (ps, composeRegisterUpdate kappa kappa', (q', h'))

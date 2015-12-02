@@ -85,6 +85,12 @@ class Function t where
   inDom   :: Dom t -> t -> Bool
   domain  :: t -> [Dom t]
 
+-- | Monoidal functions:
+--     (i)   are functions between monoids
+--     (ii)  have a monoid structure
+--     (iii) are compatible with the monoid structure. f(x)g(y) = (fg)(xy)
+class (Monoid t, Monoid (Dom t), Monoid (Rng t), Function t) => MonFunction t where
+
 {----------------------------------------------------------------------}
 {- Partial orders                                                     -}
 {----------------------------------------------------------------------}
@@ -121,8 +127,46 @@ class (Ord var, Show var, Eq var) => Variable var where
 class (Ord delta, Show delta, Eq delta, Enum delta, Bounded delta) => Alphabet delta where
 
 {----------------------------------------------------------------------}
+{- Function combinators                                               -}
+{----------------------------------------------------------------------}
+-- | Adjoins a new epsilon element to a set of monoid-valued functions
+data EpsFunc f = JustFunc f | EpsFunc deriving (Eq, Ord)
+
+instance (Function t, Enum (Dom t), Bounded (Dom t), Monoid (Rng t))
+         => Function (EpsFunc t) where
+  type Dom (EpsFunc t) = Dom t
+  type Rng (EpsFunc t) = Rng t
+  eval EpsFunc _ = mempty
+  eval (JustFunc f) x = eval f x
+  isConst EpsFunc = Just mempty
+  isConst (JustFunc f) = isConst f
+  inDom _ EpsFunc = True
+  inDom x (JustFunc f) = inDom x f
+  domain EpsFunc = [minBound .. maxBound]
+  domain (JustFunc f) = domain f
+
+{----------------------------------------------------------------------}
 {- Instances                                                          -}
 {----------------------------------------------------------------------}
+
+-- | A list of functions into a monoid forms a function from a list of domain
+-- elements into the same monoid.
+instance (Function t, Monoid (Rng t)) => Function [t] where
+  type Dom [t] = [Dom t]
+  type Rng [t] = Rng t
+  eval []     []     = mempty
+  eval (f:fs) (x:xs) = eval f x `mappend` eval fs xs
+  eval _      _      = error "arity mismatch"
+
+  isConst fs = mconcat <$> mapM isConst fs
+  inDom xs fs = all id $ zipWith inDom xs fs
+  domain [] = [[]]
+  domain (f:fs) = do
+    a <- domain f
+    as <- domain fs
+    return $ a:as
+
+instance (Function t, Monoid (Rng t)) => MonFunction [t]
 
 instance (Ord a, Enum a, Bounded a) => Boolean (RangeSet a) where
   top  = RS.universe
