@@ -23,7 +23,21 @@ output alphabet can also be interpreted as SST actions.
 -}
 
 type ActionSST st digit sigma var
-  = SST st (CodeInputLab digit) (DecodeFunc (RangeSet sigma) digit (Identity sigma)) var
+  = SST st (ConstOrAnyLab digit) (DecodeFunc (RangeSet sigma) digit (Identity sigma)) var
+
+-------------
+-- Predicates
+-------------
+
+-- | Single-symbol data type representing labels for action SSTs
+data ConstOrAnyLab b = ConstLab b -- ^ Read exactly this symbol
+                     | AnyLab     -- ^ Read any symbol
+  deriving (Eq, Ord)
+
+
+-----------------
+-- SST generation
+-----------------
 
 actionToSST :: forall st sigma digit.
                (Ord st, Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit)
@@ -95,14 +109,16 @@ next :: (Ord st)
      => ActionMachine st sigma RegAction digit
      -> M.Map RegIdent Int
      -> (st, Int)
-     -> [([CodeInputLab digit]
+     -> [([ConstOrAnyLab digit]
          ,RegisterUpdate Int (DecodeFunc (RangeSet sigma) digit (Identity sigma))
          ,(st, Int))]
 next actM regs (q, h) = do
   (p, f, q'') <- fromMaybe [] (M.lookup q (FST.eForward . fstE $ actM))
+  let ps           = case p of InputAny k    -> replicate k AnyLab
+                               InputConst bs -> map ConstLab bs
   let (us, q')     = followEps actM q''
   let (h'', kappa) = case f of
                      DecodeConst c -> interp regs h c
                      DecodeArg es  -> (h, M.singleton h [VarA h, FuncA (DecodeArg es) 0])
   let (h', kappa') = interp regs h'' us
-  return ([p], composeRegisterUpdate kappa kappa', (q', h'))
+  return (ps, composeRegisterUpdate kappa kappa', (q', h'))
