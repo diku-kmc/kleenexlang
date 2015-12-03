@@ -6,6 +6,9 @@ module KMC.Kleenex.Syntax
        , Prog(..)
        , Decl(..)
        , Term(..)
+       , eraseInfoProg
+       , eraseInfoDecl
+       , eraseInfoTerm
        , RProg(..)
        , RTerm(..)
        , RIdent
@@ -49,6 +52,29 @@ data Term i = Var Ident
             | TermInfo i (Term i) -- ^ constructor for storing meta-data from parser
           deriving (Eq, Ord, Show)
 
+eraseInfoProg :: Prog i -> Prog a
+eraseInfoProg (Kleenex pipeline ds) = Kleenex pipeline (map eraseInfoDecl ds)
+
+eraseInfoDecl :: Decl i -> Decl a
+eraseInfoDecl (DeclInfo _ d) = eraseInfoDecl d
+eraseInfoDecl (Decl ident t) = Decl ident (eraseInfoTerm t)
+
+eraseInfoTerm :: Term i -> Term a
+eraseInfoTerm (TermInfo _ t) = eraseInfoTerm t
+eraseInfoTerm (RedirectReg ident t) = RedirectReg ident (eraseInfoTerm t)
+eraseInfoTerm (SuppressOutput t) = SuppressOutput (eraseInfoTerm t)
+eraseInfoTerm (Range m n t) = Range m n (eraseInfoTerm t)
+eraseInfoTerm (Question t) = Question (eraseInfoTerm t)
+eraseInfoTerm (Plus t) = Plus (eraseInfoTerm t)
+eraseInfoTerm (Star t) = Star (eraseInfoTerm t)
+eraseInfoTerm (Sum t1 t2) = Sum (eraseInfoTerm t1) (eraseInfoTerm t2)
+eraseInfoTerm (Seq t1 t2) = Seq (eraseInfoTerm t1) (eraseInfoTerm t2)
+eraseInfoTerm (Var x) = Var x
+eraseInfoTerm (Constant c) = Constant c
+eraseInfoTerm (RE e) = RE e
+eraseInfoTerm One = One
+eraseInfoTerm (UpdateReg ident es) = UpdateReg ident es
+eraseInfoTerm (WriteReg ident) = WriteReg ident
 
 ------------------
 -- Reduced Kleenex

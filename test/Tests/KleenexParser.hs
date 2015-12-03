@@ -2,18 +2,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Tests.KleenexParser (kleenexParserTests) where
 
-import qualified Data.Set as S
 import qualified Distribution.TestSuite as TS
-    
+import qualified KMC.Kleenex.Syntax as S
+
 import qualified KMC.Kleenex.Parser as HP
 import qualified KMC.Syntax.External as R
 import           KMC.Util.Heredoc
-import           KMC.Expression
-import           KMC.Kleenex.Lang
-    
+
 import           Tests.TestUtils
-    
-    
+
+
 {--------------------------------------------------------------------}
 {- Kleenex parser tests                                             -}
 {--------------------------------------------------------------------}
@@ -50,10 +48,10 @@ kleenexParserTests =
                       [ run kp_postfix1
                       , run kp_postfix2
                       ]
-    , simpleGroup True "Find locations of suppressed subterms"
-                  [ run kp_test16
-                  , run kp_test17
-                  ]
+--    , simpleGroup True "Find locations of suppressed subterms"
+--                  [ run kp_test16
+--                  , run kp_test17
+--                  ]
     ]
     where
       run = uncurry simpleTest
@@ -62,22 +60,28 @@ kleenexParserTests =
 assertOutputsEqual :: String -> String -> IO TS.Result
 assertOutputsEqual progA progB =
     case (HP.parseKleenex progA, HP.parseKleenex progB) of
-      (Right sa, Right sb) -> if sa == sb
-                            then return TS.Pass
-                            else return $ TS.Fail $ "[ " ++ show sa ++
-                                     "] != [ " ++ show sb ++ "]"
-      (Left e, _)         -> return $ TS.Fail e
-      (_, Left e)         -> return $ TS.Fail e
+      (Right sa, Right sb) ->
+        let sa' = S.eraseInfoProg sa :: S.Prog ()
+            sb' = S.eraseInfoProg sb :: S.Prog ()
+         in if sa' == sb' then
+               return TS.Pass
+            else
+              return $ TS.Fail $ "[ " ++ show sa' ++ "] != [ " ++ show sb' ++ "]"
+      (Left e, _)         -> return $ TS.Fail (show e)
+      (_, Left e)         -> return $ TS.Fail (show e)
 
-assertProgramIs :: String -> HP.Kleenex -> IO TS.Result
+assertProgramIs :: String -> S.Prog () -> IO TS.Result
 assertProgramIs prog expected =
     case (HP.parseKleenex prog) of
       Right p ->
-        if p == expected
-        then return TS.Pass
-        else return $ TS.Fail $ "[ " ++ show p ++ "] != [ " ++ show expected ++ "]"
-      Left e  -> return $ TS.Fail e
+        let p' = S.eraseInfoProg p :: S.Prog ()
+        in if p' == expected then
+             return TS.Pass
+           else
+             return $ TS.Fail $ "[ " ++ show p' ++ "] != [ " ++ show expected ++ "]"
+      Left e  -> return $ TS.Fail (show e)
 
+{-
 assertMarksAre :: String -> Marks -> IO TS.Result
 assertMarksAre prog marks =
     case (testKleenex prog) of
@@ -87,6 +91,7 @@ assertMarksAre prog marks =
                                       "Marked: " ++ show marks' ++
                                       " Expected: " ++ show marks
       Left e -> return $ TS.Fail e
+-}
 
 kp_test1 :: (TestName, IO TS.Result)
 kp_test1 = "Mid-of-line //" <@>
@@ -182,7 +187,7 @@ main := "a" /b/ // hello|]
         pb = [strQ|
 main := "a" /b/|]
     in assertOutputsEqual pa pb
-            
+
 
 kp_test7 :: (TestName, IO TS.Result)
 kp_test7 = "No newline at end of file" <@>
@@ -268,7 +273,8 @@ x := /a/
 kp_test13 :: (TestName, IO TS.Result)
 kp_test13 = "Sanity check #1" <@>
     let p = [strQ|main := "a" /b/|]
-        e = HP.Kleenex [HP.Identifier "main"] [HP.HA (HP.Identifier "main", HP.Seq (HP.Constant "a") (HP.RE (R.Chr 'b')))]
+        e = S.Kleenex [S.Ident "main"]
+                      [S.Decl (S.Ident "main") (S.Seq (S.Constant "a") (S.RE (R.Chr 'b')))]
     in assertProgramIs p e
 
 kp_test14 :: (TestName, IO TS.Result)
@@ -277,13 +283,13 @@ kp_test14 = "Sanity check #2" <@>
 r:= /A/
 q:= /B/ "B" p
 |]
-        e = HP.Kleenex [ HP.Identifier "main" ]
-                       [ HP.HA (HP.Identifier "main", HP.Sum (HP.Seq (HP.Constant "a") (HP.Var (HP.Identifier "q")))
-                                                       (HP.Seq (HP.Constant "b") (HP.Var (HP.Identifier "r"))))
-                       , HP.HA (HP.Identifier "r", HP.RE (R.Chr 'A'))
-                       , HP.HA (HP.Identifier "q", HP.Seq (HP.RE (R.Chr 'B'))
-                                                       (HP.Seq (HP.Constant "B")
-                                                               (HP.Var (HP.Identifier "p"))))
+        e = S.Kleenex [ S.Ident "main" ]
+                       [ S.Decl (S.Ident "main") (S.Sum (S.Seq (S.Constant "a") (S.Var (S.Ident "q")))
+                                                       (S.Seq (S.Constant "b") (S.Var (S.Ident "r"))))
+                       , S.Decl (S.Ident "r") (S.RE (R.Chr 'A'))
+                       , S.Decl (S.Ident "q") (S.Seq (S.RE (R.Chr 'B'))
+                                                       (S.Seq (S.Constant "B")
+                                                               (S.Var (S.Ident "p"))))
                        ]
     in assertProgramIs p e
 
@@ -291,12 +297,12 @@ kp_test15 :: (TestName, IO TS.Result)
 kp_test15 = "Sanity check #3" <@>
     let p = [strQ|main := (((/a/* | /b/? | ~/c/+)*)+)?
 |]
-        e = HP.Kleenex [HP.Identifier "main"] [
-            HP.HA (HP.Identifier "main",
-                HP.Question $ HP.Plus $ HP.Star $
-                    HP.Sum (HP.Star $ HP.RE (R.Chr 'a')) $
-                    HP.Sum (HP.Question $ HP.RE (R.Chr 'b')) $
-                           (HP.Plus $ HP.Ignore $ HP.RE $ R.Chr 'c')
+        e = S.Kleenex [S.Ident "main"] [
+            S.Decl (S.Ident "main")
+                (S.Question $ S.Plus $ S.Star $
+                    S.Sum (S.Star $ S.RE (R.Chr 'a')) $
+                    S.Sum (S.Question $ S.RE (R.Chr 'b')) $
+                           (S.Plus $ S.SuppressOutput $ S.RE $ R.Chr 'c')
             )
           ]
     in assertProgramIs p e
@@ -304,9 +310,9 @@ kp_test15 = "Sanity check #3" <@>
 kp_sanity4 :: (TestName, IO TS.Result)
 kp_sanity4 = "Sanity check #4" <@>
              let p = [strQ|main := ~(/a/*)|]
-                 e = HP.Kleenex [HP.Identifier "main"] [
-                      HP.HA (HP.Identifier "main",
-                            HP.Ignore $ HP.Star $ HP.RE $ (R.Chr 'a'))
+                 e = S.Kleenex [S.Ident "main"] [
+                      S.Decl (S.Ident "main")
+                            (S.SuppressOutput $ S.Star $ S.RE $ (R.Chr 'a'))
                      ]
             in
               assertProgramIs p e
@@ -314,14 +320,15 @@ kp_sanity4 = "Sanity check #4" <@>
 kp_one1 :: (TestName, IO TS.Result)
 kp_one1 = "One constructor #1" <@>
           let p = [strQ|main := 1 | (/a/ | 1)|]
-              e = HP.Kleenex [HP.Identifier "main"] [
-                   HP.HA (HP.Identifier "main",
-                         HP.Sum HP.One (HP.Sum (HP.RE $ R.Chr 'a') HP.One))
+              e = S.Kleenex [S.Ident "main"] [
+                   S.Decl (S.Ident "main")
+                         (S.Sum S.One (S.Sum (S.RE $ R.Chr 'a') S.One))
                   ]
           in
             assertProgramIs p e
 
-       
+
+{-
 -------------------------------------------------------------------------------
 -- Check that the correct subterms are identified as being suppressed.
 -------------------------------------------------------------------------------
@@ -332,7 +339,7 @@ main := ~(/abc/ /def/* | (~/abc/ | ~/abc/))
 |]
                 exp = S.fromList $ [[], [L]]
             in assertMarksAre p exp
-              
+
 kp_test17 :: (TestName, IO TS.Result)
 kp_test17 = "Find suppressed subterms #2" <@>
             let p = [strQ|
@@ -340,3 +347,4 @@ main := ((/abc/ /def/*) | (~/abc/ | ~/abc/))
 |]
                 exp = S.fromList $ [[R,L], [L,R,L], [R,R,L]]
             in assertMarksAre p exp
+-}
