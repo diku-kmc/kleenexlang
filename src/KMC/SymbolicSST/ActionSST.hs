@@ -3,7 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ParallelListComp #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-module KMC.SymbolicSST.ActionSST(ActionSST, actionToSST) where
+module KMC.SymbolicSST.ActionSST(ActionSST, ConstOrAnyLab(..), actionToSST) where
 
 import           Data.Functor.Identity
 import qualified Data.Map as M

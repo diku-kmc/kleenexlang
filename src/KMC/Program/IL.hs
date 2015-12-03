@@ -12,7 +12,7 @@ import qualified Data.Map as M
 -- corresponding to f(e_i), where e_i is the i'th element of the domain.
 -- Functions may be partial. In the case, the value at an undefined index is
 -- arbitrary.
-data Table delta = Table { tblTable :: [[delta]], tblDigitSize :: Int }
+data Table = Table { tblTable :: [[Int]], tblDigitSize :: Int }
   deriving (Eq, Ord, Show)
 
 newtype ConstId = ConstId { getConstId :: Int } deriving (Eq, Ord, Show)
@@ -29,7 +29,7 @@ data Expr =
   | TrueE
   | LteE Expr Expr
   | LtE  Expr Expr
-  | GteE Expr Expr 
+  | GteE Expr Expr
   | GtE  Expr Expr
   | EqE  Expr Expr
   | OrE  Expr Expr
@@ -37,7 +37,7 @@ data Expr =
   | NotE Expr
   deriving (Eq, Ord, Show)
 
-data Instr delta =
+data Instr =
     AcceptI                             -- ^ accept (Program stops)
   | FailI                               -- ^ fail   (Program stops)
   | AppendI    BufferId ConstId         -- ^ buf  := buf ++ bs
@@ -51,9 +51,9 @@ data Instr delta =
                                         --   contents of buf2 will be efficient.
                                         --   This instruction is a hint to the runtime, and does not
                                         --   affect the final result.
-  | IfI        Expr (Block delta)       -- ^ if (e :: Bool) { ... }
+  | IfI        Expr Block               -- ^ if (e :: Bool) { ... }
   | GotoI      BlockId                  -- ^ goto b
-  | NextI      Int Int (Block delta)    -- ^ if (!getChars(min,max)) { ... }
+  | NextI      Int Int Block            -- ^ if (!getChars(min,max)) { ... }
   | ConsumeI   Int                      -- ^ next += i
     -- Buffer stack operations
   | PushI                               -- ^ push new empty buffer to stack
@@ -64,20 +64,30 @@ data Instr delta =
                                         -- the stack.
   deriving (Eq, Ord, Show)
 
-type Block delta = [Instr delta]
+type Block = [Instr]
 
-data Program delta =
+data Program =
   Program
-  { progTables       :: M.Map TableId (Table delta)
-  , progConstants    :: M.Map ConstId [delta]
+  { -- | Number of bits required to code a single input symbol
+    progInBits       :: Int
+    -- ^ Number of bits required to code a single output symbol
+  , progOutBits      :: Int
+    -- ^ Function lookup tables
+  , progTables       :: M.Map TableId Table
+    -- ^ Constant tables (each constant is a sequence of output symbols)
+  , progConstants    :: M.Map ConstId [Int]
+    -- ^ The designated output buffer
   , progStreamBuffer :: BufferId
+    -- ^ All buffers
   , progBuffers      :: [BufferId]
+    -- ^ Initial block
   , progInitBlock    :: BlockId
-  , progBlocks       :: M.Map BlockId (Block delta)
+    -- ^ Block map
+  , progBlocks       :: M.Map BlockId Block
   }
   deriving (Eq, Show)
 
-type Pipeline delta gamma = Either [Program delta] [(Program delta, Program gamma)]
+type Pipeline = Either [Program] [(Program, Program)]
 
 
 -----------------------------------------------------
@@ -88,7 +98,7 @@ type Pipeline delta gamma = Either [Program delta] [(Program delta, Program gamm
 -- function and replace all lookups in them with a special instruction,
 -- denoting that the current input character in the runtime should be output
 -- or appended.
-elimIdTables :: (Bounded delta, Enum delta) => Program delta -> Program delta
+elimIdTables :: Program -> Program
 elimIdTables prog = prog { progTables = rest
                          , progBlocks = M.map elimTables $ progBlocks prog
                          }
