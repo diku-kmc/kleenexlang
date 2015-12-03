@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Parser(parseKleenex, parseKleenexFromFile) where
+module KMC.Kleenex.Parser(Prog,parseKleenex, parseKleenexFromFile) where
 
 import           Control.Monad.Identity (Identity)
 import           Data.ByteString (ByteString)
@@ -27,7 +27,7 @@ skip p = p *> pure ()
 whiteSpace :: Parser ()
 whiteSpace = skipMany (simpleSpace <|> singleLineComment <|> multiLineComment)
   where
-    singleLineComment = skip (try (string "//") *> manyTill anyChar newline)
+    singleLineComment = skip (try (string "//") *> manyTill anyChar (skip newline <|> eof))
     multiLineComment = skip (try (string "/*") *> manyTill anyChar (try (string "*/")))
     simpleSpace = skipMany1 (satisfy isSpace) <?> ""
 

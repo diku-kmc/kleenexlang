@@ -15,22 +15,21 @@ import           KMC.Kleenex.Desugaring (desugarProg)
 import           KMC.Kleenex.Parser (parseKleenex)
 import           KMC.Kleenex.Syntax
 import           KMC.RangeSet
-import           KMC.SymbolicFST as FST
 import           KMC.SymbolicFST.ActionMachine
 import           KMC.SymbolicFST.OracleMachine
 import           KMC.SymbolicFST.Transducer
 import           KMC.SymbolicSST as SST
 import           KMC.SymbolicSST.ActionSST
 import           KMC.Util.Heredoc
-    
+
 import           Tests.TestUtils
-    
+
 regressionTests :: [TS.Test]
 regressionTests =
     [ simpleTest "unsound_lookahead" unsound_lookahead
---    , simpleTest "character class accepts dash" charclass_accept_dash
---    , simpleTest "newline bug" newline_bug
---    , simpleTest "pipeline" pipeline
+    , simpleTest "character class accepts dash" charclass_accept_dash
+    , simpleTest "newline bug" newline_bug
+    , simpleTest "pipeline" pipeline
     ]
 
 unsound_lookahead :: IO TS.Result
@@ -114,7 +113,7 @@ encodeChar :: Char -> [Word8]
 encodeChar = BS.unpack . encodeUtf8 . T.singleton
 
 charclass_accept_dash :: IO TS.Result
-charclass_accept_dash = 
+charclass_accept_dash =
     let prog = [strQ|
 main := /[a-z-]*/|]
     in kleenexIdTest prog "a-b-c-d---d-f-eerasdfs-"
