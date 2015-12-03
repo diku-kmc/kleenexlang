@@ -8,7 +8,7 @@ import           Data.List (intercalate)
 import qualified Data.Set as S
 import           Data.Time (NominalDiffTime,getCurrentTime, diffUTCTime)
 import           Data.Word (Word8)
-import           KMC.Determinization (sstFromFST)
+import           KMC.Determinization (SSTFunc, sstFromFST)
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Desugaring
 import           KMC.Kleenex.Parser
@@ -35,7 +35,7 @@ data TransducerUnit =
                  , tuDuration    :: NominalDiffTime
                  }
 
-type OracleSST = SST Int (RS.RangeSet Word8) (CodeFunc (RS.RangeSet Word8) Word8 Word8) Int
+type OracleSST = SST Int (RS.RangeSet Word8) (SSTFunc (CodeFunc (RS.RangeSet Word8) Word8 Word8)) Int
 data OracleSSTUnit =
   OracleSSTUnit { ouTransducers :: [OracleSST]
                 , ouDuration    :: NominalDiffTime

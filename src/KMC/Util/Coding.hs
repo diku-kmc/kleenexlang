@@ -9,21 +9,22 @@ module KMC.Util.Coding
     ,decodeEnum)
 where
 
--- | Compute the number of digits required to fit n values in a word of digits of a given base
-bitWidth :: Int -- ^ Base
-         -> Int -- ^ Domain size
-         -> Int
+bitWidth :: (Integral b, Num a, Ord a)
+         => a -- ^ Base
+         -> a -- ^ Domain size
+         -> b -- ^ Digit count
 bitWidth base n = go 0
     where
       go w | base^w >= n = w
            | otherwise   = go (w+1)
 
 -- | Get the size of a bounded domain.
-boundedSize :: forall b. (Bounded b, Enum b)
+boundedSize :: forall b s. (Bounded b, Enum b, Num s)
                => b   -- ^ Dummy argument. Not evaluated
-               -> Int -- ^ Size of domain
-boundedSize _ = fromEnum (maxBound :: b) - fromEnum (minBound :: b) + 1
-      
+               -> s -- ^ Size of domain
+boundedSize _ = fromInteger $ toInteger (fromEnum (maxBound :: b))
+                            - toInteger (fromEnum (minBound :: b)) + 1
+
 -- | Code an integral value as a big-endian sequence of digits in an arbitrary base.
 codeFixedWidth :: Int   -- ^ Base
                -> Int   -- ^ Number of digits

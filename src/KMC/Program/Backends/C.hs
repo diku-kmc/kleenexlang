@@ -79,7 +79,7 @@ matchTemplate progString n = [strQ|void match|] ++ show n ++ [strQ|()
     exit(1);
 }
 |]
-  
+
 
 {- Types -}
 
@@ -190,39 +190,33 @@ num ctype width x
         in "0x" ++ showHex (x `shiftL` sh) ""
 
 -- | Pretty print a table as a C array initializer with entries rendered as the given C type.
-prettyTableExpr :: forall delta. (Enum delta, Bounded delta) => CType -> Table delta -> Doc
-prettyTableExpr ctype table@(Table { tblTable = tableData }) =
+prettyTableExpr :: Int -> CType -> Table -> Doc
+prettyTableExpr outBits ctype (Table { tblTable = tableData, tblDigitSize = digitSize }) =
   lbrace <> prettyLines <> rbrace
   where
     prettyLines = vcat
                   . punctuate comma
                   $ [ hsep . punctuate comma . map prettyCell $ line | line <- chunk 8 tableData ]
 
-    prettyCell c = text (padL cellWidth (num ctype bwidth (decodeEnum c :: Integer)))
+    prettyCell c =
+      let n    = decode (2 ^ outBits) (map toInteger c) :: Integer
+          ndoc = num ctype bwidth n
+      in text $ padL cellWidth ndoc
 
-    bwidth = tblBitSize table
+    bwidth = outBits * digitSize
     cellWidth = case ctype of
                      UInt8T  -> 4
                      UInt16T -> 6
                      UInt32T -> 10
                      UInt64T -> 18
 
--- | Compute the number of bits required to represent a single entry from the table.
-tblBitSize :: forall delta. (Enum delta, Bounded delta) => Table delta -> Int
-tblBitSize (Table { tblDigitSize = digitSize }) = baseBits * digitSize
-  where
-    base = fromEnum (maxBound :: delta) - fromEnum (minBound :: delta) + 1
-    baseBits = bitWidth 2 base
-
 -- | Take a value to output/append and represent it as a list of integers which
 -- each fit the given C type. The second component of each pair is the number of
 -- bits of the first component that make up the value encoding.
-splitAppends :: forall delta. (Enum delta, Bounded delta) => CType -> [delta] -> [(Integer, Int)]
-splitAppends buftype digits = [ (decodeEnum bs, length bs * baseBits) | bs <- groups ]
+splitAppends :: Int -> CType -> [Int] -> [(Integer, Int)]
+splitAppends outBits buftype digits = [ (decodeEnum bs, length bs * outBits) | bs <- groups ]
   where
-    base = fromEnum (maxBound :: delta) - fromEnum (minBound :: delta) + 1
-    baseBits = bitWidth 2 base
-    digitsPerAppend = cbitSize buftype `div` baseBits
+    digitsPerAppend = cbitSize buftype `div` outBits
     groups = split digits
 
     split [] = []
@@ -233,10 +227,9 @@ splitAppends buftype digits = [ (decodeEnum bs, length bs * baseBits) | bs <- gr
 -- destination buffer is the output buffer or a regular bufer. An optional
 -- dynamic offset variable can be specified for printing append instructions
 -- within a loop.
-prettyAppendTbl :: (Bounded delta, Enum delta) =>
-                   CType
+prettyAppendTbl :: CType
                 -> CType
-                -> Program delta
+                -> Program
                 -> BufferId
                 -> TableId
                 -> Int
@@ -245,7 +238,8 @@ prettyAppendTbl :: (Bounded delta, Enum delta) =>
                 -> Doc
 prettyAppendTbl buftype tbltype prog bid tid i mx phase =
   let arg       = tbl buftype tbltype tid i mx phase
-      lendoc    = int (tblBitSize $ progTables prog M.! tid)
+      bwidth    = progOutBits prog * (tblDigitSize $ progTables prog M.! tid)
+      lendoc    = int bwidth
       streamBuf = progStreamBuffer prog
   in if bid == streamBuf then
          text "outputconst" <> parens (hcat [arg, comma, lendoc]) <> semi
@@ -264,24 +258,21 @@ prettyAppendSym bid outBuf i mx =
         text "append"
         <> parens (hcat [buf bid, comma, symb, comma, int 8]) <> semi
 
-            
+
 -- | Pretty print an instruction. Note that the C runtime currently
 -- distinguishes between regular buffers and the output buffer, and hence the
 -- pretty printer needs to handle this case specially.
-prettyInstr :: forall delta. (Enum delta, Bounded delta) =>
-               CType          -- ^ The buffer unit type
+prettyInstr :: CType          -- ^ The buffer unit type
             -> CType          -- ^ The table unit type
-            -> Program delta  -- ^ The surrounding program
-            -> Instr delta -> Int -> Doc
+            -> Program        -- ^ The surrounding program
+            -> Instr -> Int -> Doc
 prettyInstr buftype tbltype prog instr phase =
   let streamBuf = progStreamBuffer prog in
   case instr of
     AcceptI            -> text "goto accept" <> int phase <> semi
     FailI              -> text "goto fail" <> int phase <> semi
     AppendI bid constid -> 
-      let base     = fromEnum (maxBound :: delta) - fromEnum (minBound :: delta) + 1
-          baseBits = bitWidth 2 base
-          lendoc   = text $ show $ length (progConstants prog M.! constid) * baseBits
+      let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
       in if bid == streamBuf then
              text "outputarray"
                <> parens (hcat [cid constid phase, comma, lendoc])
@@ -317,7 +308,7 @@ prettyInstr buftype tbltype prog instr phase =
     PopI bid           -> text "stack_pop" <> parens (buf bid) <> semi
     WriteI bid         -> text "stack_write" <> parens (buf bid) <> semi
 
-appendSpan :: BufferId -> TableId -> Int -> Block delta -> Maybe (Int, Block delta)
+appendSpan :: BufferId -> TableId -> Int -> Block -> Maybe (Int, Block)
 appendSpan bid tid i is =
   let (is1, is2) = span isAppendTbl is
   in if not (null is1)
@@ -330,7 +321,7 @@ appendSpan bid tid i is =
       isAppendTbl (AppendTblI bid' tid' _) = bid == bid' && tid == tid'
       isAppendTbl _ = False
 
-appendSymSpan :: BufferId -> Int -> Block delta -> Maybe (Int, Block delta)
+appendSymSpan :: BufferId -> Int -> Block -> Maybe (Int, Block)
 appendSymSpan bid i is =
     let (is1, is2) = span isAppendSym is
     in if not (null is1)
@@ -344,7 +335,7 @@ appendSymSpan bid i is =
       isAppendSym _ = False
 
 -- | Pretty print a list of instructions.
-prettyBlock :: (Enum delta, Bounded delta) => CType -> CType -> Program delta -> Block delta -> Int -> Doc
+prettyBlock :: CType -> CType -> Program -> Block -> Int -> Doc
 prettyBlock buftype tbltype prog instrs phase = go instrs
   where
     go [] = empty
@@ -417,84 +408,80 @@ prettyExpr e =
     op str e1 e2 = parens (prettyExpr e1 <+> text str <+> prettyExpr e2)
 
 -- | Pretty print all table declarations.
-prettyTableDecl :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
-                   CType                 -- ^ Table unit type
-                -> Pipeline delta gamma  -- ^ Programs
+prettyTableDecl :: CType                 -- ^ Table unit type
+                -> Pipeline              -- ^ Programs
                 -> Doc
-prettyTableDecl tbltype pipeline = case pipeline of 
+prettyTableDecl tbltype pipeline = case pipeline of
                                     Left  progs -> vcat $ zipWith tableDecl progs [1..]
                                     Right progs -> vcat $ zipWith combine progs [1,3..]
   where
     combine (p,a) i = tableDecl p i $+$ tableDecl a (i+1)
-    tableDecl prog phase = 
-        if null tables 
-        then text "/* no tables */" 
+    tableDecl prog phase =
+        if null tables
+        then text "/* no tables */"
         else text "const" <+> ctyp tbltype <+> text "tbl" <> int phase
           <> brackets (int (length tables)) <> brackets (int tableSize) <+> text "="
-          $$ lbrace <> vcat (punctuate comma (map (prettyTableExpr tbltype) tables)) 
+          $$ lbrace <> vcat (punctuate comma (map (prettyTableExpr (progOutBits prog) tbltype) tables))
           <> rbrace <> semi
       where
         tables    = M.elems $ progTables prog
         tableSize = length . tblTable . head $ tables
 
 -- | Pretty print all buffer declarations.
-prettyBufferDecls :: Pipeline delta gamma -> Doc
+prettyBufferDecls :: Pipeline -> Doc
 prettyBufferDecls progs =
   vcat (map bufferDecl $ neededBuffers progs)
   where
     bufferDecl (BufferId n) = text "buffer_t" <+> text bufferPrefix <> int n <> semi
 
-prettyConstantDecls :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
-                        CType -- ^ Buffer unit type
-                     -> Pipeline delta gamma
-                     -> Doc
+prettyConstantDecls :: CType -- ^ Buffer unit type
+                    -> Pipeline
+                    -> Doc
 prettyConstantDecls buftype pipeline = case pipeline of
     Left progs -> vcat $ zipWith constantDecls progs [1..]
     Right progs -> vcat $ zipWith combine progs [1,3..]
   where
-    constantDecls prog i = vcat $ map (constantDecl i) $ M.toList $ progConstants prog
+    constantDecls prog i = vcat $ map (constantDecl (progOutBits prog) i) $ M.toList $ progConstants prog
     combine (p,a) i = constantDecls p i $+$ constantDecls a (i+1)
-    constantDecl phase (ConstId n, deltas) =
-      let chunks = splitAppends buftype deltas
+    constantDecl outBits phase (ConstId n, deltas) =
+      let chunks = splitAppends outBits buftype deltas
           constdocs = map (\(c, nbits) -> text $ num buftype nbits c) chunks
-          comment = join $ map escape $ map (chr . fromEnum) deltas
+          comment = join $ map escape $ map chr deltas
           escape c = if isPrint c && isAscii c && isSafe c then [c] else "\\x" ++ showHex (ord c) ""
           isSafe c = c /= '\\'
       in vcat [ text "//" <+> text comment
-              , text "const" <+> text "buffer_unit_t" <+> text constPrefix 
+              , text "const" <+> text "buffer_unit_t" <+> text constPrefix
                 <> int phase <> text "_" <> int n
                 <> brackets (int $ length chunks)
                 <+> text "=" <+>
                 (braces $ hcat $ punctuate comma constdocs) <> semi
              ]
 
-neededBuffers :: Pipeline delta gamma -> [BufferId]
-neededBuffers pipeline = case pipeline of 
+neededBuffers :: Pipeline -> [BufferId]
+neededBuffers pipeline = case pipeline of
         Left  progs -> deduplicate $ concatMap progBuffers progs
         Right progs -> deduplicate $ concatMap combine progs
     where
         combine (p,a) = progBuffers p ++ progBuffers a
         deduplicate = S.toList . S.fromList
 
-neededNonStreamBuffers :: Pipeline delta gamma -> [BufferId]
+neededNonStreamBuffers :: Pipeline -> [BufferId]
 neededNonStreamBuffers pipeline = S.toList . S.unions $ case pipeline of
     Left  progs -> map needed progs
     Right progs -> map (\(p,a) -> S.union (needed p) (needed a)) progs
   where
-    needed prog = S.fromList $ filter (/= progStreamBuffer prog) $ progBuffers prog 
-    
-    
+    needed prog = S.fromList $ filter (/= progStreamBuffer prog) $ progBuffers prog
 
 
 -- | Pretty print initialization code. This is just a call to init_buffer() for
 -- each buffer in the program.
-prettyInit :: Pipeline delta gamma -> Doc
+prettyInit :: Pipeline -> Doc
 prettyInit progs =
   vcat (map bufferInit $ neededNonStreamBuffers progs)
   where
     bufferInit bid = text "init_buffer" <> parens (buf bid) <> semi
 
-prettyProg :: (Enum delta, Bounded delta) => CType -> CType -> Program delta -> Int -> Doc
+prettyProg :: CType -> CType -> Program -> Int -> Doc
 prettyProg buftype tbltype prog phase =
   text "goto" <+> blck (progInitBlock prog) phase <> semi
   $$ vcat (map pblock (M.toList $ progBlocks prog))
@@ -503,7 +490,7 @@ prettyProg buftype tbltype prog phase =
       blck blid phase <>  char ':'
                       <+> prettyBlock buftype tbltype prog is phase
 
-programsToC :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) => CType -> Pipeline delta gamma -> CProg
+programsToC :: CType -> Pipeline -> CProg
 programsToC buftype pipeline =
   CProg
   { cTables       = prettyTableDecl tbltype pipeline
@@ -538,11 +525,10 @@ ccVersion comp = do
   errStr <- hGetContents hErr
   return $ intercalate "\\n" $ lines $ errStr
 
-compileProgram :: (Enum delta, Bounded delta, Enum gamma, Bounded gamma) =>
-                  CType
+compileProgram :: CType
                -> Int
                -> Bool
-               -> Pipeline delta gamma
+               -> Pipeline
                -> Maybe String -- ^ Optional descriptor to put in program.
                -> FilePath     -- ^ Path to C compiler
                -> Maybe FilePath
@@ -584,7 +570,7 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
                 , maybe "No environment info available" id desc
                 , "" -- adds newline at the end
                 ]
-    outInfo cver path = quote $ intercalate "\\n" 
+    outInfo cver path = quote $ intercalate "\\n"
                         [ "Compiler info: "
                         , cver
                         , ""
@@ -594,4 +580,3 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
                         , maybe "No environment info available" id desc
                         , "" -- adds newline at the end
                         ]
-    
