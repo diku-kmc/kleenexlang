@@ -25,7 +25,7 @@ strictCatch = catch . (toNF =<<)
 catchAllExceptions :: IO TS.Result -> IO TS.Result
 catchAllExceptions test = test `strictCatch`
                           \(e :: SomeException) -> return $ TS.Error $ show e
-             
+
 -- | A TS.Result can be forced to normal form.
 instance NFData TS.Result where
     rnf TS.Pass      = ()
