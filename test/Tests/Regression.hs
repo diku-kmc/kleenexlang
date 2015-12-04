@@ -119,27 +119,7 @@ ds := ~/d/{2,3} "yep d" | ~/d*/ "nope d"
 
 
 kleenexIdTest :: String -> String -> IO TS.Result
-kleenexIdTest prog str =
-    let inp = concatMap encodeChar str in
-    case parseKleenex prog of
-      Left err -> return $ TS.Error (show err)
-      Right p  ->
-          let dp = desugarProg p
-              ts = map (constructTransducer dp) (rprogPipeline dp)
-                   :: [Transducer [RIdent] Word8 (Either Word8 RegAction)]
-              ots = map oracle ts :: [OracleMachine [RIdent] Word8 Word8]
-              ats = map action ts :: [ActionMachine [RIdent] Word8 RegAction Word8]
-              ossts = map (SST.enumerateStates . flip sstFromFST True) ots
-              assts = map actionToSST ats
-              out  = foldl (\acc (osst, asst) ->
-                             SST.flattenStream $ SST.run asst
-                             $ SST.flattenStream $ SST.run osst acc)
-                           inp
-                           (zip ossts assts)
-          in if inp == out
-             then return TS.Pass
-             else return $ TS.Fail $ "Identity failed: expected '" ++ show inp
-                                  ++ "', got '" ++ show out ++ "'"
+kleenexIdTest prog str = kleenexIOTest prog [(str, str)]
 
 kleenexIOTest :: String -> [(String, String)] -> IO TS.Result
 kleenexIOTest prog cases =
