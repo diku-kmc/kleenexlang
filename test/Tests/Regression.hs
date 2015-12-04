@@ -5,7 +5,7 @@ module Tests.Regression ( regressionTests ) where
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Text as T
-import           Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Word (Word8)
 import qualified Distribution.TestSuite as TS
 
@@ -30,6 +30,7 @@ regressionTests =
     , simpleTest "character class accepts dash" charclass_accept_dash
     , simpleTest "newline bug" newline_bug
     , simpleTest "pipeline" pipeline
+    , simpleTest "range disambiguation" range_disamb
     ]
 
 unsound_lookahead :: IO TS.Result
@@ -84,6 +85,39 @@ b := /ab/ "c"
     in kleenexIdTest prog "abc"
 
 
+-- This test was failing for compiled Kleenex. Make sure that it works when
+-- simulating.
+range_disamb :: IO TS.Result
+range_disamb =
+  let prog = [strQ|main := (test /\n/)*
+test := as | bs | cs | ds
+
+as := ~/a/{3} "yep a" | ~/a*/ "nope a"
+bs := ~/b/{2,} "yep b" | ~/b*/ "nope b"
+cs := ~/c/{,3} "yep c" | ~/c*/ "nope c"
+ds := ~/d/{2,3} "yep d" | ~/d*/ "nope d"
+|]
+      cases = [("\n","nope a\n")
+              ,("a\n","nope a\n")
+              ,("aa\n","nope a\n")
+              ,("aaa\n","yep a\n")
+              ,("aaaa\n","nope a\n")
+              ,("b\n","nope b\n")
+              ,("bb\n","yep b\n")
+              ,("bbb\n","yep b\n")
+              ,("bbbb\n","yep b\n")
+              ,("c\n","yep c\n")
+              ,("cc\n","yep c\n")
+              ,("ccc\n","yep c\n")
+              ,("cccc\n","nope c\n")
+              ,("d\n","nope d\n")
+              ,("dd\n","yep d\n")
+              ,("ddd\n","yep d\n")
+              ,("dddd\n","nope d\n")
+              ]
+   in kleenexIOTest prog cases
+
+
 kleenexIdTest :: String -> String -> IO TS.Result
 kleenexIdTest prog str =
     let inp = concatMap encodeChar str in
@@ -107,10 +141,38 @@ kleenexIdTest prog str =
              else return $ TS.Fail $ "Identity failed: expected '" ++ show inp
                                   ++ "', got '" ++ show out ++ "'"
 
-
+kleenexIOTest :: String -> [(String, String)] -> IO TS.Result
+kleenexIOTest prog cases =
+  case parseKleenex prog of
+    Left err -> return $ TS.Error (show err)
+    Right p  ->
+      let dp = desugarProg p
+          ts = map (constructTransducer dp) (rprogPipeline dp)
+               :: [Transducer [RIdent] Word8 (Either Word8 RegAction)]
+          ots = map oracle ts :: [OracleMachine [RIdent] Word8 Word8]
+          ats = map action ts :: [ActionMachine [RIdent] Word8 RegAction Word8]
+          ossts = map (SST.enumerateStates . flip sstFromFST True) ots
+          assts = map actionToSST ats
+          exec s  = foldl (\acc (osst, asst) ->
+                            SST.flattenStream $ SST.run asst
+                            $ SST.flattenStream $ SST.run osst acc)
+                          (concatMap encodeChar s)
+                          (zip ossts assts)
+          fails = [ (inp,expected,out) | (inp, expected) <- cases
+                                       , let out = exec inp
+                                       , out /= concatMap encodeChar expected ]
+          formatErr (inp,expected,out) =
+            "  in: '" ++ inp ++
+            "', expected: '" ++ expected ++
+            "', got: '" ++ decodeChars out ++ "' ;; "
+       in if null fails then return TS.Pass else
+            return $ TS.Fail $ "I/O test failed: (" ++ concatMap formatErr fails ++ ")"
 
 encodeChar :: Char -> [Word8]
 encodeChar = BS.unpack . encodeUtf8 . T.singleton
+
+decodeChars :: [Word8] -> String
+decodeChars = T.unpack . decodeUtf8 . BS.pack
 
 charclass_accept_dash :: IO TS.Result
 charclass_accept_dash =
