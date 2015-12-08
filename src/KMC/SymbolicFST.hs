@@ -65,10 +65,10 @@ deriving instance (Show q, Show pred, Show func, Show (Rng func)) => Show (FST q
 edgesFromList :: (Ord q) => [Edge q pred func] -> OrderedEdgeSet q pred func
 edgesFromList es =
   OrderedEdgeSet
-  { eForward = M.fromListWith (++) [ (q, [(a, b, q')]) | (q, Left (a,b), q') <- es ]
-  , eBackward = M.fromListWith (++) [ (q', [(a, b, q)]) | (q, Left (a,b), q') <- es ]
-  , eForwardEpsilon = M.fromListWith (++) [(q, [(y, q')]) | (q, Right y, q') <- es ]
-  , eBackwardEpsilon = M.fromListWith (++) [(q', [(y,q)]) | (q, Right y, q') <- es ]
+  { eForward = M.fromListWith (flip (++)) [ (q, [(a, b, q')]) | (q, Left (a,b), q') <- es ]
+  , eBackward = M.fromListWith (flip (++)) [ (q', [(a, b, q)]) | (q, Left (a,b), q') <- es ]
+  , eForwardEpsilon = M.fromListWith (flip (++)) [(q, [(y, q')]) | (q, Right y, q') <- es ]
+  , eBackwardEpsilon = M.fromListWith (flip (++)) [(q', [(y,q)]) | (q, Right y, q') <- es ]
   }
 
 -- | Get the number of states in the FST
