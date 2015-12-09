@@ -442,7 +442,11 @@ int main(int argc, char *argv[])
         uint32_t bufsize = 256;
         _NSGetExecutablePath(filename, &bufsize);
         #else
-        readlink("/proc/self/exe", filename, 256);
+        int r = readlink("/proc/self/exe", filename, 256);
+        if (r < 0) {
+          fprintf(stderr, "Error getting executable path");
+          return 1;
+        }
         #endif
         char *args[] = { filename, "--phase", phase, 0 };
         execv(filename, args);
