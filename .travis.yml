@@ -14,20 +14,26 @@ notifications:
       on_success: change
       on_failure: always
 
-# The following lines enable several GHC versions and/or HP versions
-# to be tested; often it's enough to test only against the last
-# release of a major GHC version. Setting HPVER implictly sets
-# GHCVER. Omit lines with versions you don't need/want testing for.
-env:
-#  - CABALVER=1.22 GHCVER=7.8.4
-  - CABALVER=1.22 GHCVER=7.10.1
+
+matrix:
+  include:
+    - env: CABALVER=1.22 GHCVER=7.10.1
+      addons: 
+        apt: 
+          packages: [cabal-install-1.22, ghc-7.10.1]
+          sources: [hvr-ghc]
+    
+  allow_failures:
+   - env: CABALVER=head GHCVER=head
+
+# Explicitly ask for the new container-based infrastructure.
+sudo:
+  false
+  
 
 # Note: the distinction between `before_install` and `install` is not
 #       important.
 before_install:
-  - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
-  - travis_retry sudo apt-get update
-  - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER
   - export PATH=/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
   - cabal sandbox init
   - cabal sandbox add-source regexps-syntax
@@ -40,7 +46,7 @@ install:
   - cabal --version
   - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
   - travis_retry cabal update
-  - cabal install --only-dependencies --enable-tests --enable-benchmarks
+  - cabal install --avoid-reinstalls --only-dependencies --enable-tests --enable-benchmarks
 
 # Here starts the actual work to be performed for the package under
 # test; any command which exits with a non-zero exit code causes the
