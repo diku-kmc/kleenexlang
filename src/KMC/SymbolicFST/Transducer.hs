@@ -25,7 +25,7 @@ type Transducer st sigma gamma
 -- | Represents functions which inject their argument into the range type. The
 -- functions may also ignore their argument and return a constant.
 data CopyFunc a c = CopyArg | CopyConst c
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 instance (Enum a, Bounded a) => Function (CopyFunc a [Either a x]) where
   type Dom (CopyFunc a [Either a x]) = a
