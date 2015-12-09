@@ -1,9 +1,12 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE QuasiQuotes #-}
 module Tests.Regression ( regressionTests ) where
 
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import           Data.Word (Word8)
@@ -12,14 +15,17 @@ import qualified Distribution.TestSuite as TS
 import           KMC.Determinization
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Desugaring (desugarProg)
+import qualified KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser (parseKleenex)
 import           KMC.Kleenex.Syntax
 import           KMC.RangeSet
+import           KMC.SymbolicFST as FST
 import           KMC.SymbolicFST.ActionMachine
 import           KMC.SymbolicFST.OracleMachine
 import           KMC.SymbolicFST.Transducer
 import           KMC.SymbolicSST as SST
 import           KMC.SymbolicSST.ActionSST
+import           KMC.Theories
 import           KMC.Util.Heredoc
 
 import           Tests.TestUtils
@@ -31,6 +37,7 @@ regressionTests =
     , simpleTest "newline bug" newline_bug
     , simpleTest "pipeline" pipeline
     , simpleTest "range disambiguation" range_disamb
+    , simpleTest "enumerateStates not idempotent" enumerateStates_idempotent
     ]
 
 unsound_lookahead :: IO TS.Result
@@ -121,38 +128,54 @@ ds := ~/d/{2,3} "yep d" | ~/d*/ "nope d"
 kleenexIdTest :: String -> String -> IO TS.Result
 kleenexIdTest prog str = kleenexIOTest prog [(str, str)]
 
+kleenexDesugarProg :: String -> (String -> IO a) -> (DS.RProg -> IO a) -> IO a
+kleenexDesugarProg prog kfail kret = case parseKleenex prog of
+    Left err -> kfail (show err)
+    Right p  -> kret (desugarProg p)
+
 kleenexIOTest :: String -> [(String, String)] -> IO TS.Result
 kleenexIOTest prog cases =
-  case parseKleenex prog of
-    Left err -> return $ TS.Error (show err)
-    Right p  ->
-      let dp = desugarProg p
-          ts = map (constructTransducer dp) (rprogPipeline dp)
-               :: [Transducer [RIdent] Word8 (Either Word8 RegAction)]
-          ots = map oracle ts :: [OracleMachine [RIdent] Word8 Word8]
-          ats = map action ts :: [ActionMachine [RIdent] Word8 RegAction Word8]
-          ossts = map (SST.enumerateStates . flip sstFromFST True) ots
-          assts = map actionToSST ats
-          exec s  = foldl (\acc (osst, asst) ->
-                            SST.flattenStream $ SST.run asst
-                            $ SST.flattenStream $ SST.run osst acc)
-                          (concatMap encodeChar s)
-                          (zip ossts assts)
-          fails = [ (inp,expected,out) | (inp, expected) <- cases
-                                       , let out = exec inp
-                                       , out /= concatMap encodeChar expected ]
-          formatErr (inp,expected,out) =
-            "  in: '" ++ inp ++
-            "', expected: '" ++ expected ++
-            "', got: '" ++ decodeChars out ++ "' ;; "
-       in if null fails then return TS.Pass else
-            return $ TS.Fail $ "I/O test failed: (" ++ concatMap formatErr fails ++ ")"
+  kleenexDesugarProg prog (return . TS.Error . show) $ \dp ->
+    let ts = map (constructTransducer dp) (rprogPipeline dp)
+             :: [Transducer [RIdent] Word8 (Either Word8 RegAction)]
+        ots = map oracle ts :: [OracleMachine [RIdent] Word8 Word8]
+        ats = map action ts :: [ActionMachine [RIdent] Word8 RegAction Word8]
+        ossts = map (SST.enumerateStates . flip sstFromFST True) ots
+        assts = map actionToSST ats
+        exec s  = foldl (\acc (osst, asst) ->
+                          SST.flattenStream $ SST.run asst
+                          $ SST.flattenStream $ SST.run osst acc)
+                        (concatMap encodeChar s)
+                        (zip ossts assts)
+        fails = [ (inp,expected,out) | (inp, expected) <- cases
+                                     , let out = exec inp
+                                     , out /= concatMap encodeChar expected ]
+        formatErr (inp,expected,out) =
+          "  in: '" ++ inp ++
+          "', expected: '" ++ expected ++
+          "', got: '" ++ decodeChars out ++ "' ;; "
+     in if null fails then return TS.Pass else
+           return $ TS.Fail $ "I/O test failed: (" ++ concatMap formatErr fails ++ ")"
 
 encodeChar :: Char -> [Word8]
 encodeChar = BS.unpack . encodeUtf8 . T.singleton
 
 decodeChars :: [Word8] -> String
 decodeChars = T.unpack . decodeUtf8 . BS.pack
+
+
+enumerateStates_idempotent :: IO TS.Result
+enumerateStates_idempotent = do
+  let prog = "main := ~/c/ | ~/c/ \"n\""
+  kleenexDesugarProg prog (return . TS.Error . show) $ \dp -> do
+    let mach = constructTransducer dp (head $ rprogPipeline dp)
+                :: Transducer [RIdent] Word8 (Either Word8 RegAction)
+    let mach1 = FST.enumerateStates mach :: Transducer Int Word8 (Either Word8 RegAction)
+    let mach2 = FST.enumerateStates mach1 :: Transducer Int Word8 (Either Word8 RegAction)
+    if (mach1 == mach2) then
+      return TS.Pass
+    else
+      return $ TS.Fail $ "enumerateStates not idempotent: " ++ show mach1 ++ " =/= " ++ show mach2
 
 charclass_accept_dash :: IO TS.Result
 charclass_accept_dash =
