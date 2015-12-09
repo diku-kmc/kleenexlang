@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Desugaring(desugarProg) where
+module KMC.Kleenex.Desugaring(desugarProg,RTerm,RProg) where
 
 import           Control.Monad.Reader
 import           Control.Monad.State
