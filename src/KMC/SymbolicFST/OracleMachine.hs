@@ -20,7 +20,7 @@ type OracleMachine st sigma digit
 -- base. The functions may also ignore their arguments and return a constant
 -- code.
 data CodeFunc enum dom digit = CodeArg enum | CodeConst [digit]
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 instance (Enum dom, Bounded dom, Enum digit, Bounded digit, Enumerable enum dom)
          => Function (CodeFunc enum dom digit) where
