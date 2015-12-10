@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Desugaring(desugarProg,RTerm,RProg) where
+module KMC.Kleenex.Desugaring(desugarProg,desugarRegex,RTerm,RProg) where
 
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -193,3 +193,13 @@ desugarProg prog =
 
     lu ident = maybe (error $ "identifier in pipeline with no declaration: " ++ fromIdent ident) id
                      (M.lookup ident identMap)
+
+desugarRegex :: E.Regex -> RProg
+desugarRegex re =
+  S.RProg { rprogPipeline = [ initIdent ]
+          , rprogDecls    = dsDecls ds
+          }
+  where
+    (initIdent, ds) = runState (runReaderT (desugarRE True re) initDC) initDS
+    initDC = DC { dcIdents = M.empty }
+    initDS = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = 0 }

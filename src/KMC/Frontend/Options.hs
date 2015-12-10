@@ -13,24 +13,23 @@ import Options
 
 data MainOptions =
     MainOptions
-    { optQuiet            :: Bool
-    , optOptimizeSST      :: Int
-    , optPreFunctionalize :: Bool
-    , optLookahead        :: Bool
-    , optExpressionArg    :: Bool
-    , optActionEnabled    :: Bool
-    , optConstructDFA     :: Bool -- ^ Enable DFA optimization
+    { optQuiet            :: Bool -- ^ Do not generate console output
+    , optOptimizeSST      :: Int  -- ^ SST optimization level (0-3)
+    , optPreFunctionalize :: Bool -- ^ Functionalize oracle before SST gen
+    , optLookahead        :: Bool -- ^ Use finite lookahead in SSTs
+    , optExpressionArg    :: Bool -- ^ Treat input as RE, generate bit-coder
+    , optActionEnabled    :: Bool -- ^ Decompose into oracle/action
     , optSuppressBits     :: Bool -- ^ Don't generate bitcodes that can be safely suppressed
     }
 
 data CompileOptions =
     CompileOptions
-    { optOptimizeLevelCC :: Int
-    , optOutFile         :: Maybe FilePath
-    , optCFile           :: Maybe FilePath
-    , optWordSize        :: CType
-    , optAltCompiler     :: FilePath
-    , optElimIdTables    :: Bool
+    { optOptimizeLevelCC :: Int            -- ^ CC optimization level
+    , optOutFile         :: Maybe FilePath -- ^ Binary output file
+    , optCFile           :: Maybe FilePath -- ^ Intermediate source file
+    , optWordSize        :: CType          -- ^ Word size in run-time buffer
+    , optAltCompiler     :: FilePath       -- ^ Alternative compiler
+    , optElimIdTables    :: Bool           -- ^ Eliminate identity tables in generated code
     }
 
 data VisualizeOptions =
@@ -40,21 +39,32 @@ data VisualizeOptions =
    , optVisOut   :: Maybe FilePath
    }
 
-data VisStage = VisFST | VisSST | VisASST
+data VisStage = VisTransducer -- ^ Visualize the generated transducer
+              | VisOracle     -- ^ Visualize the oracle transducer
+              | VisAction     -- ^ Visualize the action machine
+              | VisSST        -- ^ Visualize the SST (composed)
+              | VisOracleSST  -- ^ Visualize the oracle SST
+              | VisActionSST  -- ^ Visualize the action SST
 
 visStageOptionType :: OptionType VisStage
 visStageOptionType =
-  optionType "fst|sst|asst"
-             VisFST
+  optionType "transducer|oracle|action|sst|oraclesst|actionsst"
+             VisTransducer
              (\s -> case s of
-                      "fst"  -> Right VisFST
-                      "sst"  -> Right VisSST
-                      "asst" -> Right VisASST
+                      "transducer" -> Right VisTransducer
+                      "oracle"     -> Right VisOracle
+                      "action"     -> Right VisAction
+                      "sst"        -> Right VisSST
+                      "oraclesst"  -> Right VisOracleSST
+                      "actionsst"  -> Right VisActionSST
                       _ -> Left $ "\"" ++ s ++ "\" is not a valid automaton type")
              (\t -> case t of
-                      VisFST  -> "fst"
-                      VisSST  -> "sst"
-                      VisASST -> "asst")
+                      VisTransducer -> "transducer"
+                      VisOracle     -> "oracle"
+                      VisAction     -> "action"
+                      VisSST        -> "sst"
+                      VisOracleSST  -> "oraclesst"
+                      VisActionSST  -> "actionsst")
 
 ctypeOptionType :: OptionType CType
 ctypeOptionType =
@@ -81,7 +91,6 @@ instance Options MainOptions where
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
       <*> simpleOption "act" True "Enable actions in the language"
-      <*> simpleOption "dfa" False "Treat ignored Kleenex-subterms as DFAs"
       <*> simpleOption "sb"  True "Avoid generating bits for suppressed terms whenever safe"
 
 instance Options CompileOptions where
@@ -103,10 +112,10 @@ instance Options VisualizeOptions where
         VisualizeOptions
         <$> defineOption visStageOptionType
                 (\o -> o { optionLongFlags = ["visstage"]
-                         , optionDefault = VisFST
+                         , optionDefault = VisTransducer
                          , optionDescription = "Automaton to visualize"
                          })
-        <*> simpleOption "visphase" 1 "Which stage in the pipeline to visualize."
+        <*> simpleOption "visphase" 0 "Which stage in the pipeline to visualize (starting from 0)"
         <*> simpleOption "visout" Nothing ("Save visualization to file (determine type from extension). "
                                            ++ "If not set, attempt to show visualization in window.")
 
@@ -115,5 +124,4 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
                      [ "SST optimization level:  " ++ show (optOptimizeSST mainOpts)
                      , "Word size:               " ++ show (optWordSize compileOpts)
                      , "Identity tables removed: " ++ show (optElimIdTables compileOpts)
-                     , "DFA optimization:        " ++ show (optConstructDFA mainOpts)
                      ]

@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module KMC.SymbolicFST
        (FST(..)
+       ,Edge
        ,fstStateSize
        ,fstTransSize
        ,edgesFromList
