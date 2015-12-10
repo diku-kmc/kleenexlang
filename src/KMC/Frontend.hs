@@ -21,7 +21,7 @@ import qualified KMC.SymbolicFST.Transducer as T
 import           KMC.SymbolicSST (SST)
 import qualified KMC.SymbolicSST as SST
 import qualified KMC.SymbolicSST.ActionSST as ASST
-import           KMC.Visualization (fstToDot, sstToDot)
+import           KMC.Visualization (fstToDot, sstToDot, graphSize)
 
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -354,8 +354,9 @@ compileCoder compileOpts useWordAlignment srcFile srcMd5 ou =
                             (optCFile compileOpts)
                             useWordAlignment
 
-visualize :: VisualizeOptions -> ProgramUnit -> Frontend ExitCode
+visualize :: VisualizeOptions -> ProgramUnit -> Frontend (IO ExitCode)
 visualize visOpts pu = do
+  quiet <- asks optQuiet
   let visPhase = optVisPhase visOpts
   when (visPhase < 0 || visPhase >= length (rprogPipeline $ puProgram pu)) $
     fatal "Invalid phase specified for visualization"
@@ -363,32 +364,41 @@ visualize visOpts pu = do
   let pu' = pu { puProgram = prog { rprogPipeline = [rprogPipeline prog !! visPhase] } }
   tu <- buildTransducers pu'
   dg <- case optVisStage visOpts of
-    VisTransducer -> return $ fstToDot $ head $ tuTransducers tu
-    VisOracle     -> return $ fstToDot $ (oracle $ head $ tuTransducers tu
-                                         :: OracleMachine)
-    VisAction     -> return $ fstToDot $ (action $ head $ tuTransducers tu
-                                          :: ActionMachine)
+    VisTransducer -> do
+      let dg' = fstToDot $ head $ tuTransducers tu
+      measure "DOT code" $ graphSize dg' `seq` return dg'
+    VisOracle     -> do
+      let dg' = fstToDot $ (oracle $ head $ tuTransducers tu :: OracleMachine)
+      measure "DOT code" $ graphSize dg' `seq` return dg'
+    VisAction     -> do
+      let dg' = fstToDot $ (action $ head $ tuTransducers tu :: ActionMachine)
+      measure "DOT code" $ graphSize dg' `seq` return dg'
     VisSST        -> do
       du <- generateDirectSSTs tu
-      return $ sstToDot $ head $ duTransducers du
+      let dg' = sstToDot $ head $ duTransducers du
+      measure "DOT code" $ graphSize dg' `seq` return dg'
     VisOracleSST  -> do
       ou <- generateOracleSSTs tu
-      return $ sstToDot $ head $ ouTransducers ou
+      let dg' = sstToDot $ head $ ouTransducers ou
+      measure "DOT code" $ graphSize dg' `seq` return dg'
     VisActionSST  -> do
       au <- generateActionSSTs tu
-      return $ sstToDot $ head $ auTransducers au
-  measure "Graphviz" $ case optVisOut visOpts of
-    Nothing -> do
-      liftIO $ GC.runGraphvizCanvas GC.Dot dg GC.Xlib
-      return ExitSuccess
-    Just f -> liftIO $ do
+      let dg' = sstToDot $ head $ auTransducers au
+      measure "DOT code" $ graphSize dg' `seq` return dg'
+  case optVisOut visOpts of
+    Nothing ->
+      return $ do when (not quiet) $
+                    hPutStrLn stdout "Starting Graphviz in canvas mode ..."
+                  GC.runGraphvizCanvas GC.Dot dg GC.Xlib
+                  return ExitSuccess
+    Just f -> do
       let ext = map toLower (takeExtension f)
       case output ext of
-        Nothing -> putStrLn ("Unknown extension \"" ++ ext ++ "\"")
-                   >> return (ExitFailure 1)
+        Nothing -> return (putStrLn ("Unknown extension \"" ++ ext ++ "\"")
+                           >> return (ExitFailure 1))
         Just out -> do
-          _ <- GC.runGraphvizCommand GC.Dot dg out f
-          return ExitSuccess
+          _ <- measure "Graphviz" $ liftIO $ GC.runGraphvizCommand GC.Dot dg out f
+          return (return ExitSuccess)
   where
     output e = case e of
                  ".pdf"  -> Just GC.Pdf
