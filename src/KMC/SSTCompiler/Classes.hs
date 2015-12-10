@@ -17,6 +17,7 @@ import           KMC.Util.Coding
 
 import           KMC.SymbolicFST.ActionMachine (CodeInputLab(..),DecodeFunc(..))
 import           KMC.SymbolicFST.OracleMachine (CodeFunc(..))
+import           KMC.SymbolicFST.Transducer (CopyFunc(..))
 import           KMC.SymbolicSST.ActionSST (ConstOrAnyLab(..))
 
 ----------
@@ -126,3 +127,15 @@ instance (Bounded dom, Enum dom, Bounded digit, Enum digit, Enumerable enum dom,
         = ((:[]) . AppendI bid) <$> ((M.!) <$> asks cmap <*> pure (map fromEnum ds))
       aux i (JustFunc (CodeArg e))
         = (:[]) <$> (AppendTblI bid <$> ((M.!) <$> asks tmap <*> pure e) <*> pure i)
+
+instance (Bounded sigma, Enum sigma)
+         => CompilableFunction [EpsFunc (CopyFunc sigma [Identity sigma])] () where
+  tables _ = M.empty
+  funcConstants fs = [ [fromEnum $ runIdentity y | y <- ys] | JustFunc (CopyConst ys) <- fs ]
+  compileFuncAppend bid fs = concat <$> zipWithM aux [0..] fs
+    where
+      aux _ EpsFunc = pure []
+      aux i (JustFunc CopyArg)
+        = return [AppendSymI bid i]
+      aux _ (JustFunc (CopyConst ys))
+        = ((:[]) . AppendI bid) <$> ((M.!) <$> asks cmap <*> pure (map (fromEnum . runIdentity) ys))

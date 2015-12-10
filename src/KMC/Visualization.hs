@@ -12,6 +12,7 @@ import qualified Data.Set as S
 
 import           Control.Concurrent (forkIO)
 import           Data.Char (chr, isPrint)
+import           Data.Functor.Identity (Identity, runIdentity)
 import           Data.List (intercalate)
 import           Data.Text.Lazy (pack)
 import           Data.Word (Word8)
@@ -27,6 +28,7 @@ import           KMC.Theories
 import           KMC.SymbolicFST.OracleMachine
 import           KMC.SymbolicFST.ActionMachine
 import           KMC.SymbolicFST.Transducer
+import qualified KMC.SymbolicSST.ActionSST as ASST
 
 class Pretty a where
   pretty :: a -> String
@@ -55,6 +57,13 @@ instance (Pretty c) => Pretty (DecodeFunc enum digit c) where
 instance Pretty c => Pretty (CopyFunc a c) where
   pretty CopyArg = "COPY"
   pretty (CopyConst c) = pretty c
+
+instance Pretty c => Pretty (ASST.ConstOrAnyLab c) where
+  pretty (ASST.ConstLab x) = pretty x
+  pretty ASST.AnyLab = "∙"
+
+instance Pretty c => Pretty (Identity c) where
+  pretty = pretty . runIdentity
 
 instance (Eq a, Pretty a) => Pretty (RangeSet a) where
   pretty rs | [(l,h)] <- ranges rs, l == h = "[" ++ pretty l ++ "]"

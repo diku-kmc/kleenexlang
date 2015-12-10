@@ -4,15 +4,17 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
 module KMC.SymbolicFST.Transducer
-       (Transducer,CopyFunc(..),constructTransducer)
+       (Transducer,CopyFunc(..),constructTransducer,projectTransducer)
        where
 
+import           Control.Monad (forM)
+import           Data.Functor.Identity (Identity(..), runIdentity)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
 import           KMC.Kleenex.Syntax (RIdent, RProg(..), RTerm(..))
 import           KMC.RangeSet (RangeSet)
-import           KMC.SymbolicFST (FST(..), edgesFromList)
+import           KMC.SymbolicFST (FST(..), edgesFromList, edgesToList)
 import           KMC.Theories (Function(..))
 
 type Transducer st sigma gamma
@@ -37,9 +39,19 @@ instance (Enum a, Bounded a) => Function (CopyFunc a [Either a x]) where
   inDom _ _ = True
   domain _ = [minBound .. maxBound]
 
----------------------------------------------
--- Construction of action and oracle machines
----------------------------------------------
+instance (Enum a, Bounded a) => Function (CopyFunc a [Identity a]) where
+  type Dom (CopyFunc a [Identity a]) = a
+  type Rng (CopyFunc a [Identity a]) = [a]
+  eval CopyArg x = [x]
+  eval (CopyConst y) _ = map runIdentity y
+  isConst CopyArg = Nothing
+  isConst (CopyConst y) = Just $ map runIdentity y
+  inDom _ _ = True
+  domain _ = [minBound .. maxBound]
+
+---------------------------------------
+-- Construction transducer from Kleenex
+---------------------------------------
 
 -- | Converts a Kleenex program to a transducer.
 constructTransducer
@@ -93,3 +105,29 @@ constructTransducer rprog initial =
     getDecl i =
       fromMaybe (error $ "internal error: identifier without declaration: " ++ show i)
         $ M.lookup i (rprogDecls rprog)
+
+
+-------------------------------------------
+-- Projection of pure transducers (partial)
+-------------------------------------------
+
+projectTransducer :: (Ord st)
+                  => Transducer st sigma (Either sigma x)
+                  -> Maybe (Transducer st sigma (Identity sigma))
+projectTransducer fst' = do
+  es' <- forM (edgesToList (fstE fst')) projectEdge
+  return $ fst' { fstE = edgesFromList es' }
+  where
+    projectEdge (p, Left (phi, f), q) =
+      case f of
+        CopyArg -> return (p, Left (phi, CopyArg), q)
+        CopyConst ys -> do
+          ys' <- forM ys $ \y -> case y of
+                                 Left b -> return (Identity b)
+                                 Right _ -> Nothing
+          return (p, Left (phi, CopyConst ys'), q)
+    projectEdge (p, Right ys, q) = do
+      ys' <- forM ys $ \y -> case y of
+                             Left b -> return b
+                             Right _ -> Nothing
+      return (p, Right ys', q)

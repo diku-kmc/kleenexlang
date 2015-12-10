@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Parser(Prog,parseKleenex, parseKleenexFromFile) where
+module KMC.Kleenex.Parser(Prog,parseKleenex, parseKleenexFromFile, parseRegex, parseRegexFromFile) where
 
 import           Control.Monad.Identity (Identity)
 import           Data.ByteString (ByteString)
@@ -9,6 +9,7 @@ import qualified KMC.Kleenex.Syntax as S
 import           KMC.Kleenex.Syntax hiding (Term,Decl,Prog)
 import           KMC.Syntax.Config (fancyRegexParser, RegexParserConfig(..))
 import           KMC.Syntax.Parser (anchoredRegexP)
+import           KMC.Syntax.ParserTypes (ParsedRegex)
 import           Numeric (readHex)
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
@@ -183,14 +184,16 @@ atomP = termPos $ choice
         , parens termP
         ]
   where
-    regexP = snd <$> (anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "/"
-                                                        , rep_freespacing = False })
     registerUpdateP = do
       ident <- regIdentifierP
       choice [ UpdateReg ident <$ symbol "<-" <*> updateAtomsP
              , UpdateReg ident <$ symbol "+=" <*> ((Left ident:) <$> updateAtomsP)
              ]
     updateAtomsP = many1 ((Left <$> regIdentifierP) <|> (Right <$> constantP))
+
+regexP :: Parser ParsedRegex
+regexP = snd <$> (anchoredRegexP $ fancyRegexParser { rep_illegal_chars = "/"
+                                                    , rep_freespacing = False })
 
 progP :: Parser Prog
 progP = Kleenex <$ whiteSpace <*> pipelineP <*> many1 declP
@@ -212,3 +215,10 @@ parseKleenex = runParser (progP <* eof) () "<input string>"
 parseKleenexFromFile :: FilePath -> IO (Either ParseError Prog)
 parseKleenexFromFile fp =
   readFile fp >>= return . runParser (progP <* eof) () fp
+
+parseRegex :: String -> Either ParseError ParsedRegex
+parseRegex = runParser (regexP <* eof) () "<input string>"
+
+parseRegexFromFile :: FilePath -> IO (Either ParseError ParsedRegex)
+parseRegexFromFile fp =
+  readFile fp >>= return . runParser (regexP <* eof) () fp
