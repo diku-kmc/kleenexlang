@@ -113,7 +113,7 @@ type DirectSST = SST Int (RS.RangeSet Word8) (SSTFunc (CopyFunc Word8 [Identity 
 data DirectSSTUnit =
   DirectSSTUnit { duTransducers :: [DirectSST] }
 
--- | These determines the types of the machines used for visualization
+-- | These determine the types of the machines used for visualization
 type OracleMachine = O.OracleMachine Int Word8 Bool
 type ActionMachine = A.ActionMachine Int Word8 RegAction Bool
 
