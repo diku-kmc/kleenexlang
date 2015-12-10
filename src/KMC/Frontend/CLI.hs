@@ -53,7 +53,11 @@ visualizeCmd mainOpts visOpts args = do
   return ret
 
 printPhases :: [Phase] -> IO ()
-printPhases = go' 0
+printPhases phases = do
+  putStrLn ""
+  putStrLn ""
+  putStrLn "Compilation report:"
+  go' 0 phases
   where
     padLeft n c s = replicate (n - length s) c ++ s
     padRight n c s = s ++ replicate (n - length s) c
