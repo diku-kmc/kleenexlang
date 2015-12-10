@@ -46,11 +46,11 @@ compileCmd mainOpts compileOpts args = do
 visualizeCmd :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
 visualizeCmd mainOpts visOpts args = do
   arg <- checkArgs args
-  (ret, phases) <- runFrontend mainOpts $ measure "Visualize" $ do
+  (act, phases) <- runFrontend mainOpts $ measure "Visualize" $ do
     pu <- createProgram arg
     visualize visOpts pu
   when (not $ optQuiet mainOpts) $ printPhases phases
-  return ret
+  act
 
 printPhases :: [Phase] -> IO ()
 printPhases phases = do

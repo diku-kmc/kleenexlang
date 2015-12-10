@@ -100,6 +100,17 @@ instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (Atom var func) 
 instance (Pretty var, Pretty func, Pretty (Rng func)) => Pretty (RegisterUpdate var func) where
   pretty m = "[" ++ intercalate "\\l," [ pretty v ++ ":=" ++ pretty f | (v,f) <- M.toList m ] ++ "]"
 
+-- | Quick and dirty way to force shallow evaluation of a DotGraph
+graphSize :: GV.DotGraph st -> Int
+graphSize = stmtsSize . GV.graphStatements
+  where
+    stmtsSize ss =
+      sum [length (GV.attrStmts ss)
+          ,length (GV.nodeStmts ss)
+          ,length (GV.edgeStmts ss)
+          ,sum (map subSize (GV.subGraphs ss))]
+    subSize sub = stmtsSize (GV.subGraphStmts sub)
+
 fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]
                  ,GV.NodeAttrs [GA.Shape GA.Circle]]
