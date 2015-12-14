@@ -426,7 +426,7 @@ prettyTableDecl tbltype pipeline = case pipeline of
           <> rbrace <> semi
       where
         tables    = M.elems $ progTables prog
-        tableSize = length . tblTable . head $ tables
+        tableSize = foldl max 0 (map (length . tblTable) tables)
 
 -- | Pretty print all buffer declarations.
 prettyBufferDecls :: Pipeline -> Doc
