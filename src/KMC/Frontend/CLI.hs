@@ -2,6 +2,7 @@ module Main where
 
 import Control.Monad.Reader
 import KMC.Frontend
+import KMC.Frontend.Commands
 import KMC.Frontend.Options
 import Options
 import System.Environment
@@ -40,7 +41,7 @@ compileCmd mainOpts compileOpts args = do
       RegexFlavor -> do
         ou <- generateOracleSSTs tu
         compileCoder compileOpts True (puSourceName pu) (puSourceHash pu) ou
-  when (not $ optQuiet mainOpts) $ printPhases phases
+  when (optReport mainOpts) $ printPhases phases
   return res
 
 visualizeCmd :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
@@ -54,22 +55,21 @@ visualizeCmd mainOpts visOpts args = do
 
 printPhases :: [Phase] -> IO ()
 printPhases phases = do
-  putStrLn ""
-  putStrLn ""
-  putStrLn "Compilation report:"
+  putStrLn $ replicate 80 '-'
+  putStrLn "Compilation report"
+  putStrLn $ replicate 80 '-'
   go' 0 phases
   where
     padLeft n c s = replicate (n - length s) c ++ s
     padRight n c s = s ++ replicate (n - length s) c
     fmtD t = let s = show (round . toRational $ 1000 * t :: Integer)
-             in padLeft 8 ' ' s
+             in s
 
     go' i       = go i . reverse
     go _ []     = return ()
     go i (p:ps) = do
-      let s = concat [padRight 70 ' ' $ replicate (2*i) ' ' ++ (pName p)
-                     ,padLeft 10 ' ' $ fmtD (pDuration p)
-                     ," ms"]
+      let s = concat [padRight 68 '.' $ replicate (2*i) ' ' ++ (pName p)
+                     ,padLeft 12 '.' $ fmtD (pDuration p) ++ " ms"]
       putStrLn s
       go' (i+1) (pSubPhases p)
       go i ps
