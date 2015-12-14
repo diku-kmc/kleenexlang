@@ -28,7 +28,7 @@ data DesugarState = DS { dsDecls    :: M.Map RIdent RTerm
                        , dsFresh    :: RIdent 
                        }
 
-data DesugarContext = DC { dcIdents   :: M.Map Ident RIdent }
+data DesugarContext = DC { dcIdents   :: M.Map (Ident, Bool) RIdent }
 
 type Desugar = ReaderT DesugarContext (State DesugarState)
 
@@ -53,9 +53,9 @@ decl t = do
       i <- getFresh
       insertDecl i t
 
-lookupIdent :: MonadReader DesugarContext m => Ident -> m RIdent
-lookupIdent ident =
-  asks (M.lookup ident . dcIdents)
+lookupIdent :: MonadReader DesugarContext m => Ident -> Bool -> m RIdent
+lookupIdent ident out =
+  asks (M.lookup (ident, out) . dcIdents)
   >>= maybe (error $ "lookupIdent invariant broken: " ++ fromIdent ident) return
 
 --------------------------------
@@ -122,7 +122,7 @@ desugarTerm :: Bool        -- ^ Indicates if input symbols are to be written as 
             -> Desugar RIdent -- ^ Identifier of nonterminal representing desugared term
 desugarTerm out t =
   case t of
-  (Var ident)   -> lookupIdent ident
+  (Var ident)   -> lookupIdent ident out
   (Constant bs) -> mapM (decl . RConst . Left) (if out then BS.unpack bs else []) >>= decl . RSeq
   (RE e)        -> desugarRE out e
   (Seq _ _)     -> mapM (desugarTerm out) (flattenSeq t) >>= decl . RSeq
@@ -175,7 +175,7 @@ desugarProg prog =
           }
   where
     ds        = execState (runReaderT (go (progDecls prog)) initDC) initDS
-    identMap  = M.fromList $ zip [ declIdent d | d <- progDecls prog ] [0..]
+    identMap  = M.fromList $ zip [ (declIdent d, out) | d <- progDecls prog, out <- [True, False] ] [0..]
     nextFresh = M.size identMap + 1
     initDS    = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = nextFresh }
     initDC    = DC { dcIdents = identMap }
@@ -186,13 +186,16 @@ desugarProg prog =
     go [] = return ()
     go (DeclInfo _ d:decls) = go (d:decls)
     go (Decl ident t:decls) = do
-      i <- lookupIdent ident
-      j <- desugarTerm True t
-      _ <- insertDecl i (RSeq [j])
+      i <- lookupIdent ident True
+      j <- lookupIdent ident False
+      i' <- desugarTerm True t
+      j' <- desugarTerm False t
+      _ <- insertDecl i (RSeq [i'])
+      _ <- insertDecl j (RSeq [j'])
       go decls
 
     lu ident = maybe (error $ "identifier in pipeline with no declaration: " ++ fromIdent ident) id
-                     (M.lookup ident identMap)
+                     (M.lookup (ident, True) identMap)
 
 desugarRegex :: E.Regex -> RProg
 desugarRegex re =
