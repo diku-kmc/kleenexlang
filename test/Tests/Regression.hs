@@ -38,6 +38,7 @@ regressionTests =
     , simpleTest "pipeline" pipeline
     , simpleTest "range disambiguation" range_disamb
     , simpleTest "enumerateStates not idempotent" enumerateStates_idempotent
+    , simpleTest "suppress output desugaring broken" suppressOutput_desugaring
     ]
 
 unsound_lookahead :: IO TS.Result
@@ -174,8 +175,13 @@ enumerateStates_idempotent = do
     let mach2 = FST.enumerateStates mach1 :: Transducer Int Word8 (Either Word8 RegAction)
     if (mach1 == mach2) then
       return TS.Pass
-    else
-      return $ TS.Fail $ "enumerateStates not idempotent: " ++ show mach1 ++ " =/= " ++ show mach2
+      else
+        return $ TS.Fail $ "enumerateStates not idempotent: " ++ show mach1 ++ " =/= " ++ show mach2
+
+suppressOutput_desugaring :: IO TS.Result
+suppressOutput_desugaring = do
+  let prog = "main := ~def def\ndef := /a|b/"
+  kleenexIOTest prog [("aa","a"), ("ab", "b"), ("ba","a"), ("bb","b")]
 
 charclass_accept_dash :: IO TS.Result
 charclass_accept_dash =
