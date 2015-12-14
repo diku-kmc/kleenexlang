@@ -14,6 +14,7 @@ import Options
 data MainOptions =
     MainOptions
     { optQuiet            :: Bool -- ^ Do not generate console output
+    , optReport           :: Bool -- ^ Generate compilation report on standard output
     , optOptimizeSST      :: Int  -- ^ SST optimization level (0-3)
     , optPreFunctionalize :: Bool -- ^ Functionalize oracle before SST gen
     , optLookahead        :: Bool -- ^ Use finite lookahead in SSTs
@@ -86,6 +87,7 @@ instance Options MainOptions where
     defineOptions =
       MainOptions
       <$> simpleOption "quiet" False "Be quiet"
+      <*> simpleOption "report" False "Write compilation report to standard out (NOTE: ignores quiet option)"
       <*> simpleOption "opt" 3 "SST optimization level (1-3)"
       <*> simpleOption "func" False "Functionalize FST before SST construction"
       <*> simpleOption "la" True "Enable lookahead"

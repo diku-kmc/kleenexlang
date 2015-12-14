@@ -4,7 +4,8 @@
 
 module KMC.Program.Backends.C where
 
-import           Control.Monad (when, join)
+import           Control.Monad (join)
+import           Control.Monad.Trans
 import           Data.Bits
 import           Data.Char (ord, chr, isPrint, isAscii, isSpace)
 import           Data.List (intercalate, isInfixOf)
@@ -516,26 +517,26 @@ renderCProg compInfo cprog =
                (render $ cInit cprog)
                (map render $ cProg cprog)
 
-ccVersion :: FilePath -> IO String
+ccVersion :: (MonadIO m) => FilePath -> m String
 ccVersion comp = do
   -- gcc/clang prints version info on stderr
-  (_, _, err, _) <- createProcess (proc comp ["-v"])
-                    { std_err = CreatePipe }
+  (_, _, err, _) <- liftIO $ createProcess (proc comp ["-v"]) { std_err = CreatePipe }
   let hErr = maybe (error "ccVersion: bogus handle") id err
-  errStr <- hGetContents hErr
+  errStr <- liftIO $ hGetContents hErr
   return $ intercalate "\\n" $ lines $ errStr
 
-compileProgram :: CType
-               -> Int
-               -> Bool
-               -> Pipeline
-               -> Maybe String -- ^ Optional descriptor to put in program.
-               -> FilePath     -- ^ Path to C compiler
-               -> Maybe FilePath
-               -> Maybe FilePath
-               -> Bool -- ^ Use word alignment
-               -> IO ExitCode
-compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPath wordAlign = do
+compileProgram :: (MonadIO m)
+               => CType            -- ^ Buffer unit type
+               -> Int              -- ^ CC Optimization level
+               -> (String -> m ()) -- ^ Info message callback
+               -> Pipeline         -- ^ Pipeline of programs to compile
+               -> Maybe String     -- ^ Optional descriptor to put in program.
+               -> FilePath         -- ^ Path to C compiler
+               -> Maybe FilePath   -- ^ Binary output path
+               -> Maybe FilePath   -- ^ C code output path
+               -> Bool             -- ^ Use word alignment
+               -> m ExitCode
+compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath wordAlign = do
   cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
   let cstr = renderCProg info . programsToC buftype $ pipeline
@@ -543,19 +544,19 @@ compileProgram buftype optLevel optQuiet pipeline desc comp moutPath cCodeOutPat
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
-      when (not optQuiet) $ putStrLn $ "Writing C source to " ++ p
-      writeFile p cstr
+      infoCallback $ "Writing C source to " ++ p
+      liftIO $ writeFile p cstr
   case moutPath of
     Nothing -> return ExitSuccess
     Just outPath -> do
-      when (not optQuiet) $
-        putStrLn ("Generated " ++ show sourceLineCount ++ " lines of C code.") >>
-        putStrLn ("Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'")
-      (Just hin, _, _, hproc) <- createProcess (proc comp (compilerOpts outPath))
-                                               { std_in = CreatePipe }
-      hPutStrLn hin cstr
-      hClose hin
-      waitForProcess hproc
+      infoCallback $ "Generated " ++ show sourceLineCount ++ " lines of C code."
+      infoCallback $ "Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'"
+      liftIO $ do
+        (Just hin, _, _, hproc) <- liftIO $ createProcess (proc comp (compilerOpts outPath))
+                                                          { std_in = CreatePipe }
+        hPutStrLn hin cstr
+        hClose hin
+        waitForProcess hproc
   where
     compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
                            , "-o", binPath] ++
