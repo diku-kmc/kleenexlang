@@ -6,6 +6,7 @@ module KMC.SymbolicFST
        ,Edge
        ,fstStateSize
        ,fstTransSize
+       ,edgesToList
        ,edgesFromList
        ,fstEvalEpsilonEdges
        ,fstAbstractEvalEdgesAll
@@ -14,7 +15,6 @@ module KMC.SymbolicFST
        ,rightClosure,rightInputClosure
        ,mapEdges
        ,eForward,eBackward,eForwardEpsilon,eBackwardEpsilon
-       ,edgesToList
        ,enumerateStates
        ,run
        ,runSequential
