@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Parser(Prog,parseKleenex, parseKleenexFromFile, parseRegex, parseRegexFromFile) where
+module KMC.Kleenex.Parser(Prog,Decl,Term,SourcePos
+                         ,parseKleenex, parseKleenexFromFile, parseRegex, parseRegexFromFile) where
 
 import           Control.Monad.Identity (Identity)
 import           Data.ByteString (ByteString)

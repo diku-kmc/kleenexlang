@@ -16,8 +16,9 @@ module KMC.Kleenex.Syntax
 
 import           Data.ByteString (ByteString)
 import qualified Data.Map as M
-import           KMC.Syntax.External (Regex)
+
 import           KMC.RangeSet
+import           KMC.Syntax.External (Regex)
 
 newtype Ident    = Ident    { fromIdent :: String }  deriving (Eq, Ord, Show)
 newtype RegIdent = RegIdent { fromRegIdent :: String } deriving (Eq, Ord, Show)
@@ -26,14 +27,14 @@ newtype RegIdent = RegIdent { fromRegIdent :: String } deriving (Eq, Ord, Show)
 -- Full Kleenex
 ---------------
 
-data Prog i      = Kleenex  { progPipeline :: [Ident]
-                            , progDecls :: [Decl i]
-                            }
-                 deriving (Eq, Ord, Show)
+data Prog i = Kleenex { progPipeline :: [Ident]
+                      , progDecls :: [Decl i]
+                      }
+            deriving (Eq, Ord, Show)
 
-data Decl i     = Decl Ident (Term i)
-                | DeclInfo i (Decl i)
-                 deriving (Eq, Ord, Show)
+data Decl i = Decl Ident (Term i)
+            | DeclInfo i (Decl i)
+            deriving (Eq, Ord, Show)
 
 data Term i = Var Ident
             | Constant ByteString
