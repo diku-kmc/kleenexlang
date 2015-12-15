@@ -13,6 +13,7 @@ import           KMC.Program.IL (elimIdTables)
 import           KMC.SSTCompiler (compile)
 import qualified KMC.SymbolicFST as FST
 import           KMC.SymbolicFST.ActionMachine (action)
+import           KMC.SymbolicFST.Functionalization (functionalize)
 import           KMC.SymbolicFST.OracleMachine (oracle)
 import qualified KMC.SymbolicFST.OutputEquivalence as OutEq
 import           KMC.SymbolicFST.Transducer (constructTransducer, projectTransducer)
@@ -66,12 +67,21 @@ buildTransducers :: ProgramUnit -> Frontend TransducerUnit
 buildTransducers pu = do
   mainOpts <- ask
   let rp = puProgram pu
-  transducers <- measure "Transducer generation" $
+  transducers' <- measure "Transducer generation" $
     forM (zip (rprogPipeline rp) ([0..]::[Int])) $ \(ident, i) ->
       measure (unwords ["Transducer",show i]) $
         let t = FST.enumerateStates $ constructTransducer rp ident
             n = FST.fstStateSize t + FST.fstTransSize t
         in n `seq` return t
+  transducers <-
+    if optPreFunctionalize mainOpts then
+      measure "Functionalization" $ forM (zip transducers' ([0..]::[Int])) $ \(t, i) ->
+        measure (unwords ["Transducer",show i]) $
+          let t' = FST.enumerateStates $ functionalize $ t
+              n  = FST.fstStateSize t' + FST.fstTransSize t'
+          in n `seq` return t'
+    else
+      return transducers'
   lpdoms <-
     if optSuppressBits mainOpts then
       measure "Post-dominators" $

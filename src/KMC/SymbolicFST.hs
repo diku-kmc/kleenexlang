@@ -14,6 +14,7 @@ module KMC.SymbolicFST
        ,prefixTests
        ,rightClosure,rightInputClosure
        ,mapEdges
+       ,trim
        ,eForward,eBackward,eForwardEpsilon,eBackwardEpsilon
        ,enumerateStates
        ,run
@@ -93,13 +94,11 @@ unionEdges es es' =
   }
 -}
 
-{-
 flipEdges :: OrderedEdgeSet q pred func -> OrderedEdgeSet q pred func
 flipEdges es = OrderedEdgeSet {eForward = eBackward es
                               ,eBackward = eForward es
                               ,eForwardEpsilon = eBackwardEpsilon es
                               ,eBackwardEpsilon = eForwardEpsilon es}
--}
 
 -- | Get the underlying list representation of an ordered edge set
 edgesToList :: OrderedEdgeSet q pred func -> [(q, Either (pred, func) (Rng func), q)]
@@ -294,7 +293,6 @@ enumerateStates fst' =
     statesMap = M.fromList (zip (S.toList (fstS fst')) [toEnum 0..])
     aux q = statesMap M.! q
 
-{-
 accessibleStates :: (Ord q, PartialOrder pred, Boolean pred)
                  => OrderedEdgeSet q pred func -> S.Set q -> S.Set q
 accessibleStates es initialWS = go initialWS S.empty
@@ -323,7 +321,6 @@ trim fst' =
   where
     useful = S.intersection (accessibleStates (fstE fst') (S.singleton (fstI fst')))
                             (coaccessibleStates (fstE fst') (fstF fst'))
--}
 
 -------------
 -- Simulation

@@ -89,7 +89,7 @@ instance Options MainOptions where
       <$> simpleOption "quiet" False "Be quiet"
       <*> simpleOption "report" False "Write compilation report to standard out (NOTE: ignores quiet option)"
       <*> simpleOption "opt" 3 "SST optimization level (1-3)"
-      <*> simpleOption "func" False "Functionalize FST before SST construction"
+      <*> simpleOption "func" False "Functionalize FST before SST construction (EXPERIMENTAL)"
       <*> simpleOption "la" True "Enable lookahead"
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
       <*> simpleOption "act" True "Enable actions in the language"

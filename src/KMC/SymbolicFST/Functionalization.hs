@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.SymbolicFST.Functionalization where
+module KMC.SymbolicFST.Functionalization (functionalize) where
 
 import qualified Data.Set as S
 
@@ -39,11 +39,11 @@ functionalize :: (Ord q, Ord pred, Monoid (Rng func), Boolean pred, PartialOrder
 functionalize fst' =
   let initialState    = (fstI fst', S.empty)
       (states, edges) = go (S.singleton initialState) S.empty []
-  in FST { fstS = states
-         , fstE = edgesFromList edges
-         , fstI = initialState
-         , fstF = S.filter isFinal states
-         }
+  in trim $ FST { fstS = states
+                , fstE = edgesFromList edges
+                , fstI = initialState
+                , fstF = S.filter isFinal states
+                }
   where
     isFinal (q, r) = S.member q (fstF fst') && not (S.member q r)
     
