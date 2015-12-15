@@ -50,7 +50,7 @@ visualizeCmd mainOpts visOpts args = do
   (act, phases) <- runFrontend mainOpts $ measure "Visualize" $ do
     pu <- createProgram arg
     visualize visOpts pu
-  when (not $ optQuiet mainOpts) $ printPhases phases
+  when (optReport mainOpts) $ printPhases phases
   act
 
 printPhases :: [Phase] -> IO ()
