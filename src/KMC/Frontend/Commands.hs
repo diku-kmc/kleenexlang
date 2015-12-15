@@ -251,6 +251,7 @@ compileCoder compileOpts useWordAlignment srcFile srcMd5 ou =
 visualize :: VisualizeOptions -> ProgramUnit -> Frontend (IO ExitCode)
 visualize visOpts pu = do
   quiet <- asks optQuiet
+  suppressBits <- asks optSuppressBits
   let visPhase = optVisPhase visOpts
   when (visPhase < 0 || visPhase >= length (rprogPipeline $ puProgram pu)) $
     fatal "Invalid phase specified for visualization"
@@ -262,10 +263,12 @@ visualize visOpts pu = do
       let dg' = fstToDot $ head $ tuTransducers tu
       measure "DOT code" $ graphSize dg' `seq` return dg'
     VisOracle     -> do
-      let dg' = fstToDot $ (oracle $ head $ tuTransducers tu :: OracleMachine)
+      let preopt = if suppressBits then OutEq.optOracle (tuLastPostDominators tu !! visPhase) else id
+      let dg' = fstToDot $ (preopt $ oracle $ tuTransducers tu !! visPhase :: OracleMachine)
       measure "DOT code" $ graphSize dg' `seq` return dg'
     VisAction     -> do
-      let dg' = fstToDot $ (action $ head $ tuTransducers tu :: ActionMachine)
+      let preopt = if suppressBits then OutEq.optAction (tuLastPostDominators tu !! visPhase) else id
+      let dg' = fstToDot $ (preopt $ action $ tuTransducers tu !! visPhase :: ActionMachine)
       measure "DOT code" $ graphSize dg' `seq` return dg'
     VisSST        -> do
       du <- generateDirectSSTs tu
@@ -273,11 +276,11 @@ visualize visOpts pu = do
       measure "DOT code" $ graphSize dg' `seq` return dg'
     VisOracleSST  -> do
       ou <- generateOracleSSTs tu
-      let dg' = sstToDot $ head $ ouTransducers ou
+      let dg' = sstToDot $ ouTransducers ou !! visPhase
       measure "DOT code" $ graphSize dg' `seq` return dg'
     VisActionSST  -> do
       au <- generateActionSSTs tu
-      let dg' = sstToDot $ head $ auTransducers au
+      let dg' = sstToDot $ auTransducers au !! visPhase
       measure "DOT code" $ graphSize dg' `seq` return dg'
   case optVisOut visOpts of
     Nothing ->
