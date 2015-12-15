@@ -14,7 +14,6 @@ Pro-tip: Compile this script with --copt 0
 
 
 deListings := (texComment | deListing | /./)*
-deListing := ~/\\begin\{lstlisting}\[language=Kleenex]/ "\\begin{kleenex}" /.*?/ "\\end{kleenex}" ~/\\end\{lstlisting}/
 deListing := /\\(begin|end)\{/ ~/lstlisting/ "kleenex" /}/ ~/\[[a-zA-Z=]*]/?
 
 texComment := /%[^\n]*\n/
