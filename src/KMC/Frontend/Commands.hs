@@ -7,6 +7,7 @@ import           KMC.Determinization (sstFromFST)
 import           KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser
 import           KMC.Kleenex.Syntax
+import qualified KMC.Kleenex.WellFormedness as WF
 import           KMC.Program.Backends.C (compileProgram)
 import           KMC.Program.IL (elimIdTables)
 import           KMC.SSTCompiler (compile)
@@ -36,14 +37,18 @@ createProgram arg = do
   case getCompileFlavor mainOpts arg of
     KleenexFlavor -> do
       kleenexSrc <- liftIO $ readFile arg
-      case parseKleenex kleenexSrc of
+      case parseKleenex arg kleenexSrc of
         Left e -> liftIO $ do
           hPutStrLn stderr $ show e
           exitWith $ ExitFailure 1
-        Right ast -> return ProgramUnit { puProgram = desugarProg ast
-                                        , puSourceName = arg
-                                        , puSourceHash = md5s (Str kleenexSrc)
-                                        }
+        Right ast ->
+          case WF.checkWellFormedness ast of
+            Left err -> fatal $ WF.prettyPrintError err
+            Right _metaData ->
+              return ProgramUnit { puProgram = desugarProg ast
+                                 , puSourceName = arg
+                                 , puSourceHash = md5s (Str kleenexSrc)
+                                 }
     RegexFlavor -> do
       (reSrc, sn) <- if optExpressionArg mainOpts then
                        return (arg, "<command line>")

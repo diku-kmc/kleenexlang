@@ -59,7 +59,7 @@ kleenexParserTests =
 
 assertOutputsEqual :: String -> String -> IO TS.Result
 assertOutputsEqual progA progB =
-    case (HP.parseKleenex progA, HP.parseKleenex progB) of
+    case (HP.parseKleenex "" progA, HP.parseKleenex "" progB) of
       (Right sa, Right sb) ->
         let sa' = S.eraseInfoProg sa :: S.Prog ()
             sb' = S.eraseInfoProg sb :: S.Prog ()
@@ -72,7 +72,7 @@ assertOutputsEqual progA progB =
 
 assertProgramIs :: String -> S.Prog () -> IO TS.Result
 assertProgramIs prog expected =
-    case (HP.parseKleenex prog) of
+    case (HP.parseKleenex "" prog) of
       Right p ->
         let p' = S.eraseInfoProg p :: S.Prog ()
         in if p' == expected then

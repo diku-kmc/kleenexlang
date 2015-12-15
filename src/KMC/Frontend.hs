@@ -89,9 +89,12 @@ warn msg = do
     liftIO $ hPutStrLn stderr msg
 
 fatal :: String -> Frontend a
-fatal msg = liftIO $ do
-  hPutStrLn stderr msg
-  exitWith $ ExitFailure 1
+fatal msg = do
+  hanging <- gets fsHangingLine
+  liftIO $ do
+    when hanging $ hPutStrLn stderr ""
+    hPutStrLn stderr msg
+    exitWith $ ExitFailure 1
 
 --------
 -- Types

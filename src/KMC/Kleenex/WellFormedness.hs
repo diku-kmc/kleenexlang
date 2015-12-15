@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.WellFormedness(PosInfo, CheckError(..), MetaData(..), checkWellFormedness) where
+module KMC.Kleenex.WellFormedness(PosInfo, CheckError(..), MetaData(..)
+                                 ,checkWellFormedness, prettyPrintError) where
 
-import           KMC.Kleenex.Parser (SourcePos)
+import           KMC.Kleenex.Parser (SourcePos, sourceName, sourceLine, sourceColumn)
 import           KMC.Kleenex.Syntax
 
 import           Control.Monad.State
@@ -9,6 +10,7 @@ import           Data.Map (Map, (!))
 import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
+import           Text.PrettyPrint
 
 --------
 -- Types
@@ -29,6 +31,46 @@ data MetaData = MetaData { mdComponents :: [Set Ident]
                          , mdDeclMap :: Map Ident (PosInfo, Term PosInfo)
                          }
               deriving (Show)
+
+------------------
+-- Pretty Printing
+------------------
+
+prettyPrintError :: CheckError -> String
+prettyPrintError = render . go
+  where
+    go EmptyPipeline = text "Error: Empty pipeline"
+    go (MultiDeclError ident thisDeclPos prevDeclPos) =
+      prettyPos thisDeclPos <> colon
+      $$ nest 4 (text ("Error: Multiple declarations of nonterminal '" ++ fromIdent ident ++ "'.")
+                $$ (text "It is previously declared at " <> shortPos (fst prevDeclPos)))
+    go (UndeclaredPipelineIdents ids) = text "Error: Undeclared nonterminals in pipeline: "
+                                        <> hsep (punctuate comma (map (text . fromIdent) ids))
+    go (StrictDependency c occs) = vcat $ map (prettyStrictOccurrences c) occs
+
+    prettyStrictOccurrences c (ident, declPos, idents) =
+      prettyPos declPos <> colon
+      $$ nest 4 (
+          text "Error: Strict occurrences in mutually recursive definition of '"
+          <> text (fromIdent ident)
+          <> text "' involving nonterminals"
+          $$ nest 4 (hsep $ punctuate comma $ map (quotes . text . fromIdent) $ S.toList c)
+          $$ text "Occurrences:"
+          $$ nest 4 (vcat $ map prettyStrictOccurrence $ M.toList idents)
+         )
+
+    prettyStrictOccurrence (ident, positions) =
+      vcat [
+        quotes (text (fromIdent ident)) <+> text "at:" <+> shortPos (fst pos) <> text "-" <> shortPos (snd pos)
+        | pos <- positions ]
+
+    shortPos pos = parens (int (sourceLine pos) <> comma <> int (sourceColumn pos))
+    prettyPos (pos1, pos2)
+      = text (sourceName pos1) <> colon <> shortPos pos1 <> text "-" <> shortPos pos2
+
+--------------------
+-- Utility functions
+--------------------
 
 -- | Successors. Note that due to desugaring, Star and Plus makes an identifier self-referential.
 succs :: Ident -> Term i -> [Ident]
@@ -78,6 +120,19 @@ strictDeps = go
       RedirectReg _ t  -> go t
       TermInfo _ t     -> go t
       _                -> M.empty
+
+-- | Utility function to take elements until (and including) the point where a
+-- given predicate holds. Undefined if the predicate never holds for any element
+-- in the list.
+splitUntil :: (t -> Bool) -> [t] -> ([t], [t])
+splitUntil _ [] = error "no element satisfies predicate"
+splitUntil p (x:xs) | p x = ([x], xs)
+                    | otherwise = let (ys, xs') = splitUntil p xs
+                                  in (x:ys, xs')
+
+--------------------
+-- Strong components
+--------------------
 
 -- | Tarjan's linear-time algorithm for finding strongly connected components
 scc :: Map Ident (PosInfo, Term PosInfo) -> [Set Ident]
@@ -137,14 +192,9 @@ data SCCState = SCCState { sccIndex :: Int
                          , sccComponents :: [Set Ident]
                          }
 
--- | Utility function to take elements until (and including) the point where a
--- given predicate holds. Undefined if the predicate never holds for any element
--- in the list.
-splitUntil :: (t -> Bool) -> [t] -> ([t], [t])
-splitUntil _ [] = error "no element satisfies predicate"
-splitUntil p (x:xs) | p x = ([x], xs)
-                    | otherwise = let (ys, xs') = splitUntil p xs
-                                  in (x:ys, xs')
+-------------------
+-- Program checking
+-------------------
 
 -- | Check that declarations and the pipeline is well-formed: pipeline must not be
 -- empty and must not refer to undeclared identifiers; there must be position

@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Parser(Prog,Decl,Term,SourcePos
+module KMC.Kleenex.Parser(Prog,Decl,Term
+                         ,SourcePos,sourceName,sourceColumn,sourceLine
                          ,parseKleenex, parseKleenexFromFile, parseRegex, parseRegexFromFile) where
 
 import           Control.Monad.Identity (Identity)
@@ -209,8 +210,8 @@ progP = Kleenex <$ whiteSpace <*> pipelineP <*> many1 declP
 ------------
 
 -- | Parse a string as a Kleenex program
-parseKleenex :: String -> Either ParseError Prog
-parseKleenex = runParser (progP <* eof) () "<input string>"
+parseKleenex :: String -> String -> Either ParseError Prog
+parseKleenex = runParser (progP <* eof) ()
 
 -- | Parse a file as a Kleenex program
 parseKleenexFromFile :: FilePath -> IO (Either ParseError Prog)

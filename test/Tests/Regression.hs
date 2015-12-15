@@ -130,7 +130,7 @@ kleenexIdTest :: String -> String -> IO TS.Result
 kleenexIdTest prog str = kleenexIOTest prog [(str, str)]
 
 kleenexDesugarProg :: String -> (String -> IO a) -> (DS.RProg -> IO a) -> IO a
-kleenexDesugarProg prog kfail kret = case parseKleenex prog of
+kleenexDesugarProg prog kfail kret = case parseKleenex "verbatim" prog of
     Left err -> kfail (show err)
     Right p  -> kret (desugarProg p)
 
