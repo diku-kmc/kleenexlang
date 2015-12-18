@@ -437,19 +437,8 @@ int main(int argc, char *argv[])
         // Should use snprintf, but I assume something else will break before we hit 10^19 phases.
         char phase[20] = {0};
         sprintf(phase, "%d", i);
-        char filename[256] = {0};
-        #ifdef __APPLE__
-        uint32_t bufsize = 256;
-        _NSGetExecutablePath(filename, &bufsize);
-        #else
-        int r = readlink("/proc/self/exe", filename, 256);
-        if (r < 0) {
-          fprintf(stderr, "Error getting executable path");
-          return 1;
-        }
-        #endif
-        char *args[] = { filename, "--phase", phase, 0 };
-        execv(filename, args);
+        char *args[] = { argv[0], "--phase", phase, 0 };
+        return main(3, args);
       }
 
       close(STDIN_FILENO);
