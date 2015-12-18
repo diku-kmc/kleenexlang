@@ -6,6 +6,7 @@ module KMC.SSTCompiler
        ,module KMC.SSTCompiler.Classes)
        where
 
+import           Control.Applicative
 import           Control.Monad.Reader
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -18,6 +19,8 @@ import           KMC.Util.Map (swapMap)
 
 import           KMC.SSTCompiler.Classes
 import           KMC.SSTCompiler.Env
+
+import           Prelude
 
 ------------------
 -- Lookahead phase

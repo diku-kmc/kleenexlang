@@ -21,12 +21,15 @@ module KMC.SymbolicFST
        ,runSequential
        ) where
 
+import           Control.Applicative
 import           Control.Monad (guard)
+import           Data.Monoid
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import           KMC.Theories
 
+import           Prelude
 
 -- | (Non-)deterministic Finite State Transducer. To be well-formed, the
 -- following conditions must be met:

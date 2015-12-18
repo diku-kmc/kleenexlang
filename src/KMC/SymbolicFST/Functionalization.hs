@@ -1,10 +1,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 module KMC.SymbolicFST.Functionalization (functionalize) where
 
+import           Data.Monoid
 import qualified Data.Set as S
 
 import           KMC.SymbolicFST
 import           KMC.Theories
+
+import           Prelude
 
 type St q = (q, S.Set q)
 

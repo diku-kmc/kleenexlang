@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module KMC.SymbolicFST.OutputEquivalence where
 
+import           Data.Foldable
 import           Data.Map (Map, (!))
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
@@ -13,6 +14,8 @@ import           KMC.SymbolicFST.Transducer (Transducer, CopyFunc(..))
 import           KMC.SymbolicFST.OracleMachine (OracleMachine)
 import           KMC.SymbolicFST.ActionMachine (ActionMachine)
 import           KMC.Theories
+
+import           Prelude hiding (all, foldl1)
 
 -- | Takes a transducer and forgets all transitions with non-epsilon output
 -- labels, and considers the result as a control-flow graph. Based on this

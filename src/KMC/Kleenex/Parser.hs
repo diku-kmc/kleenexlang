@@ -3,6 +3,7 @@ module KMC.Kleenex.Parser(Prog,Decl,Term
                          ,SourcePos,sourceName,sourceColumn,sourceLine
                          ,parseKleenex, parseKleenexFromFile, parseRegex, parseRegexFromFile) where
 
+import           Control.Applicative hiding ((<|>), many)
 import           Control.Monad.Identity (Identity)
 import           Data.ByteString (ByteString)
 import           Data.ByteString.Char8 (pack)
@@ -15,6 +16,8 @@ import           KMC.Syntax.ParserTypes (ParsedRegex)
 import           Numeric (readHex)
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
+
+import 		 Prelude
 
 type Parser = ParsecT [Char] () Identity
 
