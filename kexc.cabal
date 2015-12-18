@@ -38,6 +38,7 @@ executable kexc
                      , template-haskell
                      , text >= 1.1.0.0
                      , time >= 1.4.2
+                     , transformers >= 0.4
 
                      -- Remove before distributing: Only needed because haskell-mode
                      -- is too stupid to figure out build-depends for the test suite.

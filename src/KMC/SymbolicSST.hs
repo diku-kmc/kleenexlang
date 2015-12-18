@@ -27,6 +27,7 @@ module KMC.SymbolicSST
        )
 where
 import           Control.Applicative
+import           Data.Monoid
 
 import qualified Data.Map.Strict as M
 import           Data.Maybe (fromMaybe)

@@ -6,6 +6,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 module KMC.Theories where
 
+import           Control.Applicative
+import           Data.Monoid
+
 import           KMC.RangeSet (RangeSet)
 import qualified KMC.RangeSet as RS
 

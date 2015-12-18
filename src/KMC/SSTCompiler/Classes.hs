@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 module KMC.SSTCompiler.Classes where
 
+import           Control.Applicative
 import           Control.Monad.Reader
 import           Data.Functor.Identity (Identity(runIdentity))
 import qualified Data.Map as M
@@ -19,6 +20,8 @@ import           KMC.SymbolicFST.ActionMachine (CodeInputLab(..),DecodeFunc(..))
 import           KMC.SymbolicFST.OracleMachine (CodeFunc(..))
 import           KMC.SymbolicFST.Transducer (CopyFunc(..))
 import           KMC.SymbolicSST.ActionSST (ConstOrAnyLab(..))
+
+import           Prelude
 
 ----------
 -- Classes

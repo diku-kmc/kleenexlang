@@ -7,9 +7,11 @@ module KMC.Frontend.Options
        )
        where
 
+import Control.Applicative
 import Data.List (intercalate)
 import KMC.Program.Backends.C (CType(..))
 import Options
+import Prelude
 
 data MainOptions =
     MainOptions
