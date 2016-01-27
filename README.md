@@ -18,6 +18,31 @@ Due to dependencies not on Hackage, it is easiest to build in a sandbox. After c
 
 To build, run `cabal configure && cabal build`. This will place a binary in `dist/build/kexc/kexc`.
 
+## Use ##
+
+First write a Kleenex program:
+
+```
+> cat add-commas.kex
+main := (num /[^0-9]/ | other)*
+num := digit{1,3} ("," digit{3})*
+digit := /[0-9]/
+other := /./
+```
+
+Next compile a transducer using the `kexc` executable:
+
+```
+> kexc compile add-commas.kex --out add-commas
+```
+
+Finally, pipe input to the transducer:
+
+```
+> echo "2016" | ./add-commas
+2,016
+```
+
 ## Test suite ##
 
 A number of test suites are included.
