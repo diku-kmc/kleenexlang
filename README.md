@@ -5,7 +5,7 @@
 This is a compiler that can:
 
 * compile regular expressions into fast, streaming parsers (see [http://www.diku.dk/kmc/documents/GHR14-0-paper.pdf]), and
-* compile programs written in the regular expression-based language Kleenex into fast, streaming string transformations.
+* compile programs written in the regular expression-based language Kleenex into fast, streaming string transformations ([http://www.diku.dk/kmc/documents/ghrst2016-0-paper.pdf]).
 
 ## Download VM for testing ##
 If you want to quickly get a sense of what Kleenex is, you can download a VirtualBox image that is ready to play around with from http://kleenexlang.org.  
