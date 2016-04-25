@@ -100,7 +100,7 @@ install:
     cabal)
       cabal --version
       travis_retry cabal update
-      (cd regexps-syntax && cabal install --enable-tests --enable-benchmarks --force-reinstalls && cd ..)
+      (cd regexps-syntax && cabal install --force-reinstalls && cd ..)
       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS
       ;;
   esac
