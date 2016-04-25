@@ -32,9 +32,9 @@ matrix:
   include:
   # We grab the appropriate GHC and cabal-install versions from hvr's PPA. See:
   # https://github.com/hvr/multi-ghc-travis
-  - env: BUILD=cabal GHCVER=7.8.4 CABALVER=1.18
+  - env: BUILD=cabal GHCVER=7.8.4 CABALVER=1.22
     compiler: ": #GHC 7.8.4"
-    addons: {apt: {packages: [cabal-install-1.18,ghc-7.8.4], sources: [hvr-ghc]}}
+    addons: {apt: {packages: [cabal-install-1.22,ghc-7.8.4], sources: [hvr-ghc]}}
   - env: BUILD=cabal GHCVER=7.10.3 CABALVER=1.22
     compiler: ": #GHC 7.10.3"
     addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
@@ -100,9 +100,7 @@ install:
     cabal)
       cabal --version
       travis_retry cabal update
-      cd regexps-syntax
-      cabal install --enable-tests --enable-benchmarks --force-reinstalls
-      cd ..
+      (cd regexps-syntax && cabal install --enable-tests --enable-benchmarks --force-reinstalls && cd ..)
       cabal install --only-dependencies --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS
       ;;
   esac
