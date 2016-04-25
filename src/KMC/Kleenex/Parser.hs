@@ -17,7 +17,7 @@ import           Numeric (readHex)
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Expr (Assoc(..), buildExpressionParser, Operator(..))
 
-import 		 Prelude
+import           Prelude
 
 type Parser = ParsecT [Char] () Identity
 
