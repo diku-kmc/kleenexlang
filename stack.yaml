@@ -1,6 +1,6 @@
-resolver: lts-3.8
+resolver: lts-5.10
 packages:
   - 'regexps-syntax'
   - '.'
-extra-deps:
-  - 'graphviz-2999.18.0.1'
+# extra-deps:
+#   - 'graphviz-2999.18.0.1'
