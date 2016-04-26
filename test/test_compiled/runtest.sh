@@ -1,7 +1,11 @@
 #! env bash
 
 test_dir=src
-kexc=../../dist/build/kexc/kexc
+if [ -f ../../dist/build/kexc/kexc ]; then
+    kexc=../../dist/build/kexc/kexc
+else
+    kexc="stack exec kexc --"
+fi
 
 getinput="sed -n 's/\/\/ IN: \(.*\)/\1/p'"
 getoutput="sed -n 's/\/\/ OUT: \(.*\)/\1/p'"

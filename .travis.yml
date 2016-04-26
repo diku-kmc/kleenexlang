@@ -122,3 +122,5 @@ script:
         (cd dist && cabal install --force-reinstalls "$SRC_TGZ")
       ;;
   esac
+# Run functional tests of the compiled Kleenex binary
+- make test
