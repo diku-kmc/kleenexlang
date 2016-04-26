@@ -12,6 +12,9 @@ import           Data.Monoid
 import           KMC.RangeSet (RangeSet)
 import qualified KMC.RangeSet as RS
 
+-- Silence unused import warnings on migration to base>=4.8
+import           Prelude
+
 {----------------------------------------------------------------------}
 {- Boolean algebras                                                   -}
 {----------------------------------------------------------------------}

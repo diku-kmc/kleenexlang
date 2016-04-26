@@ -11,6 +11,7 @@ import System.Exit
 main :: IO ExitCode
 main = runSubcommand
        [ subcommand "compile" compileCmd
+       , subcommand "simulate" simulateCmd
        , subcommand "visualize" visualizeCmd
        ]
 
@@ -18,7 +19,7 @@ checkArgs :: [String] -> IO FilePath
 checkArgs [fp] = return fp
 checkArgs _ = do
   prog <- getProgName
-  putStrLn $ "Usage: " ++ prog ++ " <compile|visualize> [options] <kleenex_file>"
+  putStrLn $ "Usage: " ++ prog ++ " <compile|simulate|visualize> [options] <kleenex_file>"
   exitWith $ ExitFailure 1
 
 compileCmd :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
@@ -41,6 +42,27 @@ compileCmd mainOpts compileOpts args = do
       RegexFlavor -> do
         ou <- generateOracleSSTs tu
         compileCoder compileOpts True (puSourceName pu) (puSourceHash pu) ou
+  when (optReport mainOpts) $ printPhases phases
+  return res
+
+simulateCmd :: MainOptions -> SimulateOptions -> [String] -> IO ExitCode
+simulateCmd mainOpts simOpts args = do
+  arg <- checkArgs args
+  (res, phases) <- runFrontend mainOpts $ measure "Simulate" $ do
+    pu <- createProgram arg
+    tu <- buildTransducers pu
+    actionDecomp <- asks optActionEnabled
+    case getCompileFlavor mainOpts arg of
+      KleenexFlavor | actionDecomp -> do
+        ou <- generateOracleSSTs tu
+        au <- generateActionSSTs tu
+        simulateOracleAction simOpts ou au
+      KleenexFlavor | otherwise -> do
+        du <- generateDirectSSTs tu
+        simulateDirect simOpts du
+      RegexFlavor -> do
+        ou <- generateOracleSSTs tu
+        simulateCoder simOpts ou
   when (optReport mainOpts) $ printPhases phases
   return res
 

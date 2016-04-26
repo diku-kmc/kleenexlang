@@ -22,18 +22,25 @@ module KMC.SymbolicSST
        ,enumerateStates
        ,enumerateVariables
        ,optimize
+       ,Stream(..)
        ,run
        ,flattenStream
+       ,flattenStream'
+       ,composeStream
        )
 where
 import           Control.Applicative
 import           Data.Monoid
-
 import qualified Data.Map.Strict as M
 import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
+import           Data.List (maximumBy)
+import           Data.Ord (comparing)
 
 import           KMC.Theories
+
+-- Silence unused import warnings on migration to base>=4.8
+import           Prelude
 
 type Valuation var delta       = M.Map var [delta]
 
@@ -363,10 +370,31 @@ enumerateVariables sst =
 data Stream a = Chunk a (Stream a) | Done | Fail String
   deriving (Show)
 
+flattenStream' :: (Monoid m) => Stream m -> Either String m
+flattenStream' (Fail e) = Left e
+flattenStream' Done = Right mempty
+flattenStream' (Chunk x s) = mappend x <$> flattenStream' s
+
 flattenStream :: (Monoid m) => Stream m -> m
 flattenStream (Fail e) = error e
 flattenStream Done = mempty
 flattenStream (Chunk x s) = mappend x (flattenStream s)
+
+-- | Compose two streams lazily; all data in the first stream is fed to the
+-- given function, regardless of the final status in the tail. Errors are lazily
+-- propagated to the tail in the resulting stream. If the function results in a
+-- failing stream, the error message in the original stream takes priority.
+composeStream :: (Monoid m) => Stream m -> (m -> Stream m') -> Stream m'
+composeStream s f = let (m, e) = flat s in attachTail e $ f m
+  where
+    flat Done = (mempty, Nothing)
+    flat (Fail e) = (mempty, Just e)
+    flat (Chunk m s') = let (m', e) = flat s' in (mappend m m', e)
+
+    attachTail Nothing s' = s'
+    attachTail (Just e) s' = case s' of
+      Chunk xs s'' -> Chunk xs (attachTail (Just e) s'')
+      _ -> Fail e
 
 valuate :: (Ord var) => Valuation var delta -> UpdateString var [delta] -> [delta]
 valuate _ [] = []
@@ -401,15 +429,17 @@ run sst = go (sstI sst) (M.fromList [ (x, []) | x <- S.toList (sstV sst) ])
         let (out, s') = extractOutput $ M.map (valuate s . evalUpdateStringFunc cs) upd
         return $ Chunk out (go q' s' as')
 
-      -- | Use backtracking to find longest matching transition
+      match :: [sigma] -> [pred] -> Maybe (Int, [sigma], [sigma])
+      match as [] = Just (0, [], as)
+      match (a:as) (p:ps)
+        | member a p = do
+            (k, cs, as') <- match as ps
+            return (k+1, a:cs, as')
+      match _ _ = Nothing
+
       findTrans :: [sigma] -> [([pred], RegisterUpdate var func, st)]
                 -> Maybe (RegisterUpdate var func, st, [sigma], [sigma])
       findTrans as ts =
-        (do (a:as') <- pure as
-            let ts' = [ (ps, upd, st') | (p:ps, upd, st') <- ts, member a p ]
-            (upd, st', cs, as'') <- findTrans as' ts'
-            return (upd, st', a:cs, as''))
-        <|> case [ (upd, st') | ([], upd, st') <- ts ] of
-              []           -> Nothing
-              [(upd, st')] -> Just (upd, st', [], as)
-              _            -> error "ambiguous lookahead"
+        let cand = [ (k, (upd, st', cs, as'))
+                     | (ps, upd, st') <- ts, Just (k, cs, as') <- [match as ps] ]
+        in if null cand then Nothing else Just $ snd $ maximumBy (comparing fst) cand

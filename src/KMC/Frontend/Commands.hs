@@ -22,12 +22,14 @@ import qualified KMC.SymbolicSST.ActionSST as ASST
 import           KMC.Visualization (fstToDot, sstToDot, graphSize)
 
 import           Control.Monad.Reader
+import qualified Data.ByteString as B
 import           Data.Char (toLower)
 import qualified Data.GraphViz.Commands as GC
 import           Data.Hash.MD5 (md5s, Str(..))
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import           Data.Word (Word8)
 import           System.Exit (ExitCode(..),exitWith)
 import           System.FilePath (takeExtension)
 import           System.IO (hPutStrLn,stdout,stderr)
@@ -257,6 +259,35 @@ compileCoder compileOpts useWordAlignment srcFile srcMd5 ou =
                    (optOutFile compileOpts)
                    (optCFile compileOpts)
                    useWordAlignment
+
+printStream :: SST.Stream [Word8] -> Frontend ExitCode
+printStream bs = case bs of
+  SST.Done -> return ExitSuccess
+  SST.Fail e -> fatal e
+  SST.Chunk xs s -> do
+    liftIO $ B.putStr $ B.pack xs
+    printStream s
+
+simulateOracleAction :: SimulateOptions -> OracleSSTUnit -> ActionSSTUnit -> Frontend ExitCode
+simulateOracleAction _simOpts ou au = do
+  let fs = zipWith (\o a xs -> SST.composeStream (SST.run o xs) (SST.run a))
+                   (ouTransducers ou)
+                   (auTransducers au)
+  input <- liftIO $ B.getContents
+  printStream $ foldl SST.composeStream (SST.Chunk (B.unpack input) SST.Done) fs
+
+simulateDirect :: SimulateOptions -> DirectSSTUnit -> Frontend ExitCode
+simulateDirect _simOpts du = do
+  input <- liftIO $ B.getContents
+  printStream $ foldl SST.composeStream
+                      (SST.Chunk (B.unpack input) SST.Done)
+                      (map SST.run (duTransducers du))
+
+simulateCoder :: SimulateOptions -> OracleSSTUnit -> Frontend ExitCode
+simulateCoder _simOpts ou = do
+  input <- liftIO $ B.getContents
+  -- We assume that a coder is always a single machine pipeline
+  printStream $ SST.run (head $ ouTransducers ou) $ B.unpack input
 
 visualize :: VisualizeOptions -> ProgramUnit -> Frontend (IO ExitCode)
 visualize visOpts pu = do

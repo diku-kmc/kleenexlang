@@ -1,6 +1,7 @@
 module KMC.Frontend.Options
        (MainOptions(..)
        ,CompileOptions(..)
+       ,SimulateOptions(..)
        ,VisualizeOptions(..)
        ,VisStage(..)
        ,prettyOptions
@@ -33,6 +34,11 @@ data CompileOptions =
     , optWordSize        :: CType          -- ^ Word size in run-time buffer
     , optAltCompiler     :: FilePath       -- ^ Alternative compiler
     , optElimIdTables    :: Bool           -- ^ Eliminate identity tables in generated code
+    }
+
+data SimulateOptions =
+    SimulateOptions
+    {
     }
 
 data VisualizeOptions =
@@ -111,6 +117,10 @@ instance Options CompileOptions where
       <*> simpleOption "cc" "gcc" "C compiler"
       <*> simpleOption "rmidtbls" False "Eliminate C-tables that implement the identity function."
 
+instance Options SimulateOptions where
+    defineOptions =
+      pure SimulateOptions
+
 instance Options VisualizeOptions where
     defineOptions =
         VisualizeOptions
@@ -129,3 +139,4 @@ prettyOptions mainOpts compileOpts = intercalate "\\n"
                      , "Word size:               " ++ show (optWordSize compileOpts)
                      , "Identity tables removed: " ++ show (optElimIdTables compileOpts)
                      ]
+
