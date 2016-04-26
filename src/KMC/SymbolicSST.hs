@@ -399,7 +399,7 @@ composeStream s f = let (m, e) = flat s in attachTail e $ f m
 valuate :: (Ord var) => Valuation var delta -> UpdateString var [delta] -> [delta]
 valuate _ [] = []
 valuate s (Right d:xs) = d ++ valuate s xs
-valuate s (Left v:xs) = maybe (error "valuate: Variable not in valuation") id (M.lookup v s)
+valuate s (Left v:xs) = maybe [] id (M.lookup v s)
                         ++ valuate s xs
 
 run :: forall var st pred func sigma delta.

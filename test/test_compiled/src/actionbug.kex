@@ -1,0 +1,4 @@
+// IN:c
+// OUT:ø
+main := word ~/\n/ main | ""
+word := os@((~/c/"ø")*) !os

@@ -1,0 +1,9 @@
+// IN:
+// IN:a
+// IN:aa
+// IN:aaa
+// OUT:b
+// OUT:a
+// OUT:a
+// OUT:a
+main := ( (~/a/+ "a" | ~/a/* "b") /\n/ ) *
