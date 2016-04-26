@@ -6,8 +6,9 @@ module KMC.Kleenex.Parser(Prog,Decl,Term
 import           Control.Applicative hiding ((<|>), many)
 import           Control.Monad.Identity (Identity)
 import           Data.ByteString (ByteString)
-import           Data.ByteString.Char8 (pack)
 import           Data.Char
+import           Data.Text (pack)
+import           Data.Text.Encoding (encodeUtf8)
 import qualified KMC.Kleenex.Syntax as S
 import           KMC.Kleenex.Syntax hiding (Term,Decl,Prog)
 import           KMC.Syntax.Config (fancyRegexParser, RegexParserConfig(..))
@@ -143,7 +144,7 @@ regIdentifierP = RegIdent <$> lexeme regIdentifier
 
 -- | Parse a constant
 constantP :: Parser ByteString
-constantP = pack <$> lexeme (between (char '"') (char '"') stringConstant)
+constantP = encodeUtf8.pack <$> lexeme (between (char '"') (char '"') stringConstant)
             <?> "string constant"
 
 -- | Parse a term
