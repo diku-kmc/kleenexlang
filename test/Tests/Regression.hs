@@ -39,6 +39,7 @@ regressionTests =
     , simpleTest "range disambiguation" range_disamb
     , simpleTest "enumerateStates not idempotent" enumerateStates_idempotent
     , simpleTest "suppress output desugaring broken" suppressOutput_desugaring
+    , simpleTest "lost output" lostOutput
     ]
 
 unsound_lookahead :: IO TS.Result
@@ -188,3 +189,8 @@ charclass_accept_dash =
     let prog = [strQ|
 main := /[a-z-]*/|]
     in kleenexIdTest prog "a-b-c-d---d-f-eerasdfs-"
+
+lostOutput :: IO TS.Result
+lostOutput = do
+  let prog = "main := ~/a/\"b\"/c?/"
+  kleenexIOTest prog [("a", "b"), ("ac", "bc")]

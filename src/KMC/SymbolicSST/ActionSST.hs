@@ -64,7 +64,7 @@ actionToSST actM = construct' (fstI actM, 0) edges outs
                       [(s, evalUpdateStringFunc [error "input function emitted along epsilon path"]
                            $ fromMaybe [VarA 0] (M.lookup 0 kappa))]
                     else []
-              es' = [ (s,ps,ru,s') | (ps, ru, s') <- next actM regs (q',h') ]
+              es' = [ (s, ps, composeRegisterUpdate kappa ru, s') | (ps, ru, s') <- next actM regs (q',h') ]
               ws'' = S.fromList [ s' | (_, _, _, s') <- es' ]
               states' = S.insert s states
           in go (S.union ws'' ws') states' (es' ++ es) (os' ++ os)
