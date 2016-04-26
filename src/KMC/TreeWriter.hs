@@ -24,6 +24,8 @@ import Control.Monad.State
 import Data.Maybe (catMaybes)
 import Data.Monoid
 
+import Prelude
+
 data Tree w a = Tip { tOutput :: w, tValue :: a }
               | Fork { tOutput :: w
                      , tForks :: [Tree w a] }
