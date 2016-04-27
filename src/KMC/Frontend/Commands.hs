@@ -32,6 +32,7 @@ import qualified Data.GraphViz.Commands as GC
 import           Data.Hash.MD5 (md5s, Str(..))
 import           Data.List (intercalate)
 import qualified Data.Map as M
+import           Data.Monoid as Mon
 import qualified Data.Set as S
 import           Data.Word (Word8)
 import           System.Exit (ExitCode(..),exitWith)
@@ -274,7 +275,7 @@ simulateLockstep _simOpts tu = do
       case FST.run t (L.unpack inp) of
         [] -> fatal "Reject"
         (acts:_) ->
-          case runAction $ mconcat $ map adjActionSem $ acts of
+          case runAction $ Mon.mconcat $ map adjActionSem $ acts of
             (_, [b]) -> return $ BB.toLazyByteString b
             (_, _) -> fatal "Malformed action program: non-singleton stack on termination"
 
