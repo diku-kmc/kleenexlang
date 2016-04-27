@@ -1,11 +1,15 @@
-#! env bash
+#!/bin/bash
 
 test_dir=src
 if [ -f ../../dist/build/kexc/kexc ]; then
-    kexc=../../dist/build/kexc/kexc
-else
-    kexc="stack exec kexc --"
+     kexc=../../dist/build/kexc/kexc
+elif which kexc >/dev/null; then
+     kexc="kexc"
+elif which stack >/dev/null; then
+     kexc="stack exec kexc --"
 fi
+
+echo "Using executable '${kexc}'"
 
 getinput="sed -n 's/\/\/ IN: \(.*\)/\1/p'"
 getoutput="sed -n 's/\/\/ OUT: \(.*\)/\1/p'"

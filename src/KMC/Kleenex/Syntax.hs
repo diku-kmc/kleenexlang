@@ -12,6 +12,7 @@ module KMC.Kleenex.Syntax
        , RProg(..)
        , RTerm(..)
        , RIdent
+       , RDecls
        ) where
 
 import           Data.ByteString (ByteString)
@@ -82,9 +83,10 @@ eraseInfoTerm (WriteReg ident) = WriteReg ident
 ------------------
 
 type RIdent = Int
+type RDecls a b = M.Map RIdent (RTerm a b)
 
 data RProg a b = RProg { rprogPipeline :: [RIdent]
-                       , rprogDecls :: M.Map RIdent (RTerm a b)
+                       , rprogDecls :: RDecls a b
                        }
   deriving (Eq, Ord, Show)
 

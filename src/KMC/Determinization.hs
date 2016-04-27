@@ -243,9 +243,8 @@ sstFromFST fst' singletonMode =
 
     saturate ws states trans outs
       | S.null ws                      = (trans, outs)
-      | (t, ws') <- S.deleteFindMin ws, S.member t states
-                                       = saturate ws' states trans outs
       | (t, ws') <- S.deleteFindMin ws =
+        if S.member t states then saturate ws' states trans outs else
         let tcl  = closureAbstractTree fst' t
             tcl' = unabstract tcl
             os   = [ (t, w) | Tip w _ <- maybeToList $ eofTree fst' tcl ]

@@ -51,18 +51,23 @@ simulateCmd mainOpts simOpts args = do
   (res, phases) <- runFrontend mainOpts $ measure "Simulate" $ do
     pu <- createProgram arg
     tu <- buildTransducers pu
-    actionDecomp <- asks optActionEnabled
-    case getCompileFlavor mainOpts arg of
-      KleenexFlavor | actionDecomp -> do
-        ou <- generateOracleSSTs tu
-        au <- generateActionSSTs tu
-        simulateOracleAction simOpts ou au
-      KleenexFlavor | otherwise -> do
-        du <- generateDirectSSTs tu
-        simulateDirect simOpts du
-      RegexFlavor -> do
-        ou <- generateOracleSSTs tu
-        simulateCoder simOpts ou
+    case (optSimulationType simOpts) of
+      SimLockstepFST -> simulateLockstep simOpts tu
+      SimLinearBacktrackingFST -> do
+        fatal "Not yet implemented"
+      SimSST -> do
+        actionDecomp <- asks optActionEnabled
+        case getCompileFlavor mainOpts arg of
+          KleenexFlavor | actionDecomp -> do
+            ou <- generateOracleSSTs tu
+            au <- generateActionSSTs tu
+            simulateOracleAction simOpts ou au
+          KleenexFlavor | otherwise -> do
+            du <- generateDirectSSTs tu
+            simulateDirect simOpts du
+          RegexFlavor -> do
+            ou <- generateOracleSSTs tu
+            simulateCoder simOpts ou
   when (optReport mainOpts) $ printPhases phases
   return res
 

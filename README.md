@@ -45,12 +45,12 @@ Finally, pipe input to the transducer:
 
 ### Interpreter interface ###
 
-The compiler has a streaming interpreter for simulating the transducers generated from Kleenex programs. Input data is read from standard input and written to standard output. This allows for faster debugging without having to invoke a C compiler for each edit cycle. The interpreter has not been optimized for speed, and is several orders of magnitude slower than compiled programs.
+The compiler has several interpreters for simulating the different transducer stages generated from Kleenex programs. Input data is read from standard input and written to standard output. This allows for faster debugging without having to invoke a C compiler for each edit cycle.
 
-Invoke the interpreter via the `simulate` subcommand. You probably want `--quiet` to avoid compiler output interleaved with the output of the simulated Kleenex program. The following example illustrates usage:
+Invoke the interpreter via the `simulate` subcommand. You probably want `--quiet` to avoid compiler output interleaved with the output of the simulated Kleenex program. If using the default simulator (others can be specified using `--sim`) then adding `--sb=false` avoids running an unneccesary analysis phase. The following example illustrates usage:
 
 ````
-> kexc --quiet simulate bench/kleenex/src/apache_log.kex < test/data/apache_log/example.log
+> kexc --sb=false --quiet simulate bench/kleenex/src/apache_log.kex < test/data/apache_log/example.log
 ````
 
 ## Test suite ##

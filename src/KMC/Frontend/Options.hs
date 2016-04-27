@@ -3,6 +3,7 @@ module KMC.Frontend.Options
        ,CompileOptions(..)
        ,SimulateOptions(..)
        ,VisualizeOptions(..)
+       ,SimulationType(..)
        ,VisStage(..)
        ,prettyOptions
        )
@@ -38,8 +39,12 @@ data CompileOptions =
 
 data SimulateOptions =
     SimulateOptions
-    {
+    { optSimulationType :: SimulationType -- ^ Simulation type (streaming FST, backtracking FST, SST sim)
     }
+
+data SimulationType = SimLockstepFST           -- ^ Straightforward lockstepped FST simulation
+                    | SimLinearBacktrackingFST -- ^ Linear-time backtracking FST simulation
+                    | SimSST                   -- ^ Streaming SST simulation
 
 data VisualizeOptions =
    VisualizeOptions
@@ -54,6 +59,20 @@ data VisStage = VisTransducer -- ^ Visualize the generated transducer
               | VisSST        -- ^ Visualize the SST (composed)
               | VisOracleSST  -- ^ Visualize the oracle SST
               | VisActionSST  -- ^ Visualize the action SST
+
+simulationTypeOptionType :: OptionType SimulationType
+simulationTypeOptionType =
+  optionType "lockstep|backtrack|sst"
+             SimLockstepFST
+             (\s -> case s of
+                 "lockstep"  -> Right SimLockstepFST
+                 "backtrack" -> Right SimLinearBacktrackingFST
+                 "sst"       -> Right SimSST
+                 _           -> Left $ concat ["\"", s, "\" is not a valid simulation type"])
+             (\t -> case t of
+                 SimLockstepFST           -> "lockstep"
+                 SimLinearBacktrackingFST -> "backtrack"
+                 SimSST                   -> "sst")
 
 visStageOptionType :: OptionType VisStage
 visStageOptionType =
@@ -119,7 +138,11 @@ instance Options CompileOptions where
 
 instance Options SimulateOptions where
     defineOptions =
-      pure SimulateOptions
+      SimulateOptions <$> defineOption simulationTypeOptionType
+                              (\o -> o { optionLongFlags = ["sim"]
+                                       , optionDefault = SimLockstepFST
+                                       , optionDescription = "What type of simulator to use"
+                                       })
 
 instance Options VisualizeOptions where
     defineOptions =

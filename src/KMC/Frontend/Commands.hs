@@ -1,9 +1,11 @@
+{-# LANGUAGE FlexibleContexts, TypeFamilies #-}
 module KMC.Frontend.Commands where
 
 import           KMC.Frontend
 import           KMC.Frontend.Options
 
 import           KMC.Determinization (sstFromFST)
+import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser
 import           KMC.Kleenex.Syntax
@@ -23,6 +25,8 @@ import           KMC.Visualization (fstToDot, sstToDot, graphSize)
 
 import           Control.Monad.Reader
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Lazy as L
 import           Data.Char (toLower)
 import qualified Data.GraphViz.Commands as GC
 import           Data.Hash.MD5 (md5s, Str(..))
@@ -260,13 +264,19 @@ compileCoder compileOpts useWordAlignment srcFile srcMd5 ou =
                    (optCFile compileOpts)
                    useWordAlignment
 
-printStream :: SST.Stream [Word8] -> Frontend ExitCode
-printStream bs = case bs of
-  SST.Done -> return ExitSuccess
-  SST.Fail e -> fatal e
-  SST.Chunk xs s -> do
-    liftIO $ B.putStr $ B.pack xs
-    printStream s
+simulateLockstep :: SimulateOptions -> TransducerUnit -> Frontend ExitCode
+simulateLockstep _simOpts tu = do
+  input <- liftIO $ L.getContents
+  liftIO . L.putStr =<< foldl1 (>=>) (map runFST (tuTransducers tu)) input
+  return ExitSuccess
+  where
+    runFST t inp =
+      case FST.run t (L.unpack inp) of
+        [] -> fatal "Reject"
+        (acts:_) ->
+          case runAction $ mconcat $ map adjActionSem $ acts of
+            (_, [b]) -> return $ BB.toLazyByteString b
+            (_, _) -> fatal "Malformed action program: non-singleton stack on termination"
 
 simulateOracleAction :: SimulateOptions -> OracleSSTUnit -> ActionSSTUnit -> Frontend ExitCode
 simulateOracleAction _simOpts ou au = do
@@ -346,3 +356,16 @@ visualize visOpts pu = do
                  ".svg"  -> Just GC.Svg
                  ".svgz" -> Just GC.SvgZ
                  _ -> Nothing
+
+
+--------------------
+-- Utility functions
+--------------------
+
+printStream :: SST.Stream [Word8] -> Frontend ExitCode
+printStream bs = case bs of
+  SST.Done -> return ExitSuccess
+  SST.Fail e -> fatal e
+  SST.Chunk xs s -> do
+    liftIO $ B.putStr $ B.pack xs
+    printStream s
