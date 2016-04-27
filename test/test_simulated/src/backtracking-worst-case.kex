@@ -1,4 +1,4 @@
 // IN:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-// OUT:aaaaaaaaaaaaaaaa
+// OUT:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
-main := /(a?){32}a{32}/
+main := /(a?){32}a{32}\n/
