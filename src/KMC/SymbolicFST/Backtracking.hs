@@ -4,6 +4,7 @@ module KMC.SymbolicFST.Backtracking(interp) where
 import           Control.Applicative
 import           Data.Map ((!))
 import qualified Data.Map as M
+import           Data.Monoid as Mon
 import qualified Data.Set as S
 
 import           KMC.Backtracking
@@ -21,7 +22,7 @@ interp phi fst' = lfp!(fstI fst') <* eof
       (if isJoinState fst' q then barrier q else pure ())
       *> case fstEvalEpsilonEdges fst' q of
            [] -> case fstEdges fst' q of
-                   [] -> pure mempty
+                   [] -> pure Mon.mempty
                    es -> consume es
                  -- TODO: Only insert fBarrier if q is on an epsilon-loop
            es -> fBarrier q *> choose es
