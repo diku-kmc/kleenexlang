@@ -1,0 +1,4 @@
+// IN:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+// OUT:aaaaaaaaaaaaaaaa
+
+main := /(a?){32}a{32}/

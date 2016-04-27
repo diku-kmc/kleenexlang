@@ -9,7 +9,11 @@ module KMC.SymbolicFST
        ,edgesToList
        ,edgesFromList
        ,fstEvalEpsilonEdges
+       ,fstEdges
        ,fstAbstractEvalEdgesAll
+       ,isChoiceState
+       ,isSkipState
+       ,isJoinState
        ,coarsestPredicateSet
        ,prefixTests
        ,rightClosure,rightInputClosure
@@ -23,8 +27,9 @@ module KMC.SymbolicFST
 
 import           Control.Applicative
 import           Control.Monad (guard)
-import           Data.Monoid
 import qualified Data.Map as M
+import           Data.Maybe (maybeToList)
+import           Data.Monoid
 import qualified Data.Set as S
 
 import           KMC.Theories
@@ -174,6 +179,13 @@ abstractEvalEdgesAll (OrderedEdgeSet { eForward = me}) q p =
 fstEvalEpsilonEdges :: (Ord st) => FST st pred func -> st -> [(Rng func, st)]
 fstEvalEpsilonEdges aut = evalEpsilonEdges (fstE aut)
 
+-- | Get the list of forward symbol edges from a state
+fstEdges :: (Ord st) => FST st pred func -> st -> [(pred, func, st)]
+fstEdges fst' q =
+  case M.lookup q (eForward $ fstE fst') of
+    Nothing -> []
+    Just es -> es
+
 -- | Like fstEvalEdges, but given an FST.
 fstEvalEdges :: (Ord st
                 ,Function func
@@ -194,6 +206,18 @@ isChoiceState fst' q =
   case (M.member q (eForward . fstE $ fst'), M.member q (eForwardEpsilon . fstE $ fst')) of
     (True, True) -> error "Inconsistent FST - a state is both a choice and symbol state"
     (_, b)       -> b
+
+isSkipState :: (Ord st) => FST st pred func -> st -> Bool
+isSkipState fst' q =
+  case M.lookup q (eForwardEpsilon . fstE $ fst') of
+    Just [_] -> True
+    _ -> False
+
+isJoinState :: (Ord st) => FST st pred func -> st -> Bool
+isJoinState fst' q =
+  let nBackEdges = length (concat (maybeToList (M.lookup q (eBackwardEpsilon . fstE $ fst'))))
+                 + length (concat (maybeToList (M.lookup q (eBackward . fstE $ fst'))))
+  in nBackEdges > 1
 
 -- | Given a state set A (represented as a list), compute the coarsest predicate
 -- set obtained from the set

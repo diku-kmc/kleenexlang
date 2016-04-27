@@ -115,13 +115,18 @@ fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]
                  ,GV.NodeAttrs [GA.Shape GA.Circle]]
 
-formatNode :: (Ord st) => (st -> Bool) -> (st -> Bool) -> (st, st) -> GA.Attributes
-formatNode isFinal isInitial (q, _) =
-    case (isInitial q, isFinal q) of
-      (True, True) -> [ GA.Shape GA.DoubleOctagon ]
-      (True, _   ) -> [ GA.Shape GA.BoxShape      ]
-      (_,    True) -> [ GA.Shape GA.DoubleCircle  ]
-      _            -> []
+formatNode :: (Ord st) => (st -> Bool) -> (st -> Bool) -> (st -> Bool) -> (st -> Bool)
+           -> (st, st) -> GA.Attributes
+formatNode isFinal isInitial isJoin isChoice (q, _) =
+  let shapes = case (isInitial q, isFinal q) of
+        (True, True) -> [ GA.Shape GA.DoubleOctagon ]
+        (True, _   ) -> [ GA.Shape GA.BoxShape      ]
+        (_,    True) -> [ GA.Shape GA.DoubleCircle  ]
+        _            -> []
+      decorations =
+           concat [ [GV.style GV.filled, GV.fillColor GV.LightSkyBlue] | isJoin q ]
+        ++ [ GV.style GV.dashed | isChoice q ]
+  in shapes ++ decorations
 
 formatFSTEdge :: (Ord st, Pretty pred, Pretty delta, Pretty func)
               => (st, st, Either (pred, func) delta)
@@ -137,7 +142,11 @@ fstToDot fst' = GV.graphElemsToDot params nodes edges
     where
       params = GV.nonClusteredParams
                { GV.globalAttributes = fstGlobalAttrs
-               , GV.fmtNode = formatNode (\q -> S.member q (fstF fst')) (== fstI fst')
+               , GV.fmtNode = formatNode (\q -> S.member q (fstF fst'))      -- final test
+                                         (== fstI fst')                      -- initial test
+                                         (isJoinState fst')                  -- join test
+                                         (\q -> isChoiceState fst' q
+                                                && not (isSkipState fst' q)) -- choice test
                , GV.fmtEdge = formatFSTEdge
                }
       nodes = map (\x -> (x,x)) (S.toList (fstS fst'))
@@ -151,6 +160,8 @@ sstToDot sst = GV.graphElemsToDot params nodes edges
                { GV.globalAttributes = fstGlobalAttrs
                , GV.fmtNode = formatNode (\q -> M.member (statesMap' M.! q) (sstF sst))
                                          (\q -> (statesMap' M.! q) == sstI sst)
+                                         (const False)
+                                         (const False)
                , GV.fmtEdge = formatSSTEdge
                }
       nodes = map (\x -> (statesMap M.! x, statesMap M.! x)) (S.toList (sstS sst))

@@ -53,8 +53,7 @@ simulateCmd mainOpts simOpts args = do
     tu <- buildTransducers pu
     case (optSimulationType simOpts) of
       SimLockstepFST -> simulateLockstep simOpts tu
-      SimLinearBacktrackingFST -> do
-        fatal "Not yet implemented"
+      SimLinearBacktrackingFST -> simulateBacktrack simOpts tu
       SimSST -> do
         actionDecomp <- asks optActionEnabled
         case getCompileFlavor mainOpts arg of

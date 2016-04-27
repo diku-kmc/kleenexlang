@@ -18,7 +18,7 @@ for tst in $(ls $test_dir); do
     if [[ $tst != *".kex" ]]; then  #
         continue
     fi
-    for simtype in lockstep sst; do
+    for simtype in lockstep backtrack sst; do
         run="${kexc} simulate --sb=false --sim=${simtype} --quiet $test_dir/${tst}"
         input=$(sed -n 's/\/\/ IN:\(.*\)/\1/p' < $test_dir/$tst)
         exp_out=$(sed -n 's/\/\/ OUT:\(.*\)/\1/p' < $test_dir/$tst)

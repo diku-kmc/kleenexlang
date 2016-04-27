@@ -1,0 +1,13 @@
+// IN:ab
+// IN:aabbaabb
+// IN:baba
+// IN:b
+// OUT:AB
+// OUT:AABBAABB
+// OUT:BABA
+// OUT:B
+
+main := (letters /\n/)*
+letters := (as bs)*
+as := (~/a/"A")*
+bs := (~/b/"B")*

@@ -49,6 +49,7 @@ library
                  , KMC.SymbolicFST.Transducer
                  , KMC.SymbolicFST.Functionalization
                  , KMC.SymbolicFST.ActionMachine
+                 , KMC.SymbolicFST.Backtracking
                  , KMC.SSTCompiler
                  , KMC.SSTCompiler.Classes
                  , KMC.SSTCompiler.Env
@@ -59,6 +60,7 @@ library
                  , KMC.Util.Map
                  , KMC.Util.Bits
                  , KMC.Util.Set
+                 , KMC.Backtracking
                  , KMC.Kleenex.WellFormedness
                  , KMC.Kleenex.Syntax
                  , KMC.Kleenex.Desugaring

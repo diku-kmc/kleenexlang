@@ -4,6 +4,7 @@ module KMC.Frontend.Commands where
 import           KMC.Frontend
 import           KMC.Frontend.Options
 
+import           KMC.Backtracking
 import           KMC.Determinization (sstFromFST)
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Desugaring as DS
@@ -15,6 +16,7 @@ import           KMC.Program.IL (elimIdTables)
 import           KMC.SSTCompiler (compile)
 import qualified KMC.SymbolicFST as FST
 import           KMC.SymbolicFST.ActionMachine (action)
+import           KMC.SymbolicFST.Backtracking (interp)
 import           KMC.SymbolicFST.Functionalization (functionalize)
 import           KMC.SymbolicFST.OracleMachine (oracle)
 import qualified KMC.SymbolicFST.OutputEquivalence as OutEq
@@ -278,6 +280,19 @@ simulateLockstep _simOpts tu = do
           case runAction $ Mon.mconcat $ map adjActionSem $ acts of
             (_, [b]) -> return $ BB.toLazyByteString b
             (_, _) -> fatal "Malformed action program: non-singleton stack on termination"
+
+simulateBacktrack :: SimulateOptions -> TransducerUnit -> Frontend ExitCode
+simulateBacktrack _simOpts tu = do
+  input <- liftIO $ L.getContents
+  liftIO . L.putStr =<< foldl1 (>=>) (map runFST (tuTransducers tu)) input
+  return ExitSuccess
+  where
+    runFST t inp =
+      case runP' (interp (Mon.mconcat . map adjActionSem) t) (0::Int, inp) of
+        Nothing -> fatal "Reject"
+        Just act -> case runAction act of
+          (_, [b]) -> return $ BB.toLazyByteString b
+          (_, _) -> fatal "Malformed action program: non-singleton stack on termination"
 
 simulateOracleAction :: SimulateOptions -> OracleSSTUnit -> ActionSSTUnit -> Frontend ExitCode
 simulateOracleAction _simOpts ou au = do
