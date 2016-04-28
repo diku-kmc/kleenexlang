@@ -49,7 +49,6 @@ library
                  , KMC.SymbolicFST.Transducer
                  , KMC.SymbolicFST.Functionalization
                  , KMC.SymbolicFST.ActionMachine
-                 , KMC.SymbolicFST.Backtracking
                  , KMC.SSTCompiler
                  , KMC.SSTCompiler.Classes
                  , KMC.SSTCompiler.Env

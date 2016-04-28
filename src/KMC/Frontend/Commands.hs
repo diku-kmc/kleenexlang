@@ -16,7 +16,6 @@ import           KMC.Program.IL (elimIdTables)
 import           KMC.SSTCompiler (compile)
 import qualified KMC.SymbolicFST as FST
 import           KMC.SymbolicFST.ActionMachine (action)
-import           KMC.SymbolicFST.Backtracking (interp)
 import           KMC.SymbolicFST.Functionalization (functionalize)
 import           KMC.SymbolicFST.OracleMachine (oracle)
 import qualified KMC.SymbolicFST.OutputEquivalence as OutEq
@@ -288,7 +287,7 @@ simulateBacktrack _simOpts tu = do
   return ExitSuccess
   where
     runFST t inp =
-      case runP' (interp (Mon.mconcat . map adjActionSem) t) (0::Int, inp) of
+      case runP' (FST.runBacktracking (Mon.mconcat . map adjActionSem) t) (0::Int, inp) of
         Nothing -> fatal "Reject"
         Just act -> case runAction act of
           (_, [b]) -> return $ BB.toLazyByteString b
