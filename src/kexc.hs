@@ -12,6 +12,9 @@ main :: IO ExitCode
 main = runSubcommand
        [ subcommand "compile" compileCmd
        , subcommand "simulate" simulateCmd
+         -- shorthand for the simulate subcommand with implied --quiet and
+         -- --sb=false for the FST simulation types.
+       , subcommand "interpret" interpretCmd
        , subcommand "visualize" visualizeCmd
        ]
 
@@ -19,7 +22,7 @@ checkArgs :: [String] -> IO FilePath
 checkArgs [fp] = return fp
 checkArgs _ = do
   prog <- getProgName
-  putStrLn $ "Usage: " ++ prog ++ " <compile|simulate|visualize> [options] <kleenex_file>"
+  putStrLn $ "Usage: " ++ prog ++ " <compile|simulate|interpret|visualize> [options] <kleenex_file>"
   exitWith $ ExitFailure 1
 
 compileCmd :: MainOptions -> CompileOptions -> [String] -> IO ExitCode
@@ -69,6 +72,18 @@ simulateCmd mainOpts simOpts args = do
             simulateCoder simOpts ou
   when (optReport mainOpts) $ printPhases phases
   return res
+
+interpretCmd :: MainOptions -> SimulateOptions -> [String] -> IO ExitCode
+interpretCmd mainOpts simOpts =
+  simulateCmd
+    (mainOpts { optQuiet = True
+              , optSuppressBits =
+                  if optSimulationType simOpts `elem` [SimLockstepFST ,SimLinearBacktrackingFST] then
+                    False
+                  else
+                    optSuppressBits mainOpts
+              })
+    simOpts
 
 visualizeCmd :: MainOptions -> VisualizeOptions -> [String] -> IO ExitCode
 visualizeCmd mainOpts visOpts args = do

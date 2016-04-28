@@ -45,6 +45,7 @@ data SimulateOptions =
 data SimulationType = SimLockstepFST           -- ^ Straightforward lockstepped FST simulation
                     | SimLinearBacktrackingFST -- ^ Linear-time backtracking FST simulation
                     | SimSST                   -- ^ Streaming SST simulation
+                    deriving (Eq, Ord)
 
 data VisualizeOptions =
    VisualizeOptions
@@ -59,6 +60,7 @@ data VisStage = VisTransducer -- ^ Visualize the generated transducer
               | VisSST        -- ^ Visualize the SST (composed)
               | VisOracleSST  -- ^ Visualize the oracle SST
               | VisActionSST  -- ^ Visualize the action SST
+              deriving (Eq, Ord)
 
 simulationTypeOptionType :: OptionType SimulationType
 simulationTypeOptionType =
