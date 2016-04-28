@@ -57,10 +57,6 @@ mark p i = M.insertWith' S.union p (S.singleton i)
 isMarked :: Name -> Index -> Marks -> Bool
 isMarked p i m = maybe False (S.member i) (M.lookup p m)
 
--- | An input is conceptually just a [sigma], but for performance reasons we
--- maintain an Index to quickly compare input positions.
---type Input sigma = (Index, [sigma])
-
 -- | CPS monad from http://www-ps.informatik.uni-kiel.de/~sebf/data/pub/atps09.pdf
 newtype CPS c a = CPS { (>>-) :: forall b. (a -> c b) -> c b }
 
