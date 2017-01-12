@@ -4,6 +4,7 @@ import           KMC.Frontend.Options
 
 import           KMC.Determinization (SSTFunc)
 import           KMC.Kleenex.Actions
+import           KMC.Kleenex.Approximation
 import           KMC.Kleenex.Desugaring as DS
 import qualified KMC.RangeSet as RS
 import qualified KMC.SymbolicFST.ActionMachine as A
@@ -78,7 +79,7 @@ info' breakLine hang msg = do
       then liftIO $ hPutStr stdout msg >> hFlush stdout
       else liftIO $ hPutStrLn stdout msg
     modify $ \s -> s { fsHangingLine = hang }
-    
+
 info :: String -> Frontend ()
 info = info' True False
 
@@ -101,7 +102,7 @@ fatal msg = do
 --------
 
 data ProgramUnit =
-  ProgramUnit { puProgram :: DS.RProg
+  ProgramUnit { puProgram :: RProgAct
               , puSourceName  :: String
               , puSourceHash  :: String
               }

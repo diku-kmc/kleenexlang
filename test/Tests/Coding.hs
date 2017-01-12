@@ -9,7 +9,7 @@ import           Tests.TestUtils
 
 codingTests :: [TS.Test]
 codingTests =
-    [ simpleTest "prop_coding_bijective" (quickTest prop_coding_bijective) ]
+    [ simpleTest "prop_coding_bijective" (quickTest 20 prop_coding_bijective) ]
 
 prop_coding_bijective :: Property
 prop_coding_bijective = forAll (elements [2..32]) $ \base x ->
