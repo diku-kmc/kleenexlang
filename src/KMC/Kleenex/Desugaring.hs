@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Desugaring(desugarProg,desugarRegex,RTerm,RProg) where
+module KMC.Kleenex.Desugaring(desugarProg,desugarRegex) where
 
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -13,21 +13,17 @@ import qualified Data.List as L
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Approximation
 import           KMC.Kleenex.Core
-import qualified KMC.Kleenex.Syntax as S
-import           KMC.Kleenex.Syntax hiding (RTerm, RProg)
+import           KMC.Kleenex.Syntax
 import qualified KMC.RangeSet as RS
 import qualified KMC.Syntax.External as E
 import           KMC.Util.UTF8
-
-type RTerm = S.RTerm Word8 (Either Word8 RegAction)
-type RProg = S.RProg Word8 (Either Word8 RegAction)
 
 -------------------
 -- Desugaring monad
 -------------------
 
-data DesugarState = DS { dsDecls    :: M.Map RIdent RTerm
-                       , dsRevDecls :: M.Map RTerm RIdent
+data DesugarState = DS { dsDecls    :: M.Map RIdent RTermAct
+                       , dsRevDecls :: M.Map RTermAct RIdent
                        , dsFresh    :: RIdent
                        , dsApprox   :: [(RIdent, RIdent, Int)]
                        }
@@ -42,7 +38,7 @@ getFresh = do
   modify $ \ds -> ds { dsFresh = dsFresh ds + 1 }
   return i
 
-insertDecl :: MonadState DesugarState m => RIdent -> RTerm -> m RIdent
+insertDecl :: MonadState DesugarState m => RIdent -> RTermAct -> m RIdent
 insertDecl i t = do modify $ \ds -> ds { dsDecls    = M.insert i t (dsDecls ds)
                                        , dsRevDecls = M.insert t i (dsRevDecls ds)
                                        }
@@ -50,11 +46,11 @@ insertDecl i t = do modify $ \ds -> ds { dsDecls    = M.insert i t (dsDecls ds)
 
 insertApproxDecl :: MonadState DesugarState m => RIdent -> RIdent -> Int -> m RIdent
 insertApproxDecl i1 i2 k = do
-  _ <- insertDecl i2 $ S.RSeq [i1]
+  _ <- insertDecl i2 $ RSeq [i1]
   modify $ \ds -> ds { dsApprox = (i1,i2,k):(dsApprox ds) }
   return i2
 
-decl :: MonadState DesugarState m => RTerm -> m RIdent
+decl :: MonadState DesugarState m => RTermAct -> m RIdent
 decl t = do
   rds <- gets dsRevDecls
   case M.lookup t rds of
@@ -173,7 +169,6 @@ desugarTerm out t =
                             [ipush, ipop] <- mapM (decl . RConst . Right) [Push, Pop r]
                             decl $ RSeq [ipush,it,ipop]
   TermInfo _ t1       -> desugarTerm out t1
-  InlineCode bs       -> decl $ RCode bs
   where
     flattenSeq (Seq t1 t2) = flattenSeq t1 ++ flattenSeq t2
     flattenSeq t'          = [t']
@@ -183,9 +178,9 @@ desugarTerm out t =
     dsUpdateSym (Right bs) = map Left $ BS.unpack bs
 
 
-desugarProg :: (Show i) => Prog i -> ApproxMetric -> ApproxMode -> Bool -> RProg
+desugarProg :: (Show i) => Prog i -> ApproxMetric -> ApproxMode -> Bool -> RProgAct
 desugarProg prog m mode ite =
-  S.RProg { rprogPipeline = [ lu ident | ident <- progPipeline prog ]
+  RProg { rprogPipeline = [ lu ident | ident <- progPipeline prog ]
           , rprogDecls    = applyApproximation ds m mode ite
           }
   where
@@ -212,19 +207,19 @@ desugarProg prog m mode ite =
     lu ident = maybe (error $ "identifier in pipeline with no declaration: " ++ fromIdent ident) id
                      (M.lookup (ident, True) identMap)
 
-applyApproximation :: DesugarState -> ApproxMetric -> ApproxMode -> Bool -> M.Map RIdent RTerm
+applyApproximation :: DesugarState -> ApproxMetric -> ApproxMode -> Bool -> M.Map RIdent RTermAct
 applyApproximation ds m mode ite = fst $ foldl go (dsDecls ds, dsFresh ds) $ dsApprox ds
   where
     applyOnce decls pl k c = rprogDecls $
-      (if ite then approxProgIt else approxProg) (stdToCore (S.RProg [pl] decls)) k c m mode
-    addApproxStms dold c i dnew = (M.insert i (S.RSeq [c]) (M.union dold dnew) , c + M.size dnew)
+      (if ite then approxProgIt else approxProg) (stdToCore (RProg [pl] decls)) k c m mode
+    addApproxStms dold c i dnew = (M.insert i (RSeq [c]) (M.union dold dnew) , c + M.size dnew)
     approxIds = map (\(_,i,_) -> i) $ dsApprox ds
     go (decls,c) (i1,i2,k) = if k < 1 then (decls,c) else
       if null (L.intersect approxIds (calculateReach i1 decls []))
       then addApproxStms decls c i2 (applyOnce decls i1 k c)
       else error "Approximated sub-programs cannot contain approximation terms"
 
-calculateReach :: RIdent -> M.Map RIdent RTerm -> [RIdent] -> [RIdent]
+calculateReach :: RIdent -> M.Map RIdent RTermAct -> [RIdent] -> [RIdent]
 calculateReach r terms rs =
   case M.findWithDefault (RSeq []) r terms of
     RSum ids -> foldl go rs ids
@@ -234,9 +229,9 @@ calculateReach r terms rs =
     go rs' r' = if (elem r' rs') then rs
                 else calculateReach r' terms (r':rs')
 
-desugarRegex :: E.Regex -> RProg
+desugarRegex :: E.Regex -> RProgAct
 desugarRegex re =
-  S.RProg { rprogPipeline = [ initIdent ]
+  RProg { rprogPipeline = [ initIdent ]
           , rprogDecls    = dsDecls ds
           }
   where

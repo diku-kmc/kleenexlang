@@ -16,7 +16,6 @@ import           KMC.Determinization
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.ApproximationMetrics
 import           KMC.Kleenex.Desugaring (desugarProg)
-import qualified KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser (parseKleenex)
 import           KMC.Kleenex.Syntax
 import           KMC.RangeSet
@@ -131,7 +130,7 @@ ds := ~/d/{2,3} "yep d" | ~/d*/ "nope d"
 kleenexIdTest :: String -> String -> IO TS.Result
 kleenexIdTest prog str = kleenexIOTest prog [(str, str)]
 
-kleenexDesugarProg :: String -> (String -> IO a) -> (DS.RProg -> IO a) -> IO a
+kleenexDesugarProg :: String -> (String -> IO a) -> (RProgAct -> IO a) -> IO a
 kleenexDesugarProg prog kfail kret = case parseKleenex "verbatim" prog of
     Left err -> kfail (show err)
     Right p  -> kret (desugarProg p LCS Correction False)
