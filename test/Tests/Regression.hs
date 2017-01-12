@@ -14,6 +14,7 @@ import qualified Distribution.TestSuite as TS
 
 import           KMC.Determinization
 import           KMC.Kleenex.Actions
+import           KMC.Kleenex.ApproximationMetrics
 import           KMC.Kleenex.Desugaring (desugarProg)
 import qualified KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser (parseKleenex)
@@ -133,7 +134,7 @@ kleenexIdTest prog str = kleenexIOTest prog [(str, str)]
 kleenexDesugarProg :: String -> (String -> IO a) -> (DS.RProg -> IO a) -> IO a
 kleenexDesugarProg prog kfail kret = case parseKleenex "verbatim" prog of
     Left err -> kfail (show err)
-    Right p  -> kret (desugarProg p)
+    Right p  -> kret (desugarProg p LCS Correction False)
 
 kleenexIOTest :: String -> [(String, String)] -> IO TS.Result
 kleenexIOTest prog cases =

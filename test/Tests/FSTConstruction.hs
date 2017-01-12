@@ -5,7 +5,7 @@ import Data.Word
 import Debug.Trace
 import KMC.Visualization
 import KMC.SSTConstruction hiding (Var)
-import KMC.FSTConstruction 
+import KMC.FSTConstruction
 
 s1 :: String
 s1 =  [strQ|
@@ -40,7 +40,7 @@ sm1 = either (error "sm1") head $ testSimple s1
 mu2 = either (error "mu2") head $ testKleenex s2
 mu3 = either (error "mu3") head $ testKleenex s3
 mu4 = either (error "mu4") head $ testKleenex s4
-      
+
 f1 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
 f1 = fromMu (fst mu1)
 
@@ -62,8 +62,8 @@ f4 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
 f4 = fromMu (fst mu4)
 g4 :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
 g4 = fromMuWithDFA (snd mu4) (fst mu4)
-     
-          
+
+
 
 viz :: FST Int (RangeSet Word8) (WithNull KleenexOutTerm)
     -> FilePath -> IO ()
