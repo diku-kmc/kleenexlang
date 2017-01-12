@@ -36,6 +36,7 @@ library
                      , text >= 1.1.0.0
                      , time >= 1.4.2
                      , transformers >= 0.4
+                     , unordered-containers >= 0.2.7
   exposed-modules: KMC.Determinization
                  , KMC.SymbolicSST
                  , KMC.SymbolicSST.ActionSST
@@ -60,6 +61,9 @@ library
                  , KMC.Util.Bits
                  , KMC.Util.Set
                  , KMC.Backtracking
+                 , KMC.Kleenex.Approximation
+                 , KMC.Kleenex.ApproximationMetrics
+                 , KMC.Kleenex.Core
                  , KMC.Kleenex.WellFormedness
                  , KMC.Kleenex.Syntax
                  , KMC.Kleenex.Desugaring

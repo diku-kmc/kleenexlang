@@ -11,6 +11,8 @@ import           KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser
 import           KMC.Kleenex.Syntax
 import qualified KMC.Kleenex.WellFormedness as WF
+import           KMC.Kleenex.Approximation
+import           KMC.Kleenex.ApproximationMetrics
 import           KMC.Program.Backends.C (compileProgram)
 import           KMC.Program.IL (elimIdTables)
 import           KMC.SSTCompiler (compile)
@@ -55,6 +57,7 @@ createProgram arg = do
             Left err -> fatal $ WF.prettyPrintError err
             Right _metaData ->
               return ProgramUnit { puProgram = desugarProg ast
+                                   (optApproxMetric mainOpts) (optApproxMode mainOpts) (optIte mainOpts)
                                  , puSourceName = arg
                                  , puSourceHash = md5s (Str kleenexSrc)
                                  }

@@ -9,7 +9,10 @@ import           Data.Char (ord)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import           Data.Word
+import qualified Data.List as L
 import           KMC.Kleenex.Actions
+import           KMC.Kleenex.Approximation
+import           KMC.Kleenex.Core
 import qualified KMC.Kleenex.Syntax as S
 import           KMC.Kleenex.Syntax hiding (RTerm, RProg)
 import qualified KMC.RangeSet as RS
@@ -25,7 +28,8 @@ type RProg = S.RProg Word8 (Either Word8 RegAction)
 
 data DesugarState = DS { dsDecls    :: M.Map RIdent RTerm
                        , dsRevDecls :: M.Map RTerm RIdent
-                       , dsFresh    :: RIdent 
+                       , dsFresh    :: RIdent
+                       , dsApprox   :: [(RIdent, RIdent, Int)]
                        }
 
 data DesugarContext = DC { dcIdents   :: M.Map (Ident, Bool) RIdent }
@@ -43,6 +47,12 @@ insertDecl i t = do modify $ \ds -> ds { dsDecls    = M.insert i t (dsDecls ds)
                                        , dsRevDecls = M.insert t i (dsRevDecls ds)
                                        }
                     return i
+
+insertApproxDecl :: MonadState DesugarState m => RIdent -> RIdent -> Int -> m RIdent
+insertApproxDecl i1 i2 k = do
+  _ <- insertDecl i2 $ S.RSeq [i1]
+  modify $ \ds -> ds { dsApprox = (i1,i2,k):(dsApprox ds) }
+  return i2
 
 decl :: MonadState DesugarState m => RTerm -> m RIdent
 decl t = do
@@ -138,6 +148,10 @@ desugarTerm out t =
   (Question t1) -> do it <- desugarTerm out t1
                       ieps <- decl $ RSeq []
                       decl $ RSum [it, ieps]
+  (Approx e t1)  -> if not out then desugarTerm out t1 else
+                      do i1 <- desugarTerm out t1
+                         i2 <- getFresh
+                         insertApproxDecl i1 i2 e
   (Range m' n' t1) -> do it <- desugarTerm out t1
                          let m = fromMaybe 0 m'
                          case n' of
@@ -159,6 +173,7 @@ desugarTerm out t =
                             [ipush, ipop] <- mapM (decl . RConst . Right) [Push, Pop r]
                             decl $ RSeq [ipush,it,ipop]
   TermInfo _ t1       -> desugarTerm out t1
+  InlineCode bs       -> decl $ RCode bs
   where
     flattenSeq (Seq t1 t2) = flattenSeq t1 ++ flattenSeq t2
     flattenSeq t'          = [t']
@@ -168,16 +183,16 @@ desugarTerm out t =
     dsUpdateSym (Right bs) = map Left $ BS.unpack bs
 
 
-desugarProg :: Prog i -> RProg
-desugarProg prog =
+desugarProg :: (Show i) => Prog i -> ApproxMetric -> ApproxMode -> Bool -> RProg
+desugarProg prog m mode ite =
   S.RProg { rprogPipeline = [ lu ident | ident <- progPipeline prog ]
-          , rprogDecls    = dsDecls ds
+          , rprogDecls    = applyApproximation ds m mode ite
           }
   where
     ds        = execState (runReaderT (go (progDecls prog)) initDC) initDS
     identMap  = M.fromList $ zip [ (declIdent d, out) | d <- progDecls prog, out <- [True, False] ] [0..]
     nextFresh = M.size identMap + 1
-    initDS    = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = nextFresh }
+    initDS    = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = nextFresh, dsApprox = []}
     initDC    = DC { dcIdents = identMap }
 
     declIdent (Decl ident _) = ident
@@ -197,6 +212,28 @@ desugarProg prog =
     lu ident = maybe (error $ "identifier in pipeline with no declaration: " ++ fromIdent ident) id
                      (M.lookup (ident, True) identMap)
 
+applyApproximation :: DesugarState -> ApproxMetric -> ApproxMode -> Bool -> M.Map RIdent RTerm
+applyApproximation ds m mode ite = fst $ foldl go (dsDecls ds, dsFresh ds) $ dsApprox ds
+  where
+    applyOnce decls pl k c = rprogDecls $
+      (if ite then approxProgIt else approxProg) (stdToCore (S.RProg [pl] decls)) k c m mode
+    addApproxStms dold c i dnew = (M.insert i (S.RSeq [c]) (M.union dold dnew) , c + M.size dnew)
+    approxIds = map (\(_,i,_) -> i) $ dsApprox ds
+    go (decls,c) (i1,i2,k) = if k < 1 then (decls,c) else
+      if null (L.intersect approxIds (calculateReach i1 decls []))
+      then addApproxStms decls c i2 (applyOnce decls i1 k c)
+      else error "Approximated sub-programs cannot contain approximation terms"
+
+calculateReach :: RIdent -> M.Map RIdent RTerm -> [RIdent] -> [RIdent]
+calculateReach r terms rs =
+  case M.findWithDefault (RSeq []) r terms of
+    RSum ids -> foldl go rs ids
+    RSeq ids -> foldl go rs ids
+    _        -> rs
+  where
+    go rs' r' = if (elem r' rs') then rs
+                else calculateReach r' terms (r':rs')
+
 desugarRegex :: E.Regex -> RProg
 desugarRegex re =
   S.RProg { rprogPipeline = [ initIdent ]
@@ -205,4 +242,4 @@ desugarRegex re =
   where
     (initIdent, ds) = runState (runReaderT (desugarRE True re) initDC) initDS
     initDC = DC { dcIdents = M.empty }
-    initDS = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = 0 }
+    initDS = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = 0, dsApprox = [] }
