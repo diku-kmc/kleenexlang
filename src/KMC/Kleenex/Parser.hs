@@ -54,6 +54,9 @@ parens = between (symbol "(") (symbol ")")
 brackets :: Parser a -> Parser a
 brackets = between (symbol "[") (symbol "]")
 
+angles :: Parser a -> Parser a
+angles = between (symbol "<") (symbol ">")
+
 -- | An identifier is one or more alphanumeric symbols, first symbol cannot be a number
 identifier :: Parser String
 identifier = (:) <$> letter <*> many (alphaNum <|> oneOf "_-")
@@ -160,6 +163,7 @@ termP = buildExpressionParser table atomP
             (termPos1 (choice [ Star     <$ symbol "*"
                               , Question <$ symbol "?"
                               , Plus     <$ symbol "+"
+                              , Approx   <$> angles integer
                               , rangeP
                               ] <?> "repetition operator"))
         ]

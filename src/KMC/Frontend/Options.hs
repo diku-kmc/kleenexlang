@@ -13,6 +13,7 @@ module KMC.Frontend.Options
 import Control.Applicative
 import Data.List (intercalate)
 import KMC.Program.Backends.C (CType(..))
+import KMC.Kleenex.ApproximationMetrics
 import Options
 import Prelude
 
@@ -26,6 +27,9 @@ data MainOptions =
     , optExpressionArg    :: Bool -- ^ Treat input as RE, generate bit-coder
     , optActionEnabled    :: Bool -- ^ Decompose into oracle/action
     , optSuppressBits     :: Bool -- ^ Don't generate bitcodes that can be safely suppressed
+    , optIte              :: Bool -- ^ Use iterative approximation
+    , optApproxMetric     :: ApproxMetric -- ^ The metric used for approximation
+    , optApproxMode       :: ApproxMode -- ^ Output mode for approximate matching
     }
 
 data CompileOptions =
@@ -102,6 +106,33 @@ visStageOptionType =
                       VisOracleSST  -> "oraclesst"
                       VisActionSST  -> "actionsst")
 
+approxMetricOptionType :: OptionType ApproxMetric
+approxMetricOptionType =
+  optionType "LCS|Hamming|Levenshtein"
+             LCS (\s -> case s of
+                          "LCS" -> Right LCS
+                          "Hamming" -> Right Hamming
+                          "Levenshtein" -> Right Levenshtein
+                          _ -> Left $ "\"" ++ s ++ "\" is not a valid approximation type")
+                  (\t -> case t of
+                          LCS -> "LCS"
+                          Hamming -> "Hamming"
+                          Levenshtein -> "Levenshtein")
+
+approxModeOptionType :: OptionType ApproxMode
+approxModeOptionType =
+  optionType "correction|matching|explicit"
+    Correction
+    (\s -> case s of
+             "correction" -> Right Correction
+             "matching"   -> Right Matching
+             "explicit"   -> Right Explicit
+             _ -> Left $ "\"" ++ s ++ "\" is not a valid approximation mode")
+    (\t -> case t of
+             Correction   -> "correction"
+             Matching     -> "matching"
+             Explicit     -> "explicit")
+
 ctypeOptionType :: OptionType CType
 ctypeOptionType =
   optionType "8|16|32|64"
@@ -129,6 +160,17 @@ instance Options MainOptions where
       <*> simpleOption "re" False "Treat argument as a verbatim regular expression (generate bit-coder)"
       <*> simpleOption "act" True "Enable actions in the language"
       <*> simpleOption "sb"  True "Avoid generating bits for suppressed terms whenever safe"
+      <*> simpleOption "ite" False "Use iterative approximation"
+      <*> defineOption approxMetricOptionType
+                (\o -> o { optionLongFlags = ["metric"]
+                         , optionDefault = LCS
+                         , optionDescription = "Error metric used for approximation"
+                         })
+      <*> defineOption approxModeOptionType
+                (\o -> o { optionLongFlags = ["approxmode"]
+                         , optionDefault = Correction
+                         , optionDescription = "Output mode when doing approximate matching"
+                         })
 
 instance Options CompileOptions where
     defineOptions =
