@@ -1,6 +1,8 @@
-resolver: lts-5.10
+resolver: lts-7.18
 packages:
   - 'regexps-syntax'
   - '.'
+nix:
+    packages: [gcc]
 # extra-deps:
 #   - 'graphviz-2999.18.0.1'
