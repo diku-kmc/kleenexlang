@@ -102,7 +102,7 @@ void init_outbuf_stack()
 
 void printCompilationInfo();
 void init();
-void match(int phase);
+void match(int phase, int start_state);
 
 void buf_flush(buffer_t *buf)
 {
@@ -353,12 +353,12 @@ void init_outbuf()
   init_outbuf_stack();
 }
 
-void run(int phase)
+void run(int phase, int start_state)
 {
   init_outbuf();
   init();
 
-  match(phase);
+  match(phase, start_state);
 
   flush_outbuf();
 }
@@ -366,6 +366,7 @@ void run(int phase)
 #ifndef FLAG_NOMAIN
 static struct option long_options[] = {
     { "phase", required_argument, 0, 'p' },
+    { "state", required_argument, 0, 's' },
     { 0, 0, 0, 0 }
 };
 
@@ -375,9 +376,10 @@ int main(int argc, char *argv[])
   int c;
   int option_index = 0;
   int phase;
+  int start_state = -1;
   bool do_phase = false;
 
-  while ((c = getopt_long (argc, argv, "ihtp:", long_options, &option_index)) != -1)
+  while ((c = getopt_long (argc, argv, "ihtps:", long_options, &option_index)) != -1)
   {
     switch (c)
     {
@@ -386,6 +388,9 @@ int main(int argc, char *argv[])
         return RETC_PRINT_INFO;
       case 't':
         do_timing = true;
+        break;
+      case 's':
+        start_state = atoi(optarg);
         break;
       case 'p':
         phase = atoi(optarg);
@@ -407,7 +412,7 @@ int main(int argc, char *argv[])
 
   if (do_phase)
   {
-    run(phase);
+    run(phase, start_state);
   }
   else
   {
@@ -434,11 +439,8 @@ int main(int argc, char *argv[])
         close(orig_stdout);
         close(pipes[i-1][READ_FD]);
 
-        // Should use snprintf, but I assume something else will break before we hit 10^19 phases.
-        char phase[20] = {0};
-        sprintf(phase, "%d", i);
-        char *args[] = { argv[0], "--phase", phase, 0 };
-        return main(3, args);
+        run(i, start_state);
+        return 0;
       }
 
       close(STDIN_FILENO);
@@ -451,7 +453,7 @@ int main(int argc, char *argv[])
     #endif
 
     // Run last phase in-process
-    run(NUM_PHASES);
+    run(NUM_PHASES, start_state);
   }
 
   if (do_timing)

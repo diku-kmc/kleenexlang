@@ -1,6 +1,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 
 module KMC.Program.Backends.C where
 
@@ -55,10 +57,10 @@ void init()
 |]++initString ++[strQ|
 }
 |]++concat (zipWith matchTemplate progStrings [1..])++[strQ|
-void match(int phase)
+void match(int phase, int start_state)
 {
   switch(phase) {
-    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(); break;"
+    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(phase, start_state); break;"
                          | i <- [1..(length progStrings)] ]++
     [strQ|
     default:
@@ -69,14 +71,14 @@ void match(int phase)
 |]
 
 matchTemplate :: String -> Int -> String
-matchTemplate progString n = [strQ|void match|] ++ show n ++ [strQ|()
+matchTemplate progString n = [strQ|void match|] ++ show n ++ [strQ|(int phase, int start_state)
 {
   int i = 0;
 |]++progString++[strQ|
   accept|]++show n++[strQ|:
     return;
   fail|]++show n++[strQ|:
-    fprintf(stderr, "Match error at input symbol %zu!\n", count);
+    fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", count, next[0]);
     exit(1);
 }
 |]
@@ -97,6 +99,7 @@ data CProg =
   , cProg         :: [Doc]
   , cInit         :: Doc
   , cBufferUnit   :: Doc
+  , cJumptable    :: Doc
   }
 
 -- | The number of bits each C type can hold
@@ -272,7 +275,7 @@ prettyInstr buftype tbltype prog instr phase =
   case instr of
     AcceptI            -> text "goto accept" <> int phase <> semi
     FailI              -> text "goto fail" <> int phase <> semi
-    AppendI bid constid -> 
+    AppendI bid constid ->
       let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
       in if bid == streamBuf then
              text "outputarray"
@@ -482,14 +485,45 @@ prettyInit progs =
   where
     bufferInit bid = text "init_buffer" <> parens (buf bid) <> semi
 
-prettyProg :: CType -> CType -> Program -> Int -> Doc
-prettyProg buftype tbltype prog phase =
-  text "goto" <+> blck (progInitBlock prog) phase <> semi
+prettyProg :: Pipeline -> CType -> CType -> Program -> Int -> Doc
+prettyProg pipeline buftype tbltype prog phase =
+     text "if (start_state < 0) goto" <+> blck (progInitBlock prog) phase <> semi
+  $$ prettyJumptable pipeline
   $$ vcat (map pblock (M.toList $ progBlocks prog))
   where
     pblock (blid, is) =
       blck blid phase <>  char ':'
                       <+> prettyBlock buftype tbltype prog is phase
+
+prettyJumptable :: Pipeline -> Doc
+prettyJumptable progs =
+  vcat [ text "switch" <+> parens (text "phase") <+> lbrace
+       , nest 2 $ vcat (map switchPhase [1..pipelineLength])
+       , rbrace
+       ]
+  where
+    pipelineLength = case progs of
+      Left xs  -> length @[] xs
+      Right xs -> length @[] xs
+    blockids = listBlockIds progs
+    switchPhase phase =
+         text "case" <+> int phase <> colon
+      $$ text "switch" <+> parens (text "start_state")
+      $$ lbrace
+      $$ vcat (map (switchState phase) (blockids !! (phase-1)))
+      $$ rbrace
+    switchState phase state =
+         text "case" <+> (int $ getBlockId state) <> colon
+      $$ text "goto" <+> blck state phase <> semi
+
+
+listBlockIds :: Pipeline -> [[BlockId]]
+listBlockIds pipeline = case pipeline of
+    Left  progs -> map (M.keys . progBlocks) progs
+    Right progs -> map (M.keys . progBlocks) . unpack $ progs
+  where
+    unpack [] = []
+    unpack ((a,b):xs) = [a,b] ++ unpack xs
 
 programsToC :: CType -> Pipeline -> CProg
 programsToC buftype pipeline =
@@ -500,13 +534,14 @@ programsToC buftype pipeline =
   , cInit         = prettyInit pipeline
   , cProg         = prettyProgs
   , cBufferUnit   = ctyp buftype
+  , cJumptable    = prettyJumptable pipeline
   }
   where
     tbltype = UInt8T
     prettyProgs = case pipeline of
-                    Left progs  -> zipWith (prettyProg buftype tbltype) progs [1..]
+                    Left progs  -> zipWith (prettyProg pipeline buftype tbltype) progs [1..]
                     Right progs -> concat $ zipWith combine progs [1,3..]
-    combine (p,a) i = [prettyProg buftype tbltype p i, prettyProg buftype tbltype a (i+1)]
+    combine (p,a) i = [prettyProg pipeline buftype tbltype p i, prettyProg pipeline buftype tbltype a (i+1)]
 
 renderCProg :: String -> CProg -> String
 renderCProg compInfo cprog =
