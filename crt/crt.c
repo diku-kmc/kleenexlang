@@ -379,7 +379,7 @@ int main(int argc, char *argv[])
   int start_state = -1;
   bool do_phase = false;
 
-  while ((c = getopt_long (argc, argv, "ihtps:", long_options, &option_index)) != -1)
+  while ((c = getopt_long (argc, argv, "ihtp:s:", long_options, &option_index)) != -1)
   {
     switch (c)
     {
