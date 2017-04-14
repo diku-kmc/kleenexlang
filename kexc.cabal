@@ -70,6 +70,7 @@ library
                  , KMC.Program.IL
                  , KMC.Theories
                  , KMC.Visualization
+                 , KMC.Simulization
 
 executable kexc
   default-extensions: TemplateHaskell

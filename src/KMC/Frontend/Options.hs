@@ -3,6 +3,7 @@ module KMC.Frontend.Options
        ,CompileOptions(..)
        ,SimulateOptions(..)
        ,VisualizeOptions(..)
+       ,SimulOptions(..)
        ,SimulationType(..)
        ,VisStage(..)
        ,prettyOptions
@@ -61,6 +62,11 @@ data VisStage = VisTransducer -- ^ Visualize the generated transducer
               | VisOracleSST  -- ^ Visualize the oracle SST
               | VisActionSST  -- ^ Visualize the action SST
               deriving (Eq, Ord)
+
+data SimulOptions =
+   SimulOptions
+   { optSimOut   :: Maybe FilePath }
+
 
 simulationTypeOptionType :: OptionType SimulationType
 simulationTypeOptionType =
@@ -157,6 +163,11 @@ instance Options VisualizeOptions where
         <*> simpleOption "visphase" 0 "Which stage in the pipeline to visualize (starting from 0)"
         <*> simpleOption "visout" Nothing ("Save visualization to file (determine type from extension). "
                                            ++ "If not set, attempt to show visualization in window.")
+
+instance Options SimulOptions where
+    defineOptions =
+        SimulOptions
+        <$> simpleOption "out" Nothing ("Save CSV to file")
 
 prettyOptions :: MainOptions -> CompileOptions -> String
 prettyOptions mainOpts compileOpts = intercalate "\\n"

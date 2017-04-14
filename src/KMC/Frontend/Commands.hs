@@ -23,6 +23,7 @@ import           KMC.SymbolicFST.Transducer (constructTransducer, projectTransdu
 import qualified KMC.SymbolicSST as SST
 import qualified KMC.SymbolicSST.ActionSST as ASST
 import           KMC.Visualization (fstToDot, sstToDot, graphSize)
+import           KMC.Simulization
 
 import           Control.Monad.Reader
 import qualified Data.ByteString as B
@@ -372,6 +373,19 @@ visualize visOpts pu = do
                  ".svgz" -> Just GC.SvgZ
                  _ -> Nothing
 
+
+simul :: SimulOptions -> ProgramUnit -> Frontend (IO ExitCode)
+simul sOpts pu = do
+  let prog = puProgram pu
+  let pu' = pu { puProgram = prog { rprogPipeline = [rprogPipeline prog !! 0] } }
+  tu <- buildTransducers pu'
+  let csv = nfstToCsv $ fstToNFST (head $ tuTransducers tu)
+  --_ <- measure "aoeu" $ liftIO $ print (head $ tuTransducers tu)
+  case optSimOut sOpts of
+    Just fp -> do
+                    _ <- measure "CSV aoeu" $ liftIO $ writeFile fp csv
+                    return $ return ExitSuccess
+    Nothing -> return $ return ExitSuccess
 
 --------------------
 -- Utility functions
