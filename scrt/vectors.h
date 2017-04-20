@@ -196,9 +196,8 @@ void cvector_remove(char_vector* vec, int ind) {
 // Concatenates two vectors in to one, and frees the remaining vector.
 void cvector_concat(char_vector* vec1, char_vector* vec2) {
     cvector_grow(vec1, vec1->len + vec2->len);
-    memcpy(vec1->data + (vec1->len - 1), vec2->data, (vec2->len) * sizeof(char));
+    memcpy(vec1->data + (vec1->len), vec2->data, (vec2->len) * sizeof(char));
     vec1->len += vec2->len;
-    cvector_free(vec2);
 }
 
 void cvector_prepend(char_vector* vec1, char_vector* vec2) {

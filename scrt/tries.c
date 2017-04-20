@@ -33,8 +33,16 @@ state* parse(char* fp, int* l, int* ss) {
                         nfst[ind] .skip.target = t1;
                         switch (tmp2) {
                             // Writing skip state
-                            case 'W':   if (fscanf(fd, " %i\n", &t2) != 1) exit(3);
-                                        nfst[ind] .skip.output = (char) t2;
+                            case 'W':   if (fscanf(fd, " %i [", &t2) != 1) exit(3);
+                                        char_vector* output = cvector_create();
+                                        char tmp3;
+                                        for (int i = 0; i < t2-1; ++i) {
+                                            if (fscanf(fd, "%i,", &tmp3) != 1) exit(3);
+                                            cvector_append(output, tmp3);
+                                        }
+                                        if (fscanf(fd, "%i]\n", &tmp3) != 1) exit(3);
+                                        cvector_append(output, tmp3);
+                                        nfst[ind] .skip.output = output;
                                         break;
                             // No output state
                             case 'E':   if (fscanf(fd, "\n", &tmp2) != 0) exit(3);
@@ -167,7 +175,7 @@ int follow_ep(state* nfst, node* n, node_vector* leafs, int j) {
                      }
         case SKIP: {
             if (st.skip.output != '\0') {
-                cvector_append(n->valuation, st.skip.output);
+                cvector_concat(n->valuation, st.skip.output);
             }
             n->node_ind = st.skip.target;
             return follow_ep(nfst, n, leafs, j);

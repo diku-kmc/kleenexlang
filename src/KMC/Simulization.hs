@@ -16,7 +16,7 @@ import           KMC.RangeSet
 
 
 data Out =
-  Sym Word8
+  Sym [Word8]
   | Reg RegAction
   | Empty
   deriving (Show)
@@ -39,12 +39,12 @@ convState :: Tr -> Int -> IState
 convState fst' k = let i = fromEnum k in
   case M.lookup k (eForward (fstE fst')) of
     Just ((p, CopyArg, t) : _) -> (i, Symbol t (ranges p) (Nothing))
-    Just ((p, CopyConst (Left w : _), t) : _) -> (i, Symbol t (ranges p) (Just (Sym w)))
+    Just ((p, CopyConst (Left w : _), t) : _) -> (i, Symbol t (ranges p) (Just (Sym [w])))
     Just ((p, CopyConst (Right r : _), t) : _) -> (i, Symbol t (ranges p) (Just (Reg r)))
     Just ((p, CopyConst [], t) : _) -> (i, Symbol t (ranges p) (Just Empty))
     Just []              -> error "No edges for state"
     Nothing -> case M.lookup k (eForwardEpsilon (fstE fst')) of
-      Just (((Left w : _), t) : [])  -> (i, Skip t (Sym w))
+      Just (((Left w : _), t) : [])  -> (i, Skip t (Sym [w]))
       Just (((Right r : _), t) : []) -> (i, Skip t (Reg r))
       Just (([], t) : [])            -> (i, Skip t Empty)
       Just ((_, t1) : (_, t2) : _)   -> (i, Choice t1 t2)
@@ -65,13 +65,13 @@ stToString (i, st) =
     Choice t1 t2 -> printf "%i C %i %i\n" i t1 t2
     Skip t a       -> let pe = printf "%i S %i " i t in
                         case a of
-                            (Sym w) -> pe ++ (printf "W %i\n" w)
+                            (Sym w) -> pe ++ (printf "W %i %s\n" (length w) (show w))
                             (Reg r) -> pe ++ (printf "R %s\n" (show r))
                             Empty   -> pe ++ "E\n"
     Symbol t p a -> let pe = printf "%i R %i %i %s " i t (length p) (show p) in
                         case a of
                             Nothing -> pe ++ "C\n"
-                            (Just (Sym w)) -> pe ++ (printf "W %i\n" w)
+                            (Just (Sym w)) -> pe ++ (printf "W %i %s\n" (length w) (show w))
                             (Just (Reg r)) -> pe ++ (printf "R %s\n" (show r))
                             (Just Empty)   -> pe ++ "E\n"
     Accept       -> printf "%i A\n" i
