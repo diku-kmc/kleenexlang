@@ -1,0 +1,43 @@
+// IN:
+// IN:a
+// IN:aa
+// IN:aaa
+// IN:aaaa
+// IN:b
+// IN:bb
+// IN:bbb
+// IN:bbbb
+// IN:c
+// IN:cc
+// IN:ccc
+// IN:cccc
+// IN:d
+// IN:dd
+// IN:ddd
+// IN:dddd
+// OUT:nope a
+// OUT:nope a
+// OUT:nope a
+// OUT:yep a
+// OUT:nope a
+// OUT:nope b
+// OUT:yep b
+// OUT:yep b
+// OUT:yep b
+// OUT:yep c
+// OUT:yep c
+// OUT:yep c
+// OUT:nope c
+// OUT:nope d
+// OUT:yep d
+// OUT:yep d
+// OUT:nope d
+
+main := (test /\n/)*
+
+test := as | bs | cs | ds
+
+as := ~/a/{3} "yep a" | ~/a*/ "nope a"
+bs := ~/b/{2,} "yep b" | ~/b*/ "nope b"
+cs := ~/c/{,3} "yep c" | ~/c*/ "nope c"
+ds := ~/d/{2,3} "yep d" | ~/d*/ "nope d"
