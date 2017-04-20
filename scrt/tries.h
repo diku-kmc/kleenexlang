@@ -35,8 +35,7 @@ typedef struct choice_s {
 // Assumes that output is not '\0'.
 typedef struct skip_s {
     int target;
-    char* output;
-    int olen;
+    char output;
 } skip_s;
 
 // Symbol state.
@@ -44,8 +43,7 @@ typedef struct skip_s {
 typedef struct symbol_s {
     int target;
     int ilen;
-    char* output;
-    int olen;
+    char output;
     rangeset* input;
 } symbol_s;
 
