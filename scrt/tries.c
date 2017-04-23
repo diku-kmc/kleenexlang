@@ -75,6 +75,36 @@ state* parse(char* fp, int* l, int* ss) {
     return nfst;
 }
 
+void vis_tree(node* n, FILE* fd) {
+    if (n->lchild != NULL) {
+        n->valuation->data[n->valuation->len] = '\0';
+        fprintf(fd, "%i [shape=circle, label=\"%i\\n%i\\nData:\"];\n",
+                n,
+                n->node_ind,
+                n->valuation->len,
+                n->valuation->data);
+        fprintf(fd, "%i -> %i;\n", n, n->lchild);
+        if (n->rchild != NULL) fprintf(fd, "%i -> %i;\n", n, n->rchild);
+        vis_tree(n->lchild, fd);
+        vis_tree(n->rchild, fd);
+    } else {
+        n->valuation->data[n->valuation->len] = '\0';
+        fprintf(fd, "%i [shape=circle, label=\"L %i\\n%i\\nData:\"];\n",
+                n,
+                n->node_ind,
+                n->valuation->len,
+                n->valuation->data);
+    }
+}
+
+void vis(node* n, char* fp) {
+    FILE* fd = fopen(fp, "w");
+    fprintf(fd, "digraph T {\n");
+    vis_tree(n, fd);
+    fprintf(fd, "}");
+    fclose(fd);
+}
+
 
 // Delete the given node, and all other deterministic ancestors.
 void ndelete(node* n, node** root) {
