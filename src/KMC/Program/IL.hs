@@ -39,7 +39,8 @@ data Expr =
 
 data Instr =
     AcceptI                             -- ^ accept (Program stops)
-  | FailI                               -- ^ fail   (Program stops)
+  | FailI                               -- ^ fail due to end of input reached      (Program stops)
+  | NoMoveI                             -- ^ fail due to no applicable transaction (Program stops)
   | AppendI    BufferId ConstId         -- ^ buf  := buf ++ bs
   | AppendTblI BufferId TableId Int     -- ^ buf  := buf ++ tbl(id)(next[i])[0 .. sz(id) - 1]
   | AppendSymI BufferId Int             -- ^ buf  := buf ++ next[i]

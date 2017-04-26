@@ -153,7 +153,7 @@ compileState trans fin = do
                                     (constUpdateStringFunc upd :: UpdateStringFunc var func)
                            return $ ass ++ [AcceptI]
   transitions <- compileTransitions 0 (kvtree [ (ps, (upd, st')) | (ps, upd, st') <- trans ])
-  return $ assignments ++ transitions ++ [FailI]
+  return $ assignments ++ transitions ++ [NoMoveI]
 
 compile :: forall st var func tid pred sigma delta.
     ( Bounded delta, Enum delta, Bounded sigma, Enum sigma

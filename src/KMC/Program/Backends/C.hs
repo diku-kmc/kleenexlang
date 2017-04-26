@@ -37,8 +37,8 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> [String] -> String
-progTemplate buString tablesString declsString infoString initString progStrings =
+progTemplate :: String -> String -> String -> String -> String -> String -> [String] -> String
+progTemplate buString tablesString declsString infoString initString stateTable progStrings =
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
@@ -50,15 +50,22 @@ void printCompilationInfo()
   fprintf(stdout, |]++infoString++[strQ|);
 }
 
+void printStateTable()
+{
+  |] ++ stateTable ++ [strQ|
+
+  fprintf(stdout, "%s", stateTable);
+}
+
 void init()
 {
 |]++initString ++[strQ|
 }
 |]++concat (zipWith matchTemplate progStrings [1..])++[strQ|
-void match(int phase)
+void match(int phase, int start_state)
 {
   switch(phase) {
-    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(); break;"
+    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(phase, start_state); break;"
                          | i <- [1..(length progStrings)] ]++
     [strQ|
     default:
@@ -69,14 +76,14 @@ void match(int phase)
 |]
 
 matchTemplate :: String -> Int -> String
-matchTemplate progString n = [strQ|void match|] ++ show n ++ [strQ|()
+matchTemplate progString n = [strQ|void match|] ++ show n ++ [strQ|(int phase, int start_state)
 {
   int i = 0;
 |]++progString++[strQ|
   accept|]++show n++[strQ|:
     return;
   fail|]++show n++[strQ|:
-    fprintf(stderr, "Match error at input symbol %zu!\n", count);
+    fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", count, next[0]);
     exit(1);
 }
 |]
@@ -97,6 +104,8 @@ data CProg =
   , cProg         :: [Doc]
   , cInit         :: Doc
   , cBufferUnit   :: Doc
+  , cJumptable    :: Doc
+  , cStateTable   :: Doc
   }
 
 -- | The number of bits each C type can hold
@@ -170,6 +179,10 @@ tbl ctypectx ctypetbl (TableId n) i mx phase =
 -- | Pretty print a block identifier
 blck :: BlockId -> Int -> Doc
 blck (BlockId n) phase  = text "l" <> int phase <> text "_" <> int n
+
+-- | Extract and pretty print the state from a block identifier
+stateId :: BlockId -> Doc
+stateId (BlockId n) = int n
 
 -- | Render a numeral value of some bith length as a C numeral, such that the
 -- most significant bit of the value is the most significant bit of the C type.
@@ -270,9 +283,13 @@ prettyInstr :: CType          -- ^ The buffer unit type
 prettyInstr buftype tbltype prog instr phase =
   let streamBuf = progStreamBuffer prog in
   case instr of
-    AcceptI            -> text "goto accept" <> int phase <> semi
-    FailI              -> text "goto fail" <> int phase <> semi
-    AppendI bid constid -> 
+    AcceptI            -> text "fprintf(stdout, \"-p %i -s %i\", phase, state)" <> semi $+$
+                          text "return" <> semi <+> text "//accept"
+    FailI              -> text "fprintf(stdout, \"-p %i -s %i\", phase, state)" <> semi $+$
+                          text "return" <> semi <+> text "//fail"
+    NoMoveI            -> text "fprintf(stdout, \"-p %i -s %i\", phase, -1)" <> semi $+$
+                          text "return" <> semi
+    AppendI bid constid ->
       let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
       in if bid == streamBuf then
              text "outputarray"
@@ -482,14 +499,72 @@ prettyInit progs =
   where
     bufferInit bid = text "init_buffer" <> parens (buf bid) <> semi
 
-prettyProg :: CType -> CType -> Program -> Int -> Doc
-prettyProg buftype tbltype prog phase =
-  text "goto" <+> blck (progInitBlock prog) phase <> semi
+prettyProg :: Pipeline -> CType -> CType -> Program -> Int -> Doc
+prettyProg pipeline buftype tbltype prog phase =
+     text "int state = 0" <> semi
+  $$ text "if (start_state < 0) goto" <+> blck (progInitBlock prog) phase <> semi
+  $$ prettyJumptable pipeline
   $$ vcat (map pblock (M.toList $ progBlocks prog))
   where
     pblock (blid, is) =
-      blck blid phase <>  char ':'
-                      <+> prettyBlock buftype tbltype prog is phase
+      blck blid phase <>  char ':' $+$
+                      text "state = " <> stateId blid <> semi
+                      $$ prettyBlock buftype tbltype prog is phase
+
+prettyJumptable :: Pipeline -> Doc
+prettyJumptable progs =
+  vcat [ text "switch" <+> parens (text "phase") <+> lbrace
+       , nest 2 $ vcat (map switchPhase [1..pipelineLength])
+       , rbrace
+       ]
+  where
+    pipelineLength = case progs of
+      Left xs  -> length xs
+      Right xs -> length xs
+    blockids = listBlockIds progs
+    switchPhase phase =
+         text "case" <+> int phase <> colon
+      $$ nest 2 (text "switch" <+> parens (text "start_state") <+> lbrace)
+      $$ nest 4 (vcat (map (switchState phase) (blockids !! (phase-1))))
+      $$ nest 4 defaultCase
+      $$ nest 2 rbrace
+    switchState phase state =
+         text "case" <+> (int $ getBlockId state) <> colon
+      $$ nest 2 (text "goto" <+> blck state phase <> semi)
+    defaultCase =
+         text "default:"
+      $$ nest 2 (text "fprintf(stdout, \"-p %i -s %i\", phase, -1)" <> semi)
+      $$ nest 2 (text "return" <> semi)
+
+-- | Print out state table as json formated string.
+prettyStateTable :: Program -> Doc
+prettyStateTable prog =
+  doubleQuotes (comma <> lbrack)
+  $+$ (vcat $ map doubleQuotes (punctuate comma (map pblock (M.toList $ progBlocks prog))))
+  $+$ doubleQuotes rbrack
+  where
+    pblock (blid, is) =
+      stateRes is blid
+
+-- | Translate block into json record of format '{ "state" : int, "accepting" : bool }'
+stateRes :: Block -> BlockId -> Doc
+stateRes instrs blid =
+  braces (text "\\\"state\\\"" <+> colon <+> (stateId blid) <> comma <+> go instrs)
+  where
+    go [] = empty
+    go (instr:is) = case instr of
+        AcceptI       -> text "\\\"accepting\\\" : true"
+        FailI         -> text "\\\"accepting\\\" : false"
+        NextI _ _ is' -> go is'
+        _             -> go is
+
+listBlockIds :: Pipeline -> [[BlockId]]
+listBlockIds pipeline = case pipeline of
+    Left  progs -> map (M.keys . progBlocks) progs
+    Right progs -> map (M.keys . progBlocks) . unpack $ progs
+  where
+    unpack [] = []
+    unpack ((a,b):xs) = [a,b] ++ unpack xs
 
 programsToC :: CType -> Pipeline -> CProg
 programsToC buftype pipeline =
@@ -498,15 +573,23 @@ programsToC buftype pipeline =
   , cDeclarations = prettyBufferDecls pipeline
                     $+$ prettyConstantDecls buftype pipeline
   , cInit         = prettyInit pipeline
-  , cProg         = prettyProgs
+  , cProg         = map (nest 2) prettyProgs
   , cBufferUnit   = ctyp buftype
+  , cJumptable    = prettyJumptable pipeline
+  , cStateTable   = stateTable
   }
   where
     tbltype = UInt8T
     prettyProgs = case pipeline of
-                    Left progs  -> zipWith (prettyProg buftype tbltype) progs [1..]
+                    Left progs  -> zipWith (prettyProg pipeline buftype tbltype) progs [1..]
                     Right progs -> concat $ zipWith combine progs [1,3..]
-    combine (p,a) i = [prettyProg buftype tbltype p i, prettyProg buftype tbltype a (i+1)]
+    combine (p,a) i = [prettyProg pipeline buftype tbltype p i, prettyProg pipeline buftype tbltype a (i+1)]
+    stateTable = case pipeline of
+                    Left progs  ->  text "char *stateTable ="
+                                    <+> doubleQuotes (lbrack <> brackets empty)
+                                    $+$ nest 21 (vcat $ map prettyStateTable progs)
+                                    $+$ nest 21 (doubleQuotes rbrack <> semi)
+                    Right _ -> error "Pipeline of pairs of program currently not supported."
 
 renderCProg :: String -> CProg -> String
 renderCProg compInfo cprog =
@@ -515,6 +598,7 @@ renderCProg compInfo cprog =
                (render $ cDeclarations cprog)
                compInfo
                (render $ cInit cprog)
+               (render $ cStateTable cprog)
                (map render $ cProg cprog)
 
 ccVersion :: (MonadIO m) => FilePath -> m String
