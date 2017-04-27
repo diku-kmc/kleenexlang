@@ -9,19 +9,22 @@ typedef struct node node;
 #include "vectors.h"
 #include <stdbool.h>
 
+// Struct to return a tuple, used by prune().
 typedef struct ret {
     node* target;
     bool keep;
 } ret;
 
 struct node {
-    int node_ind;
-    bool del;
-    bool leaf;
+    int node_ind;           // Should probably be called state_ind; index into
+                            // the NFST array.
+
+    bool del;               // Marked for deletion
+    bool leaf;              // Is leaf node.
     char_vector* valuation;
     struct node* lchild;
     struct node* rchild;
-    struct node* parent;
+    struct node* parent;    // Needed for final output.
 };
 
 // Data structures for representing the NFST.

@@ -74,6 +74,7 @@ state* parse(char* fp, int* l, int* ss) {
     return nfst;
 }
 
+// Simple visualization of the path tree, might not work currently.
 void vis_tree(node* n, FILE* fd) {
     if (!n->leaf) {
         n->valuation->data[n->valuation->len] = '\0';
@@ -108,6 +109,9 @@ void vis(node* n, char* fp) {
 
 bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
     int ind = n->node_ind;
+
+    // Stop and mark node for deletion, if the state has been previously
+    // visited in current input iteration.
     if (visited[ind]) {
         n->leaf = true;
         n->del = true;
@@ -185,10 +189,12 @@ void output(node_vector* leafs, state* nfst) {
 }
 
 
+// Prunes the path tree, expects to be passed the root node as initial call.
 ret prune(node* n) {
     struct ret a;
     a.keep = true;
     if (n->leaf) {
+        // Push node to pool, if it is marked for deletion.
         if (n->del) {
             a.keep = false;
             n->del = false;
@@ -203,15 +209,18 @@ ret prune(node* n) {
     struct ret left  = prune(n->lchild);
     struct ret right = prune(n->rchild);
 
-    // Maybe goto/cmov in the future
     if (left.keep) {
         if (right.keep) {
+            // Keeping both children, just update pointers to possibly new
+            // locations.
             n->lchild = left.target;
             n->rchild = right.target;
             left.target->parent = n;
             right.target->parent = n;
             a.target = n;
         } else {
+            // If only one child is to be kept, give that child back, and push
+            // current node to pool
             node* target = left.target;
             a.target = target;
 
@@ -221,6 +230,8 @@ ret prune(node* n) {
         }
     } else {
         if (right.keep) {
+            // If only one child is to be kept, give that child back, and push
+            // current node to pool
             node* target = right.target;
             a.target = target;
 
@@ -228,6 +239,7 @@ ret prune(node* n) {
             n->valuation->len = 0;
             nvector_push(pool, n);
         } else {
+            // None of the children are kept, there for nothing to keep.
             a.keep = false;
 
             n->valuation->len = 0;
@@ -263,6 +275,8 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs, int j, n
     }
 }
 
+// Mostly unused, just to free as much as possible, to have better use of
+// Valgrind for memory checks
 void free_tree(node* n) {
     if (n->leaf) {
         cvector_free(n->valuation);
@@ -274,9 +288,8 @@ void free_tree(node* n) {
 }
 
 int main(int argc, char** argv) {
-    //char* input = "babab";
-
     if (argc < 2) {
+        // Simple way to check actual size of a node struct.
         printf("%i\n", sizeof(node));
         exit(23);
     }
@@ -286,6 +299,7 @@ int main(int argc, char** argv) {
     int nlen, ss;
     state* nfst = parse(argv[1], &nlen, &ss);
 
+    // ALlocate and initialize root node of the path tree.
     node* root = (node*) malloc(sizeof(node));
     root->valuation = cvector_create();
     root->node_ind = ss;
@@ -306,11 +320,13 @@ int main(int argc, char** argv) {
     unsigned int k = 0;
     char input = getchar();
     while (input != '\0' && !feof(stdin)) {
+        // Iterate over active leaf nodes.
         for (int j = 0; j < leafs->len; ++j) {
             node* leaf = leafs->data[j];
             step(input, nfst, leaf, leafs2, j, &root, visited);
         }
 
+        // Swap leafs to the newly found ones, and reset the other vector.
         tmp = leafs;
         leafs = leafs2;
         leafs2 = tmp;
@@ -318,7 +334,7 @@ int main(int argc, char** argv) {
 
         k++;
 
-        // Prune path tree
+        // Prune path tree, and print whatever resides in the root node.
         if (k % 8 == 0) {
             struct ret a = prune(root);
             if (!a.keep) {
@@ -333,6 +349,7 @@ int main(int argc, char** argv) {
             root->valuation->len = 0;
         }
 
+        // Reset visited array.
         memset(visited, 0, sizeof(bool) * nlen);
 
         input = getchar();
@@ -340,7 +357,7 @@ int main(int argc, char** argv) {
     output(leafs, nfst);
     //fprintf(stderr, "Leafs: %i\n", leafs->len);
 
-    // Free (most) of the used memory, to better use Valgrind.
+    // Free (most) of the used memory, to better use of Valgrind memchecker.
     /*free(nfst);
     free(visited);
     free_tree(root);
