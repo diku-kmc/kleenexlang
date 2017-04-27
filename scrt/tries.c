@@ -106,81 +106,15 @@ void vis(node* n, char* fp) {
 }
 
 
-// Delete the given node, and all other deterministic ancestors.
-void ndelete(node* n, node** root) {
-    node* p = n->parent;
-
-    // Deleting the root causes rejection.
-    if (p == NULL) {
-        printf("Reject\n");
-        exit(0);
+bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
+    int ind = n->node_ind;
+    if (visited[ind]) {
+        n->leaf = true;
+        n->del = true;
+        return false;
     }
-    n->lchild = NULL;
-    n->rchild = NULL;
-    n->parent = NULL;
-    n->valuation->len = 0;
-    //cvector_free(n->valuation);
-    nvector_push(pool, n);
-    if (p->rchild == n) {
-        node* lchild = p->lchild;
-        // Empty node after delete?
-        if (lchild == NULL) {
-            ndelete(p, root);
-        } else {
-            // Send data down the tree as to not change leaf pointers.
-            cvector_prepend(lchild->valuation, p->valuation);
-
-            node* pp = p->parent;
-            if (pp == NULL) {
-                // Update root
-                *root = lchild;
-                lchild->parent = NULL;
-            } else if (pp->lchild == p) {
-                pp->lchild = lchild;
-                lchild->parent = pp;
-            } else {
-                pp->rchild = lchild;
-                lchild->parent = pp;
-            }
-            //cvector_free(p->valuation);
-            char_vector* t = p->valuation;
-            t->len = 0;
-            memset(p, 0, sizeof(node));
-            p->valuation = t;
-            nvector_push(pool, p);
-        }
-    } else {
-        node* rchild = p->rchild;
-
-        if (rchild == NULL) {
-            ndelete(p, root);
-        } else {
-            cvector_prepend(rchild->valuation, p->valuation);
-            p->valuation->len = 0;
-
-            node* pp = p->parent;
-            if (pp == NULL) {
-                *root = rchild;
-                rchild->parent = NULL;
-            } else if (pp->lchild == p) {
-                pp->lchild = rchild;
-                rchild->parent = pp;
-            } else {
-                pp->rchild = rchild;
-                rchild->parent = pp;
-            }
-            //cvector_free(p->valuation);
-            char_vector* t = p->valuation;
-            t->len = 0;
-            memset(p, 0, sizeof(node));
-            p->valuation = t;
-            nvector_push(pool, p);
-        }
-    }
-}
-
-int follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
-    state st = nfst[n->node_ind];
+    visited[ind] = true;
+    state st = nfst[ind];
     switch (st.s_type) {
         case CHOICE: {
             if (pool->len > 0) {
@@ -192,6 +126,11 @@ int follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
             n->lchild->del = false;
             n->lchild->leaf = false;
 
+            n->lchild->parent = n;
+            n->lchild->node_ind = st.choice.t1;
+
+            follow_ep(nfst, n->lchild, leafs, visited);
+
             if (pool->len > 0) {
                 n->rchild = nvector_pop(pool);
             } else {
@@ -201,15 +140,10 @@ int follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
             n->rchild->del = false;
             n->rchild->leaf = false;
 
-            //vector_append(n->lchild->valuation, 0);
-            n->lchild->parent = n;
-            n->lchild->node_ind = st.choice.t1;
 
-            //vector_append(n->rchild->valuation, 1);
             n->rchild->parent = n;
             n->rchild->node_ind = st.choice.t2;
 
-            int t = follow_ep(nfst, n->lchild, leafs, visited);
             return follow_ep(nfst, n->rchild, leafs, visited);
                      }
         case SKIP: {
@@ -223,7 +157,7 @@ int follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
         default: {
             n->leaf = true;
             nvector_append(leafs, n);
-            return 0;
+            return true;
             break;
                  }
     }
@@ -245,9 +179,9 @@ void output(node_vector* leafs, state* nfst) {
         }
     }
     for (int i = 0; i < data->len; ++i) {
-        printf("%c", data->data[i]);
+        putchar(data->data[i]);
     }
-    cvector_free(data);
+    //cvector_free(data);
 }
 
 
@@ -373,6 +307,8 @@ int main(int argc, char** argv) {
     follow_ep(nfst, root, leafs, visited);
     memset(visited, 0, sizeof(bool) * nlen);
 
+    bool pr = false;
+
     int k = 0;
     char kk[512];
     char input = getchar();
@@ -386,18 +322,26 @@ int main(int argc, char** argv) {
         leafs = leafs2;
         leafs2 = tmp;
         leafs2->len = 0;
-        struct ret a = prune(root);
-        if (!a.keep) {
-            printf("Reject!");
-            exit(11);
+
+        k++;
+        pr = (k % 2 == 0);
+
+        // Prune path tree
+        if (pr) {
+            pr = false;
+            struct ret a = prune(root);
+            if (!a.keep) {
+                printf("Reject!");
+                exit(11);
+            }
+            root = a.target;
+            root->parent = NULL;
         }
-        root = a.target;
-        root->parent = NULL;
+
         memset(visited, 0, sizeof(bool) * nlen);
 
-        for (int i = 0; i < root->valuation->len; ++i) {
-            putchar(root->valuation->data[i]);
-        }
+        root->valuation->data[root->valuation->len] = '\0';
+        puts(root->valuation->data);
         root->valuation->len = 0;
         input = getchar();
     }
