@@ -185,12 +185,6 @@ void output(node_vector* leafs, state* nfst) {
 }
 
 
-typedef struct ret {
-    node* target;
-    bool keep;
-} ret;
-
-
 ret prune(node* n) {
     struct ret a;
     a.keep = true;
@@ -309,8 +303,7 @@ int main(int argc, char** argv) {
 
     bool pr = false;
 
-    int k = 0;
-    char kk[512];
+    unsigned int k = 0;
     char input = getchar();
     while (input != '\0' && !feof(stdin)) {
         for (int j = 0; j < leafs->len; ++j) {
@@ -324,11 +317,9 @@ int main(int argc, char** argv) {
         leafs2->len = 0;
 
         k++;
-        pr = (k % 2 == 0);
 
         // Prune path tree
-        if (pr) {
-            pr = false;
+        if (k % 8 == 0) {
             struct ret a = prune(root);
             if (!a.keep) {
                 printf("Reject!");
@@ -336,13 +327,14 @@ int main(int argc, char** argv) {
             }
             root = a.target;
             root->parent = NULL;
+
+            root->valuation->data[root->valuation->len] = '\0';
+            fputs(root->valuation->data, stdout);
+            root->valuation->len = 0;
         }
 
         memset(visited, 0, sizeof(bool) * nlen);
 
-        root->valuation->data[root->valuation->len] = '\0';
-        puts(root->valuation->data);
-        root->valuation->len = 0;
         input = getchar();
     }
     output(leafs, nfst);

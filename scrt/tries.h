@@ -9,6 +9,11 @@ typedef struct node node;
 #include "vectors.h"
 #include <stdbool.h>
 
+typedef struct ret {
+    node* target;
+    bool keep;
+} ret;
+
 struct node {
     int node_ind;
     bool del;
