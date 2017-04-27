@@ -7,9 +7,12 @@ typedef struct char_vector char_vector;
 typedef struct node node;
 
 #include "vectors.h"
+#include <stdbool.h>
 
 struct node {
     int node_ind;
+    bool del;
+    bool leaf;
     char_vector* valuation;
     struct node* lchild;
     struct node* rchild;

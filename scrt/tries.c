@@ -1,4 +1,3 @@
-#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -76,7 +75,7 @@ state* parse(char* fp, int* l, int* ss) {
 }
 
 void vis_tree(node* n, FILE* fd) {
-    if (n->lchild != NULL) {
+    if (!n->leaf) {
         n->valuation->data[n->valuation->len] = '\0';
         fprintf(fd, "%i [shape=circle, label=\"%i\\n%i\\nData:\"];\n",
                 n,
@@ -84,7 +83,8 @@ void vis_tree(node* n, FILE* fd) {
                 n->valuation->len,
                 n->valuation->data);
         fprintf(fd, "%i -> %i;\n", n, n->lchild);
-        if (n->rchild != NULL) fprintf(fd, "%i -> %i;\n", n, n->rchild);
+        //if (n->rchild != NULL)
+        fprintf(fd, "%i -> %i;\n", n, n->rchild);
         vis_tree(n->lchild, fd);
         vis_tree(n->rchild, fd);
     } else {
@@ -117,7 +117,9 @@ void ndelete(node* n, node** root) {
     }
     n->lchild = NULL;
     n->rchild = NULL;
+    n->parent = NULL;
     n->valuation->len = 0;
+    //cvector_free(n->valuation);
     nvector_push(pool, n);
     if (p->rchild == n) {
         node* lchild = p->lchild;
@@ -140,7 +142,12 @@ void ndelete(node* n, node** root) {
                 pp->rchild = lchild;
                 lchild->parent = pp;
             }
-            free(p);
+            //cvector_free(p->valuation);
+            char_vector* t = p->valuation;
+            t->len = 0;
+            memset(p, 0, sizeof(node));
+            p->valuation = t;
+            nvector_push(pool, p);
         }
     } else {
         node* rchild = p->rchild;
@@ -149,6 +156,7 @@ void ndelete(node* n, node** root) {
             ndelete(p, root);
         } else {
             cvector_prepend(rchild->valuation, p->valuation);
+            p->valuation->len = 0;
 
             node* pp = p->parent;
             if (pp == NULL) {
@@ -161,7 +169,12 @@ void ndelete(node* n, node** root) {
                 pp->rchild = rchild;
                 rchild->parent = pp;
             }
-            free(p);
+            //cvector_free(p->valuation);
+            char_vector* t = p->valuation;
+            t->len = 0;
+            memset(p, 0, sizeof(node));
+            p->valuation = t;
+            nvector_push(pool, p);
         }
     }
 }
@@ -174,6 +187,8 @@ int follow_ep(state* nfst, node* n, node_vector* leafs, int j) {
                 n->lchild = nvector_pop(pool);
             } else {
                 n->lchild = (node*) malloc(sizeof(node));
+                n->lchild->del = false;
+                n->lchild->leaf = false;
                 n->lchild->valuation = cvector_create();
             }
 
@@ -181,6 +196,8 @@ int follow_ep(state* nfst, node* n, node_vector* leafs, int j) {
                 n->rchild = nvector_pop(pool);
             } else {
                 n->rchild = (node*) malloc(sizeof(node));
+                n->rchild->del = false;
+                n->rchild->leaf = false;
                 n->rchild->valuation = cvector_create();
             }
 
@@ -204,7 +221,8 @@ int follow_ep(state* nfst, node* n, node_vector* leafs, int j) {
             break;
                    }
         default: {
-            nvector_insert(leafs, n, j);
+            n->leaf = true;
+            nvector_append(leafs, n);
             return j;
             break;
                  }
@@ -229,34 +247,65 @@ void output(node_vector* leafs, state* nfst) {
     for (int i = 0; i < data->len; ++i) {
         printf("%c", data->data[i]);
     }
-    /*state cur_state = nfst[0];
-    for (int i = 0; i < data->len; ++i) {
-        while (cur_state.s_type != CHOICE) {
-            switch (cur_state.s_type) {
-                case SYMBOL:
-                    if (cur_state.symbol.output != '\0') {
-                        printf("%c", cur_state.symbol.output);
-                    }
-                    cur_state = nfst[cur_state.symbol.target];
-                    break;
-                case SKIP:
-                    printf("%c", cur_state.skip.output);
-                    cur_state = nfst[cur_state.skip.target];
-                    break;
-                default:
-                    printf("Accept state??");
-                    exit(22); // Probably shouldn't happen.
-                    break;
-            }
+    cvector_free(data);
+}
+
+
+typedef struct ret {
+    node* target;
+    bool keep;
+} ret;
+
+
+ret prune(node* n) {
+    struct ret a;
+    a.keep = true;
+    if (n->leaf) {
+        if (n->del) {
+            a.keep = false;
+            cvector_free(n->valuation);
+            free(n);
         }
-        if (data->data[i] == 0) {
-            cur_state = nfst[cur_state.choice.t1];
+
+        a.target = n;
+        return a;
+    }
+
+    struct ret left  = prune(n->lchild);
+    struct ret right = prune(n->rchild);
+
+    // Maybe goto/cmov in the future
+    if (left.keep) {
+        if (right.keep) {
+            n->lchild = left.target;
+            n->rchild = right.target;
+            left.target->parent = n;
+            right.target->parent = n;
+            a.target = n;
         } else {
-            cur_state = nfst[cur_state.choice.t2];
+            node* target = left.target;
+            a.target = target;
+
+            cvector_prepend(target->valuation, n->valuation);
+            cvector_free(n->valuation);
+            free(n);
+        }
+    } else {
+        if (right.keep) {
+            node* target = right.target;
+            a.target = target;
+
+            cvector_prepend(target->valuation, n->valuation);
+            cvector_free(n->valuation);
+            free(n);
+        } else {
+            a.keep = false;
         }
     }
-    */
+    return a;
 }
+
+
 
 
 int step(unsigned char input, state* nfst, node* n, node_vector* leafs, int j, node** root) {
@@ -266,18 +315,15 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs, int j, n
             int match = false;
             for (int i = 0; i < st.symbol.ilen; ++i) {
                 if (input >= st.symbol.input[i].start && input <= st.symbol.input[i].end) {
-                    match = true;
-                    break;
+                    n->node_ind = st.symbol.target;
+                    if (st.symbol.output) cvector_append(n->valuation, input);
+                    n->leaf = false;
+                    return follow_ep(nfst, n, leafs, j); // Use truth value to determine deletion
                 }
-            }
-            if (match) {
-                n->node_ind = st.symbol.target;
-                if (st.symbol.output) cvector_append(n->valuation, input);
-                return follow_ep(nfst, n, leafs, j);
             }
             } // Fallthrough
         case ACCEPT:
-            ndelete(n, root);
+            n->del = true;
             return j-1;
         default:
             exit(23); // Stepping on choice or skip state should not happen.
@@ -289,6 +335,7 @@ int main(int argc, char** argv) {
     //char* input = "babab";
 
     if (argc < 2) {
+        printf("%i\n", sizeof(node));
         exit(23);
     }
 
@@ -301,18 +348,32 @@ int main(int argc, char** argv) {
     root->valuation = cvector_create();
     root->node_ind = ss;
 
+    node_vector* tmp;
     node_vector* leafs = nvector_create();
+    node_vector* leafs2 = nvector_create();
     follow_ep(nfst, root, leafs, 0);
 
+    int k = 0;
+    char kk[512];
     char input = getchar();
     while (input != '\0' && !feof(stdin)) {
         for (int j = 0; j < leafs->len; ++j) {
-            int sti = leafs->data[j]->node_ind;
-            state st = nfst[sti];
             node* leaf = leafs->data[j];
-            nvector_remove(leafs, j);
-            j = step(input, nfst, leaf, leafs, j, &root);
+            step(input, nfst, leaf, leafs2, j, &root);
         }
+
+        tmp = leafs;
+        leafs = leafs2;
+        leafs2 = tmp;
+        leafs2->len = 0;
+        struct ret a = prune(root);
+        if (!a.keep) {
+            printf("Reject!");
+            exit(11);
+        }
+        root = a.target;
+        root->parent = NULL;
+
         for (int i = 0; i < root->valuation->len; ++i) {
             putchar(root->valuation->data[i]);
         }
@@ -320,5 +381,10 @@ int main(int argc, char** argv) {
         input = getchar();
     }
     output(leafs, nfst);
+    free(nfst);
+    fprintf(stderr, "Leafs: %i\n", leafs->len);
+    nvector_free(pool);
+    nvector_free(leafs);
+    nvector_free(leafs2);
 }
 
