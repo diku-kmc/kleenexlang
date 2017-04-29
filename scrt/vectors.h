@@ -1,6 +1,7 @@
 #ifndef VECTORS
 #define VECTORS
-#define VECTOR_INITIAL_CAPACITY 100
+#define VECTOR_INITIAL_CAPACITY 128
+
 
 // Node pointer vector
 typedef struct node_vector {
@@ -150,5 +151,45 @@ void cvector_prepend(char_vector* vec1, char_vector* vec2) {
     vec1->capacity = vec2->capacity;
     vec2->data = tmp_data;
     vec2->capacity = tmp_cap;
+}
+
+
+// Int vector
+struct int_vector {
+    int* data;
+    int len;
+    int capacity;
+};
+
+int_vector* ivector_create() {
+    int_vector* vector = (int_vector*) malloc(sizeof(int_vector));
+    int* array         = (int*) malloc(VECTOR_INITIAL_CAPACITY * sizeof(int));
+
+    if (array == NULL)
+        exit(666);
+    vector->data        = array;
+    vector->len         = 0;
+    vector->capacity    = VECTOR_INITIAL_CAPACITY;
+
+    return vector;
+}
+
+void ivector_free(char_vector* vec) {
+    free(vec->data);
+    free(vec);
+}
+
+void ivector_grow(char_vector* vec, int min_capacity) {
+    if (vec->capacity < min_capacity) {
+        vec->capacity += min_capacity;
+        vec->data = realloc(vec->data, sizeof(int) * vec->capacity);
+    }
+    return;
+}
+
+void ivector_append(char_vector* vec, int data) {
+    ivector_grow(vec, vec->len + 1);
+    vec->data[vec->len] = data;
+    vec->len++;
 }
 #endif

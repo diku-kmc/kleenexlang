@@ -4,6 +4,7 @@
 #include "tries.h"
 
 node_vector* pool;
+mvector* ns;
 
 state* parse(char* fp, int* l, int* ss) {
     FILE* fd = fopen(fp, "r");
@@ -125,8 +126,7 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             if (pool->len > 0) {
                 n->lchild = nvector_pop(pool);
             } else {
-                n->lchild = (node*) malloc(sizeof(node));
-                n->lchild->valuation = cvector_create();
+                n->lchild = mvector_get(ns);
             }
             n->lchild->del = false;
             n->lchild->leaf = false;
@@ -140,8 +140,7 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             if (pool->len > 0) {
                 n->rchild = nvector_pop(pool);
             } else {
-                n->rchild = (node*) malloc(sizeof(node));
-                n->rchild->valuation = cvector_create();
+                n->rchild = mvector_get(ns);
             }
             n->rchild->del = false;
             n->rchild->leaf = false;
@@ -333,12 +332,13 @@ int main(int argc, char** argv) {
     }
 
     pool = nvector_create();
+    ns   = mvector_create();
 
     int nlen, ss;
     state* nfst = parse(argv[1], &nlen, &ss);
 
     // ALlocate and initialize root node of the path tree.
-    node* root = (node*) malloc(sizeof(node));
+    node* root = mvector_get(ns);
     root->valuation = cvector_create();
     root->node_ind = ss;
     root->del = false;

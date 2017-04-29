@@ -71,4 +71,43 @@ typedef struct state {
         symbol_s symbol;
     };
 } state;
+
+typedef struct mvector {
+    node* data;
+    int len;
+    int capacity;
+} mvector;
+
+mvector* mvector_create() {
+    mvector* mvec  = (mvector*) malloc(sizeof(mvector));
+    node* narray   = (node*) malloc(2 * VECTOR_INITIAL_CAPACITY * sizeof(node));
+
+    mvec->data     = narray;
+    mvec->len      = 0;
+    mvec->capacity = VECTOR_INITIAL_CAPACITY;
+
+    return mvec;
+}
+
+void mvector_free(node_vector* vec) {
+    free(vec->data);
+    free(vec);
+}
+
+void mvector_grow(mvector* vec) {
+    vec->capacity += VECTOR_INITIAL_CAPACITY;
+    vec->data = realloc(vec->data, sizeof(node) * vec->capacity);
+    return;
+}
+
+node* mvector_get(mvector* vec) {
+    if (vec->len >= vec->capacity) {
+        mvector_grow(vec);
+    }
+    node* ret = &(vec->data[vec->len]);
+    ret->valuation = cvector_create();
+    vec->len++;
+
+    return ret;
+}
 #endif
