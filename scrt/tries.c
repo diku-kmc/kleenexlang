@@ -6,13 +6,14 @@
 node_vector* pool;
 mvector* ns;
 
-state* parse(char* fp, int* l, int* ss) {
+state* parse(char* fp, int* l, int* ss, int* ns) {
     FILE* fd = fopen(fp, "r");
     int len, starts;
     if (fscanf(fd, "%i %i\n", &len, &starts) != 2) exit(3);
     state* nfst = (state*) malloc(len * sizeof(state));
     *l = len;
     *ss = starts;
+    *ns = 0;
 
     // Parse states
     int ind, t1, t2;
@@ -65,9 +66,11 @@ state* parse(char* fp, int* l, int* ss) {
                         nfst[ind] .symbol.ilen = t2;
                         nfst[ind] .symbol.input = rs;
                         nfst[ind] .symbol.output = (tmp2 == 'C'); // No output unless its CopyArg (no register actions)
+                        *ns += 1;
                         break;
             // Accept state
             case 'A':   nfst[ind] .s_type = ACCEPT;
+                        *ns += 1;
                         break;
         }
 
@@ -331,11 +334,13 @@ int main(int argc, char** argv) {
         exit(23);
     }
 
-    pool = nvector_create();
-    ns   = mvector_create();
+    const int interval = 8;
 
-    int nlen, ss;
-    state* nfst = parse(argv[1], &nlen, &ss);
+    pool = nvector_create();
+
+    int nlen, ss, num_ras;
+    state* nfst = parse(argv[1], &nlen, &ss, &num_ras);
+    ns   = mvector_create(num_ras * 2 * interval);
 
     // ALlocate and initialize root node of the path tree.
     node* root = mvector_get(ns);

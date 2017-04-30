@@ -78,13 +78,13 @@ typedef struct mvector {
     int capacity;
 } mvector;
 
-mvector* mvector_create() {
+mvector* mvector_create(int size) {
     mvector* mvec  = (mvector*) malloc(sizeof(mvector));
-    node* narray   = (node*) malloc(2 * VECTOR_INITIAL_CAPACITY * sizeof(node));
+    node* narray   = (node*) malloc(size * sizeof(node));
 
     mvec->data     = narray;
     mvec->len      = 0;
-    mvec->capacity = VECTOR_INITIAL_CAPACITY;
+    mvec->capacity = size;
 
     return mvec;
 }
@@ -101,9 +101,6 @@ void mvector_grow(mvector* vec) {
 }
 
 node* mvector_get(mvector* vec) {
-    if (vec->len >= vec->capacity) {
-        mvector_grow(vec);
-    }
     node* ret = &(vec->data[vec->len]);
     ret->valuation = cvector_create();
     vec->len++;
