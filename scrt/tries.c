@@ -252,7 +252,7 @@ ret prune(node* n) {
 
 
 
-int step(unsigned char input, state* nfst, node* n, node_vector* leafs, int j, node** root,
+int step(unsigned char input, state* nfst, node* n, node_vector* leafs, node** root,
         bool* visited) {
     state st = nfst[n->node_ind];
     switch (st.s_type) {
@@ -269,7 +269,7 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs, int j, n
             } // Fallthrough
         case ACCEPT:
             n->del = true;
-            return j-1;
+            return 0;
         default:
             exit(23); // Stepping on choice or skip state should not happen.
     }
@@ -323,7 +323,7 @@ int main(int argc, char** argv) {
         // Iterate over active leaf nodes.
         for (int j = 0; j < leafs->len; ++j) {
             node* leaf = leafs->data[j];
-            step(input, nfst, leaf, leafs2, j, &root, visited);
+            step(input, nfst, leaf, leafs2, &root, visited);
         }
 
         // Swap leafs to the newly found ones, and reset the other vector.
