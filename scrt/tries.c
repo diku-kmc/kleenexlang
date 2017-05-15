@@ -191,7 +191,7 @@ void output(node_vector* leafs, state* nfst) {
     //cvector_free(data);
 }
 
-void delete(node* n, node** root) {
+inline void delete(node* n, node** root) {
     node* target;
     node* parent = n->parent;
 
@@ -211,9 +211,6 @@ void delete(node* n, node** root) {
     n->valuation->len = 0;
     nvector_push(pool, n);
 
-    if (target == NULL) {
-        delete(parent, root);
-    } else {
         cvector_prepend(target->valuation, parent->valuation);
         target->parent = parent->parent;
         target->islchild = parent->islchild;
@@ -228,7 +225,6 @@ void delete(node* n, node** root) {
         }
         parent->valuation->len = 0;
         nvector_push(pool, parent);
-    }
 }
 
 // Prunes the path tree, expects to be passed the root node as initial call.
