@@ -35,6 +35,7 @@ data CompileOptions =
     , optWordSize        :: CType          -- ^ Word size in run-time buffer
     , optAltCompiler     :: FilePath       -- ^ Alternative compiler
     , optElimIdTables    :: Bool           -- ^ Eliminate identity tables in generated code
+    , optGenerateHFile   :: Bool           -- ^ Generate header file
     }
 
 data SimulateOptions =
@@ -137,6 +138,7 @@ instance Options CompileOptions where
                        })
       <*> simpleOption "cc" "gcc" "C compiler"
       <*> simpleOption "rmidtbls" False "Eliminate C-tables that implement the identity function."
+      <*> simpleOption "hf" False "Generate header file to use with dispatcher."
 
 instance Options SimulateOptions where
     defineOptions =

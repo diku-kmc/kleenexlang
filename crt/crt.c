@@ -103,8 +103,8 @@ void init_outbuf_stack()
 
 void printCompilationInfo();
 void init();
-void match(int phase, int start_state);
-void printStateTable();
+int match(int phase, int start_state, char* buf, long length);
+void print_state_table();
 
 void buf_flush(buffer_t *buf)
 {
@@ -325,7 +325,7 @@ int cmp(unsigned char *str1, unsigned char *str2, int l)
   return 1;
 }
 
-void printUsage(char *name)
+static void printUsage(char *name)
 {
   fprintf(stdout, "Normal usage: %s < infile > outfile\n", name);
   fprintf(stdout, "- \"%s\": reads from stdin and writes to stdout.\n", name);
@@ -362,16 +362,16 @@ void run(int phase, int start_state)
   init_outbuf();
   init();
 
-  match(phase, start_state);
+  // match(phase, start_state);
 
   flush_outbuf();
 }
 
 #ifndef FLAG_NOMAIN
 static struct option long_options[] = {
-    { "phase", required_argument, 0, 'p' },
-    { "state", required_argument, 0, 's' },
-    { 0, 0, 0, 0 }
+   { "phase", required_argument, 0, 'p' },
+   { "state", required_argument, 0, 's' },
+   { 0, 0, 0, 0 }
 };
 
 int main(int argc, char *argv[])

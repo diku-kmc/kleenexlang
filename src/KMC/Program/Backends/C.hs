@@ -16,6 +16,7 @@ import           System.Exit (ExitCode(..))
 import           System.IO
 import           System.Process
 import           Text.PrettyPrint
+import qualified System.FilePath as FP
 
 import           KMC.Util.Coding
 import           KMC.Program.IL
@@ -37,35 +38,36 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> String -> [String] -> String
-progTemplate buString tablesString declsString infoString initString stateTable progStrings =
+progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String
+progTemplate buString tablesString declsString infoString initString progStrings incMain =
+ (if (not incMain)
+  then ([strQ|/* include main */
+|])
+  else ([strQ|#define FLAG_NOMAIN 1 /* no main */
+|] )) ++
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
   ++ [fileQ|crt/crt.c|] ++ "\n"
-  ++ tablesString ++ "\n"
+  ++ tablesString ++ "\n\n"
   ++ declsString ++ [strQ|
 void printCompilationInfo()
 {
   fprintf(stdout, |]++infoString++[strQ|);
 }
 
-void printStateTable()
-{
-  |] ++ stateTable ++ [strQ|
-
-  fprintf(stdout, "%s", stateTable);
-}
-
 void init()
 {
 |]++initString ++[strQ|
 }
+
 |]++concat (zipWith matchTemplate progStrings [1..])++[strQ|
-void match(int phase, int start_state)
+int match(int phase, int start_state, char * buf, long length)
 {
   switch(phase) {
-    |]++intercalate "\n" ["case " ++ show i ++ ": match" ++ show i ++ "(phase, start_state); break;"
+    |]++intercalate "\n" ["case " ++ show i ++ ":\n\
+    \      return match" ++ show i ++ "(phase, start_state, buf, length);\n\
+    \      break;"
                          | i <- [1..(length progStrings)] ]++
     [strQ|
     default:
@@ -76,15 +78,15 @@ void match(int phase, int start_state)
 |]
 
 matchTemplate :: String -> Int -> String
-matchTemplate progString n = [strQ|void match|] ++ show n ++ [strQ|(int phase, int start_state)
+matchTemplate progString n =
+  [strQ|int match|] ++ show n ++ [strQ|(int phase, int start_state, char * buf, long length)
 {
-  int i = 0;
 |]++progString++[strQ|
-  accept|]++show n++[strQ|:
-    return;
-  fail|]++show n++[strQ|:
-    fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", count, next[0]);
-    exit(1);
+  //accept|]++show n++[strQ|:
+  //  return;
+  //fail|]++show n++[strQ|:
+  //  fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", count, next[0]);
+  //  exit(1);
 }
 |]
 
@@ -99,13 +101,15 @@ data CType = UInt8T | UInt16T | UInt32T | UInt64T
 -- spliced into the template.
 data CProg =
   CProg
-  { cTables       :: Doc
-  , cDeclarations :: Doc
-  , cProg         :: [Doc]
-  , cInit         :: Doc
-  , cBufferUnit   :: Doc
-  , cJumptable    :: Doc
-  , cStateTable   :: Doc
+  { cTables         :: Doc
+  , cDeclarations   :: Doc
+  , cProg           :: [Doc]
+  , cInit           :: Doc
+  , cBufferUnit     :: Doc
+  , cJumptable      :: Doc
+  , cStateTableJson :: Doc
+  , cStateTableVar  :: Doc
+  , cStateCountVar  :: Doc
   }
 
 -- | The number of bits each C type can hold
@@ -180,9 +184,9 @@ tbl ctypectx ctypetbl (TableId n) i mx phase =
 blck :: BlockId -> Int -> Doc
 blck (BlockId n) phase  = text "l" <> int phase <> text "_" <> int n
 
--- | Extract and pretty print the state from a block identifier
-stateId :: BlockId -> Doc
-stateId (BlockId n) = int n
+-- | Pretty print a block id (state only)
+stateNr :: BlockId -> Doc
+stateNr (BlockId n) = int n
 
 -- | Render a numeral value of some bith length as a C numeral, such that the
 -- most significant bit of the value is the most significant bit of the C type.
@@ -283,12 +287,9 @@ prettyInstr :: CType          -- ^ The buffer unit type
 prettyInstr buftype tbltype prog instr phase =
   let streamBuf = progStreamBuffer prog in
   case instr of
-    AcceptI            -> text "fprintf(stdout, \"-p %i -s %i\", phase, state)" <> semi $+$
-                          text "return" <> semi <+> text "//accept"
-    FailI              -> text "fprintf(stdout, \"-p %i -s %i\", phase, state)" <> semi $+$
-                          text "return" <> semi <+> text "//fail"
-    NoMoveI            -> text "fprintf(stdout, \"-p %i -s %i\", phase, -1)" <> semi $+$
-                          text "return" <> semi
+    AcceptI            -> text "return state; //accept"
+    FailI              -> text "return state; //fail"
+    NoMoveI            -> text "return -1;"
     AppendI bid constid ->
       let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
       in if bid == streamBuf then
@@ -316,12 +317,12 @@ prettyInstr buftype tbltype prog instr phase =
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
                           rbrace
     GotoI blid         -> text "goto" <+> blck blid phase <> semi
-    NextI minL maxL is -> text "if"
-                            <+> parens (text "!readnext" <> parens (int minL <> comma <+> int maxL)) $$
+    NextI minL _ is -> text "if"
+                            <+> parens (text "left <" <+> int minL) $$
                           lbrace $+$
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
                           rbrace
-    ConsumeI i         -> text "consume" <> parens (int i) <> semi
+    ConsumeI i         -> text "next +=" <+> int i <> semi <+> text "left -=" <+> int i <> semi
     PushI              -> text "stack_push()" <> semi
     PopI bid           -> text "stack_pop" <> parens (buf bid) <> semi
     WriteI bid         -> text "stack_write" <> parens (buf bid) <> semi
@@ -400,7 +401,7 @@ prettyExpr :: Expr -> Doc
 prettyExpr e =
   case e of
     SymE i            -> text "next" <> brackets (int i)
-    AvailableSymbolsE -> text "avail"
+    AvailableSymbolsE -> text "left"
     CompareE i str    -> text "cmp"
                            <> parens (hcat $ punctuate comma
                                         [text "&next" <> brackets (int i)
@@ -501,14 +502,16 @@ prettyInit progs =
 
 prettyProg :: Pipeline -> CType -> CType -> Program -> Int -> Doc
 prettyProg pipeline buftype tbltype prog phase =
-     text "int state = 0" <> semi
+     text "int state = 0;"
+  $$ text "long left = length;"
+  $$ text "unsigned char * next = (unsigned char *)buf;"
   $$ text "if (start_state < 0) goto" <+> blck (progInitBlock prog) phase <> semi
   $$ prettyJumptable pipeline
   $$ vcat (map pblock (M.toList $ progBlocks prog))
   where
     pblock (blid, is) =
       blck blid phase <>  char ':' $+$
-                      text "state = " <> stateId blid <> semi
+                      text "state = " <> stateNr blid <> semi
                       $$ prettyBlock buftype tbltype prog is phase
 
 prettyJumptable :: Pipeline -> Doc
@@ -533,23 +536,45 @@ prettyJumptable progs =
       $$ nest 2 (text "goto" <+> blck state phase <> semi)
     defaultCase =
          text "default:"
-      $$ nest 2 (text "fprintf(stdout, \"-p %i -s %i\", phase, -1)" <> semi)
-      $$ nest 2 (text "return" <> semi)
+      -- $$ nest 2 (text "fprintf(stdout, \"-p %i -s %i\", phase, -1)" <> semi)
+      $$ nest 2 (text "return -1" <> semi)
 
--- | Print out state table as json formated string.
 prettyStateTable :: Program -> Doc
 prettyStateTable prog =
+  -- doubleQuotes (comma <> lbrack)
+  -- $+$
+  (vcat $ punctuate comma (map pblock (M.toList $ progBlocks prog)))
+  -- $+$ doubleQuotes rbrack
+  where
+    pblock (blid, is) =
+      stateRes is (stateNr blid)
+
+-- | Pretty print a list of instructions.
+-- | relies on check for eof is the appeas firs in each state.
+stateRes :: Block -> Doc -> Doc
+stateRes instrs state =
+  braces (text ".num = " <+> state <> comma <+> go instrs)
+  where
+    go [] = empty
+    go (instr:is) = case instr of
+        AcceptI       -> text ".accepting = 1"
+        FailI         -> text ".accepting = 0"
+        NextI _ _ is' -> go is'
+        _             -> go is
+
+prettyStateTableJson :: Program -> Doc
+prettyStateTableJson prog =
   doubleQuotes (comma <> lbrack)
   $+$ (vcat $ map doubleQuotes (punctuate comma (map pblock (M.toList $ progBlocks prog))))
   $+$ doubleQuotes rbrack
   where
     pblock (blid, is) =
-      stateRes is blid
+      stateResJson is (stateNr blid)
 
--- | Translate block into json record of format '{ "state" : int, "accepting" : bool }'
-stateRes :: Block -> BlockId -> Doc
-stateRes instrs blid =
-  braces (text "\\\"state\\\"" <+> colon <+> (stateId blid) <> comma <+> go instrs)
+-- | Pretty print a list of instructions.
+stateResJson :: Block -> Doc -> Doc
+stateResJson instrs state =
+  braces (text "\\\"state\\\"" <+> colon <+> state <> comma <+> go instrs)
   where
     go [] = empty
     go (instr:is) = case instr of
@@ -569,14 +594,16 @@ listBlockIds pipeline = case pipeline of
 programsToC :: CType -> Pipeline -> CProg
 programsToC buftype pipeline =
   CProg
-  { cTables       = prettyTableDecl tbltype pipeline
-  , cDeclarations = prettyBufferDecls pipeline
-                    $+$ prettyConstantDecls buftype pipeline
-  , cInit         = prettyInit pipeline
-  , cProg         = map (nest 2) prettyProgs
-  , cBufferUnit   = ctyp buftype
-  , cJumptable    = prettyJumptable pipeline
-  , cStateTable   = stateTable
+  { cTables         = prettyTableDecl tbltype pipeline
+  , cDeclarations   = prettyBufferDecls pipeline
+                      $+$ prettyConstantDecls buftype pipeline
+  , cInit           = prettyInit pipeline
+  , cProg           = map (nest 2) prettyProgs
+  , cBufferUnit     = ctyp buftype
+  , cJumptable      = prettyJumptable pipeline
+  , cStateTableJson = stateTableJson -- lagacy to support python dispatcher
+  , cStateTableVar  = stateTableVar
+  , cStateCountVar  = stateCountVar
   }
   where
     tbltype = UInt8T
@@ -584,22 +611,66 @@ programsToC buftype pipeline =
                     Left progs  -> zipWith (prettyProg pipeline buftype tbltype) progs [1..]
                     Right progs -> concat $ zipWith combine progs [1,3..]
     combine (p,a) i = [prettyProg pipeline buftype tbltype p i, prettyProg pipeline buftype tbltype a (i+1)]
-    stateTable = case pipeline of
+    stateTableJson = case pipeline of
                     Left progs  ->  text "char *stateTable ="
                                     <+> doubleQuotes (lbrack <> brackets empty)
-                                    $+$ nest 21 (vcat $ map prettyStateTable progs)
+                                    $+$ nest 21 (vcat $ map prettyStateTableJson progs)
                                     $+$ nest 21 (doubleQuotes rbrack <> semi)
-                    Right _ -> error "Pipeline of pairs of program currently not supported."
+                    Right _ -> error "tjoooo..."
+    stateTableVar = case pipeline of
+                    Left progs  ->  text "struct state state_table[] =" <+> lbrace
+                                    -- <+> doubleQuotes (lbrack <> brackets empty)
+                                    $+$ nest 2 (vcat $ map prettyStateTable progs)
+                                    $+$ rbrace <> semi
+                    Right _ -> error "tjoooo..."
+    stateCountVar = case pipeline of
+                    Left (p:_) -> text "int state_count =" <+> int (length (progBlocks p)) <> semi
+                    Left _     -> empty -- multi phase not supported
+                    Right _    -> error "tjoooo..."
 
-renderCProg :: String -> CProg -> String
-renderCProg compInfo cprog =
+renderHeader :: String -> String -> String -> String
+renderHeader output stateTable stateCount =
+  [strQ|
+//
+//  |]++ output ++ [strQ|.h
+//
+
+#ifndef |] ++ output ++ [strQ|_h
+#define |] ++ output ++ [strQ|_h
+
+struct state {
+  int num;
+  int accepting;
+};
+
+static const struct state fail_state = { .num = -1, .accepting = 0 };
+
+|] ++ stateCount ++ [strQ|
+
+|] ++ stateTable ++ [strQ|
+
+int match(int, int, char *, long);
+
+#endif /* |] ++ output ++ [strQ|_h */
+|]
+
+renderHFile :: String -> CProg -> String
+renderHFile baseName cprog =
+  renderHeader  baseName
+                (render $ cStateTableVar cprog)
+                (render $ cStateCountVar cprog)
+
+renderCProg :: String -> CProg -> Bool -> String
+renderCProg compInfo cprog genHeader =
   progTemplate (render $ cBufferUnit cprog)
                (render $ cTables cprog)
                (render $ cDeclarations cprog)
                compInfo
                (render $ cInit cprog)
-               (render $ cStateTable cprog)
+               -- (render $ cStateTableVar cprog)
+               -- (render $ cStateTableJson cprog)
                (map render $ cProg cprog)
+               genHeader
 
 ccVersion :: (MonadIO m) => FilePath -> m String
 ccVersion comp = do
@@ -618,18 +689,23 @@ compileProgram :: (MonadIO m)
                -> FilePath         -- ^ Path to C compiler
                -> Maybe FilePath   -- ^ Binary output path
                -> Maybe FilePath   -- ^ C code output path
+               -> Bool             -- ^ Generate header file
                -> Bool             -- ^ Use word alignment
                -> m ExitCode
-compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath wordAlign = do
+compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath genHeader wordAlign = do
   cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
-  let cstr = renderCProg info . programsToC buftype $ pipeline
+  let cprog = programsToC buftype $ pipeline
+  let cstr = renderCProg info cprog genHeader
   let sourceLineCount = length (lines cstr)
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
+      let base = FP.dropExtension p
+      let hstr = renderHFile base cprog
       infoCallback $ "Writing C source to " ++ p
       liftIO $ writeFile p cstr
+      liftIO $ writeFile (base ++ ".h") hstr
   case moutPath of
     Nothing -> return ExitSuccess
     Just outPath -> do
