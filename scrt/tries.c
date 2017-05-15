@@ -14,7 +14,7 @@ state* parse(char* fp, int* l, int* ss) {
     *ss = starts;
 
     // Parse states
-    int ind, t1, t2, out;
+    int ind, t1, t2;
     char tmp, tmp2;
     for (int i = 0; i < len; ++i) {
         if (fscanf(fd, "%i %c", &ind, &tmp) != 2) exit(3); // Parse state index and type
@@ -36,7 +36,7 @@ state* parse(char* fp, int* l, int* ss) {
                                         nfst[ind] .skip.output = (char) t2;
                                         break;
                             // No output state
-                            case 'E':   if (fscanf(fd, "\n", &tmp2) != 0) exit(3);
+                            case 'E':   if (fscanf(fd, "\n") != 0) exit(3);
                                         nfst[ind] .skip.output = '\0';
                                         break;
                             default: exit(2); // Not supported yet (Register actions)
@@ -78,23 +78,21 @@ state* parse(char* fp, int* l, int* ss) {
 void vis_tree(node* n, FILE* fd) {
     if (!n->leaf) {
         n->valuation->data[n->valuation->len] = '\0';
-        fprintf(fd, "%i [shape=circle, label=\"%i\\n%i\\nData:\"];\n",
+        fprintf(fd, "\"%p\" [shape=circle, label=\"%i\\n%p\\nData:\"];\n",
                 n,
                 n->node_ind,
-                n->valuation->len,
-                n->valuation->data);
-        fprintf(fd, "%i -> %i;\n", n, n->lchild);
+                n->valuation);
+        fprintf(fd, "\"%p\" -> \"%p\";\n", n, n->lchild);
         //if (n->rchild != NULL)
-        fprintf(fd, "%i -> %i;\n", n, n->rchild);
+        fprintf(fd, "\"%p\" -> \"%p\";\n", n, n->rchild);
         vis_tree(n->lchild, fd);
         vis_tree(n->rchild, fd);
     } else {
         n->valuation->data[n->valuation->len] = '\0';
-        fprintf(fd, "%i [shape=circle, label=\"L %i\\n%i\\nData:\"];\n",
+        fprintf(fd, "\"%p\" [shape=circle, label=\"L %i\\n%p\\nData:\"];\n",
                 n,
                 n->node_ind,
-                n->valuation->len,
-                n->valuation->data);
+                n->valuation);
     }
 }
 
@@ -107,7 +105,9 @@ void vis(node* n, char* fp) {
 }
 
 
-bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
+bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
+        node_vector* del)
+{
     int ind = n->node_ind;
 
     // Stop and mark node for deletion, if the state has been previously
@@ -115,6 +115,7 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
     if (visited[ind]) {
         n->leaf = true;
         n->del = true;
+        nvector_push(del, n);
         return false;
     }
     visited[ind] = true;
@@ -129,11 +130,12 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
             }
             n->lchild->del = false;
             n->lchild->leaf = false;
+            n->lchild->islchild = true;
 
             n->lchild->parent = n;
             n->lchild->node_ind = st.choice.t1;
 
-            follow_ep(nfst, n->lchild, leafs, visited);
+            follow_ep(nfst, n->lchild, leafs, visited, del);
 
             if (pool->len > 0) {
                 n->rchild = nvector_pop(pool);
@@ -143,19 +145,20 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited) {
             }
             n->rchild->del = false;
             n->rchild->leaf = false;
+            n->rchild->islchild = false;
 
 
             n->rchild->parent = n;
             n->rchild->node_ind = st.choice.t2;
 
-            return follow_ep(nfst, n->rchild, leafs, visited);
+            return follow_ep(nfst, n->rchild, leafs, visited, del);
                      }
         case SKIP: {
             if (st.skip.output != '\0') {
                 cvector_append(n->valuation, st.skip.output);
             }
             n->node_ind = st.skip.target;
-            return follow_ep(nfst, n, leafs, visited);
+            return follow_ep(nfst, n, leafs, visited, del);
             break;
                    }
         default: {
@@ -188,6 +191,73 @@ void output(node_vector* leafs, state* nfst) {
     //cvector_free(data);
 }
 
+void delete(node* n, node** root) {
+    node* target;
+    node* parent = n->parent;
+
+    if (parent == NULL) {
+        printf("Reject!\n");
+        exit(111);
+    }
+
+    /*
+    if (n != parent->lchild && n != parent->rchild) {
+        printf("Hmm\n");
+    }
+    if (n->islchild && n != parent->lchild) {
+        printf("NO!\n");
+    } else if (!n->islchild && n != parent->rchild) {
+        printf("NO2!!\n");
+    }
+    */
+
+    if (n->islchild) {
+        parent->lchild = NULL;
+        target = parent->rchild;
+    } else {
+        parent->rchild = NULL;
+        target = parent->lchild;
+    }
+
+    n->valuation->len = 0;
+    n->del = false;
+    //memset(n, 0, sizeof(node));
+    nvector_push(pool, n);
+
+
+    if (target == NULL) {
+        //printf("test\n");
+        //fflush(stdout);
+        delete(parent, root);
+    } else {
+        /*
+        if (n->islchild) {
+            if (target != parent->rchild) {
+                printf("TEST1\n");
+            }
+        } else {
+            if (target != parent->lchild) {
+                printf("TEST2\n");
+            }
+        }
+        */
+        cvector_prepend(target->valuation, parent->valuation);
+        target->parent = parent->parent;
+        target->islchild = parent->islchild;
+        if (parent->parent == NULL) {
+            *root = target;
+        } else {
+            if (parent->islchild) {
+                parent->parent->lchild = target;
+            } else {
+                parent->parent->rchild = target;
+            }
+        }
+        parent->valuation->len = 0;
+        parent->del = false;
+        nvector_push(pool, parent);
+    }
+}
 
 // Prunes the path tree, expects to be passed the root node as initial call.
 ret prune(node* n) {
@@ -252,23 +322,23 @@ ret prune(node* n) {
 
 
 
-int step(unsigned char input, state* nfst, node* n, node_vector* leafs, node** root,
-        bool* visited) {
+int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
+        bool* visited, node_vector* del) {
     state st = nfst[n->node_ind];
     switch (st.s_type) {
         case SYMBOL: {
-            int match = false;
             for (int i = 0; i < st.symbol.ilen; ++i) {
                 if (input >= st.symbol.input[i].start && input <= st.symbol.input[i].end) {
                     n->node_ind = st.symbol.target;
                     if (st.symbol.output) cvector_append(n->valuation, input);
                     n->leaf = false;
-                    return follow_ep(nfst, n, leafs, visited); // Use truth value to determine deletion
+                    return follow_ep(nfst, n, leafs, visited, del); // Use truth value to determine deletion
                 }
             }
             } // Fallthrough
         case ACCEPT:
             n->del = true;
+            nvector_push(del, n);
             return 0;
         default:
             exit(23); // Stepping on choice or skip state should not happen.
@@ -290,7 +360,7 @@ void free_tree(node* n) {
 int main(int argc, char** argv) {
     if (argc < 2) {
         // Simple way to check actual size of a node struct.
-        printf("%i\n", sizeof(node));
+        printf("Node size: %lu, State size: %lu\n", sizeof(node), sizeof(state));
         exit(23);
     }
 
@@ -312,10 +382,9 @@ int main(int argc, char** argv) {
     node_vector* tmp;
     node_vector* leafs = nvector_create();
     node_vector* leafs2 = nvector_create();
-    follow_ep(nfst, root, leafs, visited);
+    node_vector* del = nvector_create();
+    follow_ep(nfst, root, leafs, visited, del);
     memset(visited, 0, sizeof(bool) * nlen);
-
-    bool pr = false;
 
     unsigned int k = 0;
     char input = getchar();
@@ -323,7 +392,7 @@ int main(int argc, char** argv) {
         // Iterate over active leaf nodes.
         for (int j = 0; j < leafs->len; ++j) {
             node* leaf = leafs->data[j];
-            step(input, nfst, leaf, leafs2, &root, visited);
+            step(input, nfst, leaf, leafs2, visited, del);
         }
 
         // Swap leafs to the newly found ones, and reset the other vector.
@@ -335,14 +404,11 @@ int main(int argc, char** argv) {
         k++;
 
         // Prune path tree, and print whatever resides in the root node.
-        if (k % 8 == 0) {
-            struct ret a = prune(root);
-            if (!a.keep) {
-                printf("Reject!");
-                exit(11);
+        if (k % 1 == 0) {
+            for (int i = 0; i < del->len; ++i) {
+                delete(del->data[i], &root);
             }
-            root = a.target;
-            root->parent = NULL;
+            del->len = 0;
 
             root->valuation->data[root->valuation->len] = '\0';
             fputs(root->valuation->data, stdout);

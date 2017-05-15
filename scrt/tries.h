@@ -15,12 +15,15 @@ typedef struct ret {
     bool keep;
 } ret;
 
+enum Child { LEFT, RIGHT };
+
 struct node {
     int node_ind;           // Should probably be called state_ind; index into
                             // the NFST array.
 
     bool del;               // Marked for deletion
     bool leaf;              // Is leaf node.
+    bool islchild;
     char_vector* valuation;
     struct node* lchild;
     struct node* rchild;

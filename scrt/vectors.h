@@ -61,6 +61,12 @@ node* nvector_pop(node_vector* vec) {
 }
 
 void nvector_push(node_vector* vec, node* data) {
+    for (int i = 0; i < vec->len; ++i) {
+        if (data == vec->data[i]) {
+            int* a = (int*) 0x0;
+            *a = 1;
+        }
+    }
     nvector_grow(vec, vec->len + 1);
     vec->data[vec->len] = data;
     vec->len += 1;
