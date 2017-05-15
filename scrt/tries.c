@@ -36,10 +36,10 @@ state* parse(char* fp, int* l, int* ss) {
                                         char_vector* output = cvector_create();
                                         char tmp3;
                                         for (int i = 0; i < t2-1; ++i) {
-                                            if (fscanf(fd, "%i,", &tmp3) != 1) exit(3);
+                                            if (fscanf(fd, "%hhi,", &tmp3) != 1) exit(3);
                                             cvector_append(output, tmp3);
                                         }
-                                        if (fscanf(fd, "%i]\n", &tmp3) != 1) exit(3);
+                                        if (fscanf(fd, "%hhi]\n", &tmp3) != 1) exit(3);
                                         cvector_append(output, tmp3);
                                         nfst[ind] .skip.output = output;
                                         break;
