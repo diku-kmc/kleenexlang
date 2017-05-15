@@ -200,17 +200,6 @@ void delete(node* n, node** root) {
         exit(111);
     }
 
-    /*
-    if (n != parent->lchild && n != parent->rchild) {
-        printf("Hmm\n");
-    }
-    if (n->islchild && n != parent->lchild) {
-        printf("NO!\n");
-    } else if (!n->islchild && n != parent->rchild) {
-        printf("NO2!!\n");
-    }
-    */
-
     if (n->islchild) {
         parent->lchild = NULL;
         target = parent->rchild;
@@ -220,27 +209,11 @@ void delete(node* n, node** root) {
     }
 
     n->valuation->len = 0;
-    n->del = false;
-    //memset(n, 0, sizeof(node));
     nvector_push(pool, n);
 
-
     if (target == NULL) {
-        //printf("test\n");
-        //fflush(stdout);
         delete(parent, root);
     } else {
-        /*
-        if (n->islchild) {
-            if (target != parent->rchild) {
-                printf("TEST1\n");
-            }
-        } else {
-            if (target != parent->lchild) {
-                printf("TEST2\n");
-            }
-        }
-        */
         cvector_prepend(target->valuation, parent->valuation);
         target->parent = parent->parent;
         target->islchild = parent->islchild;
@@ -254,7 +227,6 @@ void delete(node* n, node** root) {
             }
         }
         parent->valuation->len = 0;
-        parent->del = false;
         nvector_push(pool, parent);
     }
 }
@@ -385,10 +357,13 @@ int main(int argc, char** argv) {
     node_vector* del = nvector_create();
     follow_ep(nfst, root, leafs, visited, del);
     memset(visited, 0, sizeof(bool) * nlen);
+    char buffer[256];
+    int pos = 0;
+    int size = fread(buffer, 1, 256, stdin);
 
-    unsigned int k = 0;
-    char input = getchar();
-    while (input != '\0' && !feof(stdin)) {
+    char input;
+    while (pos < size) {
+        input = buffer[pos];
         // Iterate over active leaf nodes.
         for (int j = 0; j < leafs->len; ++j) {
             node* leaf = leafs->data[j];
@@ -401,24 +376,23 @@ int main(int argc, char** argv) {
         leafs2 = tmp;
         leafs2->len = 0;
 
-        k++;
-
         // Prune path tree, and print whatever resides in the root node.
-        if (k % 1 == 0) {
-            for (int i = 0; i < del->len; ++i) {
-                delete(del->data[i], &root);
-            }
-            del->len = 0;
-
-            root->valuation->data[root->valuation->len] = '\0';
-            fputs(root->valuation->data, stdout);
-            root->valuation->len = 0;
+        for (int i = 0; i < del->len; ++i) {
+            delete(del->data[i], &root);
         }
+        del->len = 0;
+
+        fwrite(root->valuation->data, 1, root->valuation->len, stdout);
+        root->valuation->len = 0;
 
         // Reset visited array.
         memset(visited, 0, sizeof(bool) * nlen);
 
-        input = getchar();
+        pos++;
+        if (pos >= size) {
+            size = fread(buffer, 1, 256, stdin);
+            pos = 0;
+        }
     }
     output(leafs, nfst);
     //fprintf(stderr, "Leafs: %i\n", leafs->len);

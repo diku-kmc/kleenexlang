@@ -61,12 +61,6 @@ node* nvector_pop(node_vector* vec) {
 }
 
 void nvector_push(node_vector* vec, node* data) {
-    for (int i = 0; i < vec->len; ++i) {
-        if (data == vec->data[i]) {
-            int* a = (int*) 0x0;
-            *a = 1;
-        }
-    }
     nvector_grow(vec, vec->len + 1);
     vec->data[vec->len] = data;
     vec->len += 1;
@@ -136,7 +130,6 @@ void cvector_remove(char_vector* vec, int ind) {
     vec->len--;
 }
 
-// Concatenates two vectors in to one, and frees the remaining vector.
 void cvector_concat(char_vector* vec1, char_vector* vec2) {
     cvector_grow(vec1, vec1->len + vec2->len);
     memcpy(vec1->data + (vec1->len - 1), vec2->data, (vec2->len) * sizeof(char));
@@ -144,8 +137,10 @@ void cvector_concat(char_vector* vec1, char_vector* vec2) {
 }
 
 void cvector_prepend(char_vector* vec1, char_vector* vec2) {
-    cvector_grow(vec2, vec1->len + vec2->len);
-    memcpy(vec2->data + vec2->len, vec1->data, (vec1->len) * sizeof(char));
+    if (vec1->len > 0) {
+        cvector_grow(vec2, vec1->len + vec2->len);
+        memcpy(vec2->data + vec2->len, vec1->data, (vec1->len) * sizeof(char));
+    }
     vec1->len += vec2->len;
 
     // Switch data pointer and capacity.
