@@ -7,5 +7,5 @@ SOURCE = scrt/tries.c
 HELPERS = scrt/tries.h scrt/vectors.h
 
 scrt: ${SOURCE} ${HELPERS}
-	gcc -O3 -o dist/build/sim/sim ${SOURCE}
+	gcc -O3 -Wall -o dist/build/sim/sim ${SOURCE}
 
