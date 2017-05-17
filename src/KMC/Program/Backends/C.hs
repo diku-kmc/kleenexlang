@@ -16,7 +16,6 @@ import           System.Exit (ExitCode(..))
 import           System.IO
 import           System.Process
 import           Text.PrettyPrint
-import qualified System.FilePath as FP
 
 import           KMC.Util.Coding
 import           KMC.Program.IL
@@ -38,18 +37,16 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> [String] -> Bool -> String
-progTemplate buString tablesString declsString infoString initString progStrings incMain =
- (if (not incMain)
-  then ([strQ|/* include main */
-|])
-  else ([strQ|#define FLAG_NOMAIN 1 /* no main */
-|] )) ++
+progTemplate :: String -> String -> String -> String -> String -> String -> String -> [String] -> String
+progTemplate buString tablesString declsString infoString initString stateTable stateCount progStrings =
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
+  ++ [fileQ|crt/crt.h|] ++ "\n"
   ++ [fileQ|crt/crt.c|] ++ "\n"
   ++ tablesString ++ "\n\n"
+  ++ stateTable ++ "\n"
+  ++ stateCount ++ "\n\n"
   ++ declsString ++ [strQ|
 void printCompilationInfo()
 {
@@ -628,49 +625,16 @@ programsToC buftype pipeline =
                     Left _     -> empty -- multi phase not supported
                     Right _    -> error "tjoooo..."
 
-renderHeader :: String -> String -> String -> String
-renderHeader output stateTable stateCount =
-  [strQ|
-//
-//  |]++ output ++ [strQ|.h
-//
-
-#ifndef |] ++ output ++ [strQ|_h
-#define |] ++ output ++ [strQ|_h
-
-struct state {
-  int num;
-  int accepting;
-};
-
-static const struct state fail_state = { .num = -1, .accepting = 0 };
-
-|] ++ stateCount ++ [strQ|
-
-|] ++ stateTable ++ [strQ|
-
-int match(int, int, char *, long);
-
-#endif /* |] ++ output ++ [strQ|_h */
-|]
-
-renderHFile :: String -> CProg -> String
-renderHFile baseName cprog =
-  renderHeader  baseName
-                (render $ cStateTableVar cprog)
-                (render $ cStateCountVar cprog)
-
-renderCProg :: String -> CProg -> Bool -> String
-renderCProg compInfo cprog genHeader =
+renderCProg :: String -> CProg -> String
+renderCProg compInfo cprog =
   progTemplate (render $ cBufferUnit cprog)
                (render $ cTables cprog)
                (render $ cDeclarations cprog)
                compInfo
                (render $ cInit cprog)
-               -- (render $ cStateTableVar cprog)
-               -- (render $ cStateTableJson cprog)
+               (render $ cStateTableVar cprog)
+               (render $ cStateCountVar cprog)
                (map render $ cProg cprog)
-               genHeader
 
 ccVersion :: (MonadIO m) => FilePath -> m String
 ccVersion comp = do
@@ -689,23 +653,19 @@ compileProgram :: (MonadIO m)
                -> FilePath         -- ^ Path to C compiler
                -> Maybe FilePath   -- ^ Binary output path
                -> Maybe FilePath   -- ^ C code output path
-               -> Bool             -- ^ Generate header file
                -> Bool             -- ^ Use word alignment
                -> m ExitCode
-compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath genHeader wordAlign = do
+compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath wordAlign = do
   cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
   let cprog = programsToC buftype $ pipeline
-  let cstr = renderCProg info cprog genHeader
+  let cstr = renderCProg info cprog
   let sourceLineCount = length (lines cstr)
   case cCodeOutPath of
     Nothing -> return ()
     Just p  -> do
-      let base = FP.dropExtension p
-      let hstr = renderHFile base cprog
       infoCallback $ "Writing C source to " ++ p
       liftIO $ writeFile p cstr
-      liftIO $ writeFile (base ++ ".h") hstr
   case moutPath of
     Nothing -> return ExitSuccess
     Just outPath -> do

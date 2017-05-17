@@ -1,59 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include <inttypes.h>
-#include <getopt.h>
-#include <unistd.h>
-#include <sys/time.h>
-#ifdef __APPLE__
-#   include <mach-o/dyld.h>
-#endif
-
-#define RETC_PRINT_USAGE     1
-#define RETC_PRINT_INFO      2
-#define RETC_PRINT_TABLE     3
-
-#define OUTBUFFER_SIZE       (16*1024)
-#define INBUFFER_SIZE        (16*1024)
-#define INITIAL_BUFFER_SIZE  (4096*8)
-#define OUTBUFFER_STACK_SIZE (1024)
-
-#ifdef FLAG_NOINLINE
-#define INLINE static
-#endif
-#ifndef INLINE
-#define INLINE static inline
-#endif
-
-#ifndef BUFFER_UNIT_T
-#warning "BUFFER_UNIT_T not defined. Falling back to default 'uint8_t'"
-#define BUFFER_UNIT_T uint8_t
-#endif
-
-#ifndef NUM_PHASES
-#error "NUM_PHASES not defined."
-#endif
-
-#ifndef OUTSTREAM
-#define OUTSTREAM stdout
-#endif
-
-// Order of descriptors provided by pipe()
-#define  READ_FD 0
-#define WRITE_FD 1
-
-typedef BUFFER_UNIT_T buffer_unit_t;
-typedef struct {
-  buffer_unit_t *data;
-  size_t size;         /* size in bytes */
-  size_t bitpos;       /* bit offset from data  */
-} buffer_t;
-
-#define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
-#define BUFFER_UNIT_BITS (BUFFER_UNIT_SIZE * 8)
-
 unsigned char *next;
 buffer_t outbuf;
 buffer_t *outbuf_ptr;
@@ -63,14 +7,6 @@ unsigned char inbuf[INBUFFER_SIZE*2];
 size_t in_size = 0;
 int in_cursor = 0;
 #define avail (in_size - in_cursor)
-
-// Output buffer stack
-
-typedef struct {
-  buffer_t **data;
-  size_t capacity;
-  size_t size;
-} buf_stack;
 
 buf_stack outbuf_stack;
 
@@ -98,13 +34,6 @@ void init_outbuf_stack()
   outbuf_stack.capacity = OUTBUFFER_STACK_SIZE;
   outbuf_stack.data = malloc(OUTBUFFER_STACK_SIZE*sizeof(buffer_t *));
 }
-
-// Program interface
-
-void printCompilationInfo();
-void init();
-int match(int phase, int start_state, char* buf, long length);
-void print_state_table();
 
 void buf_flush(buffer_t *buf)
 {
@@ -367,111 +296,3 @@ void run(int phase, int start_state)
   flush_outbuf();
 }
 
-#ifndef FLAG_NOMAIN
-static struct option long_options[] = {
-   { "phase", required_argument, 0, 'p' },
-   { "state", required_argument, 0, 's' },
-   { 0, 0, 0, 0 }
-};
-
-int main(int argc, char *argv[])
-{
-  bool do_timing = false;
-  int c;
-  int option_index = 0;
-  int phase;
-  int start_state = -1;
-  bool do_phase = false;
-
-  while ((c = getopt_long (argc, argv, "ihtop:s:", long_options, &option_index)) != -1)
-  {
-    switch (c)
-    {
-      case 'i':
-        printCompilationInfo();
-        return RETC_PRINT_INFO;
-      case 't':
-        do_timing = true;
-        break;
-      case 's':
-        start_state = atoi(optarg);
-        break;
-      case 'p':
-        phase = atoi(optarg);
-        do_phase = true;
-        break;
-      case 'o':
-        printStateTable();
-        return RETC_PRINT_TABLE;
-      case 'h':
-      default:
-        printUsage(argv[0]);
-        return RETC_PRINT_USAGE;
-    }
-  }
-
-  struct timeval time_before, time_after, time_result;
-  long int millis;
-  if(do_timing)
-  {
-    gettimeofday(&time_before, NULL);
-  }
-
-  if (do_phase)
-  {
-    run(phase, start_state);
-  }
-  else
-  {
-    // set up a pipeline
-    // stdin -> prog --phase 1 -> prog --phase 2 -> ... -> prog --phase n -> stdout
-
-    int orig_stdout = dup(STDOUT_FILENO);
-    int pipes[NUM_PHASES-1][2];
-
-    int i;
-    for (i = 1; i < NUM_PHASES; i++)
-    {
-      if (i != 1) close(pipes[i-2][WRITE_FD]);
-
-      if (pipe(pipes[i-1]) != 0)
-      {
-        fprintf(stderr, "Error creating pipe %d.", i);
-        return 1;
-      }
-      dup2(pipes[i-1][WRITE_FD], STDOUT_FILENO);
-
-      if (! fork())
-      {
-        close(orig_stdout);
-        close(pipes[i-1][READ_FD]);
-
-        run(i, start_state);
-        return 0;
-      }
-
-      close(STDIN_FILENO);
-      dup2(pipes[i-1][READ_FD], STDIN_FILENO);
-    }
-
-    #if NUM_PHASES>1
-    close(pipes[NUM_PHASES-2][WRITE_FD]);
-    dup2(orig_stdout, STDOUT_FILENO);
-    #endif
-
-    // Run last phase in-process
-    run(NUM_PHASES, start_state);
-  }
-
-  if (do_timing)
-  {
-    gettimeofday(&time_after, NULL);
-    timersub(&time_after, &time_before, &time_result);
-    // A timeval contains seconds and microseconds.
-    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
-    fprintf(stderr, "time (ms): %ld\n", millis);
-  }
-
-  return 0;
-}
-#endif

@@ -19,7 +19,7 @@
 
 #include <omp.h>
 
-#include "email.h"
+#include "crt.h"
 #include "util.h"
 #include "list.h"
 
@@ -81,7 +81,7 @@ void init_target(char* file_name)
   fseek(f, 0, SEEK_END);
   target_size = ftell(f);
   fclose(f);
-  
+
   int fd = open(file_name, O_RDONLY);
   target = mmap(NULL, target_size + 1, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, 0);
 }
@@ -90,7 +90,7 @@ int did_accept(int state) {
   if (0 <= state && state < state_count ) {
     return state_table[state].accepting;
   }
-  
+
   fprintf(stderr, "State %i does not exist.", state);
   exit(EXIT_FAILURE);
 }
@@ -121,12 +121,12 @@ int* suffix_analysis(long offset, long suffix_len) {
   int i;
   char* suffix = target + offset - suffix_len;
   int* map = malloc(state_count * sizeof(int));
-  
+
 #pragma omp parallel for
   for (i = 0; i < state_count; i++) {
     map[i] = match(1, i, suffix, suffix_len);
   }
-  
+
   return map;
 }
 
@@ -136,7 +136,7 @@ int* suffix_analysis(long offset, long suffix_len) {
  */
 void run_single_chunk() {
   int result;
-  
+
   result = match(1, -1, target, target_size);
   fprintf(stdout, "-p 1 -s %i\n", result);
   if(did_accept(result)) {
@@ -158,7 +158,7 @@ void update_jobs(int** resultmap, int num_of_chunks, struct node ** job_list) {
     idx = resultmap[chunk][idx];
     chunk++;
   }
-  
+
   while (*job_list != NULL) {
     job_t * job = (*job_list)->data;
     if (job->chunk <= chunk) {
@@ -167,14 +167,14 @@ void update_jobs(int** resultmap, int num_of_chunks, struct node ** job_list) {
       break;
     }
   }
-  
+
   if (chunk >= num_of_chunks) return;
-  
+
   job_t * job = malloc(sizeof(job_t));
   job->chunk = chunk;
   job->state = idx;
   job->started = 0;
-  
+
   push(job_list, job, sizeof(job_t));
   free(job);
 }
@@ -191,27 +191,27 @@ int map_output(int** resultmap, int num_of_chunks) {
 
 void run_multi_chunk(int num_of_chunks, int suffix_len) {
   int i, j;
-  
+
   /* SET UP */
   long chunk_size = target_size / num_of_chunks;
-  
+
   long * chunk_sizes = malloc(num_of_chunks * chunk_size);
   for (i = 0; i < num_of_chunks -1; chunk_sizes[i++] = chunk_size);
   chunk_sizes[num_of_chunks - 1] = target_size - chunk_size * (num_of_chunks - 1);
-  
+
   /* CALCULATE OFFSET FOR EACH CHUNK */
   long * chunk_offset = malloc(num_of_chunks * sizeof(chunk_offset));
   for(i = 0; i < num_of_chunks; i++) {
     chunk_offset[i] = i * chunk_size;
   }
-  
+
   /* DO SUFFIX ANALYSIS */
   int ** chunkmap = malloc(num_of_chunks * sizeof(chunkmap));
   #pragma omp parallel for
   for (i = 1; i < num_of_chunks; i++) {
     chunkmap[i] = suffix_analysis(chunk_offset[i], suffix_len);
   }
-  
+
   // RUN KLEENEX
   int ** resultmap = malloc(num_of_chunks * sizeof(resultmap)); // Map containing result of each chunk
 #pragma omp parallel for
@@ -220,14 +220,14 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
     for (j = 0; j < state_count; temp[j++] = -2);
     resultmap[i] = temp;
   }
-  
-  
+
+
   // CREATE JOBS
   size_t job_size = sizeof(job_t);
-  
+
   struct node * job_list = NULL;
   struct job_node * job = malloc(job_size);
-  
+
   for (i = num_of_chunks - 1; i > 0; i--) { // start at 1 as we know the start state of chunk 0.
     int * ss = unique(chunkmap[i], state_count);
     j = 0;
@@ -239,13 +239,13 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
       j++;
     }
   }
-  
+
   /* Push job for chunk 0 */
   job->chunk = 0; job->state = -1; job-> started = 0;
   push(&job_list, job, job_size);
-  
+
   printList(job_list, &print_job);
-  
+
   while (job_list != NULL) {
 #pragma omp parallel
     {
@@ -266,9 +266,9 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
         }
       }
       if (chunk != -2) {
-        
+
         offset = chunk * chunk_size;
-        
+
         if (chunk == 0) {
           resultmap[chunk][0] = match(1, start_state, target, chunk_sizes[chunk]);
         } else {
@@ -279,7 +279,7 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
     /* REMOVE OUTDATED JOBS */
     update_jobs(resultmap, num_of_chunks, &job_list);
   }
-  
+
   fprintf(stdout, "printing results:\n");
   for (i = 0; i < num_of_chunks; i++) {
     fprintf(stdout, "chunk %i: ", i);
@@ -288,9 +288,9 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
     }
     fprintf(stdout, "\n");
   }
-  
+
   int final_state = map_output(resultmap, num_of_chunks);
-  
+
   fprintf(stdout, "-p 1 -s %i\n", final_state);
   if(did_accept(final_state)) {
     fprintf(stdout,"\033[1mDID ACCEPT\033[0m\n");
@@ -315,12 +315,12 @@ int main(int argc, char *argv[]) {
   int chunks_provided = 0;
   int suffix_len = DEFAULT_SUFFIX_LENGTH;
   char* file_name = NULL;
-  
+
   if (argc == 1) {
     print_usage(argv[0]);
     return RETC_PRINT_USAGE;
   }
-  
+
   while ((c = getopt_long(argc, argv, ":hl:f:c:", long_options, &option_index)) != -1) {
     switch (c)
     {
@@ -328,13 +328,13 @@ int main(int argc, char *argv[]) {
         /* handle -f and --file */
         file_name = optarg;
         break;
-        
+
       case 'c':
         /* handle -c and --chunks */
         num_of_chunks = atoi(optarg);
         chunks_provided = 1;
         break;
-        
+
       case 'l':
         /* handle -l and --len-suffix */
         suffix_len = atoi(optarg);
@@ -347,7 +347,7 @@ int main(int argc, char *argv[]) {
           return RETC_PRINT_ERROR;
         }
         break;
-        
+
       case ':':
         /* missing option argument */
         fprintf(stderr, "%s: option '-%c' requires an argument\n\n",
@@ -355,14 +355,14 @@ int main(int argc, char *argv[]) {
         print_usage(argv[0]);
         return RETC_PRINT_ERROR;
         break;
-        
+
       case '?':
         /* invalid option */
         fprintf(stderr, "%s: option '-%c' is invalid\n\n",
                 argv[0], optopt);
         print_usage(argv[0]);
         return RETC_PRINT_ERROR;
-        
+
       case 'h':
       default:
         /* handle -h and --help*/
@@ -370,7 +370,7 @@ int main(int argc, char *argv[]) {
         return RETC_PRINT_USAGE;
     }
   }
-  
+
   /* Validate provided arguments */
   /* Check that file_name was provided */
   if (file_name == NULL) {
@@ -379,7 +379,7 @@ int main(int argc, char *argv[]) {
     print_usage(argv[0]);
     return RETC_PRINT_ERROR;
   }
-  
+
   /* Check that file can be accessed */
   if (access(file_name, R_OK)) {
     switch (errno) {
@@ -388,13 +388,13 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "%s: the file '%s' does not exist\n", argv[0], file_name);
         return RETC_PRINT_ERROR;
         break;
-        
+
       default:
         fprintf(stdout, "Error no.: %d", errno);
         break;
     }
   }
-  
+
   /* Validate number of chunks */
   if (!chunks_provided) {
     fprintf(stderr, "%s: option ['-c' | '--chunks'] is required\n\n",
@@ -407,17 +407,17 @@ int main(int argc, char *argv[]) {
     print_usage(argv[0]);
     return RETC_PRINT_ERROR;
   }
-  
+
   /* Handle multiple chunks */
   init_target(file_name);
-  
+
   /* Handle single chunk */
   if (num_of_chunks == 1) {
     run_single_chunk();
     return 0;
   }
-  
+
   run_multi_chunk(num_of_chunks, suffix_len);
-  
+
   return 0;
 }

@@ -199,7 +199,6 @@ compileDirect compileOpts useWordAlignment srcFile srcMd5 du =
                    (optAltCompiler compileOpts)
                    (optOutFile compileOpts)
                    (optCFile compileOpts)
-                   (optGenerateHFile compileOpts)
                    useWordAlignment
 
 compileOracleAction :: CompileOptions
@@ -234,7 +233,6 @@ compileOracleAction compileOpts useWordAlignment srcFile srcMd5 ou au =
                    (optAltCompiler compileOpts)
                    (optOutFile compileOpts)
                    (optCFile compileOpts)
-                   (optGenerateHFile compileOpts)
                    useWordAlignment
 
 compileCoder :: CompileOptions
@@ -266,7 +264,6 @@ compileCoder compileOpts useWordAlignment srcFile srcMd5 ou =
                    (optAltCompiler compileOpts)
                    (optOutFile compileOpts)
                    (optCFile compileOpts)
-                   (optGenerateHFile compileOpts)
                    useWordAlignment
 
 simulateLockstep :: SimulateOptions -> TransducerUnit -> Frontend ExitCode

@@ -1,6 +1,6 @@
 //
 //  list.h
-//  
+//
 //
 //  Created by Jonas Jørgensen on 03/05/2017.
 //
