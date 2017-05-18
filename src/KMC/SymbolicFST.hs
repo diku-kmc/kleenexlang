@@ -46,10 +46,10 @@ import           Prelude
 -- symbol transitions, but not both.
 data FST q pred func =
   FST
-  { fstS :: S.Set q
-  , fstE :: OrderedEdgeSet q pred func
-  , fstI :: q
-  , fstF :: S.Set q
+  { fstS :: S.Set q                     -- States
+  , fstE :: OrderedEdgeSet q pred func  -- Edges
+  , fstI :: q                           -- Initial state
+  , fstF :: S.Set q                     -- Final states
   }
 
 -- | Type synonym for a transition. A transition is either labeled by a
