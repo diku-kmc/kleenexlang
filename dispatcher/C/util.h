@@ -9,8 +9,15 @@
 #ifndef util_h
 #define util_h
 
-int** factor(int*, int);
-int* gather(int*, int*, int);
-int* unique(int*, int);
+typedef struct {
+  int size;
+  int * data;
+} arr;
+
+extern size_t arr_size;
+
+arr ** factor(arr *);
+arr * gather(arr *, arr *);
+arr * unique(arr *);
 
 #endif /* util_h */

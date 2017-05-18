@@ -9,20 +9,22 @@
 
 #include "util.h"
 
+size_t arr_size = sizeof(arr);
+
 /**
  *    Checks if arr contains the target element.
  *    Returns 1 if target is found with in the first n elements of arr,
  *            0 otherwise.
  *
- *    int* arr:   Array subject to search.
+ *    arr * arr:   Array subject to search.
  *    int target: Target object of search.
- *    int n:      Length of arr.
  */
 int /* 1 - true or 0 - false */
-contains(int*  arr, int target, int n) {
-  int i;
-  for (i = 0; i < n; i++) {
-    if (target == arr[i]) {return 1;}
+contains(arr *  arr, int target) {
+  for (int i = 0; i < arr->size; i++) {
+    if (target == arr->data[i]) {
+      return 1;
+    }
   }
   return 0;
 }
@@ -35,29 +37,30 @@ contains(int*  arr, int target, int n) {
  *
  *    Returns an three dimensional array f, such that f[0] = lookup and f[1] = unique.
  *
- *    int* s: array to factor.
- *    int  n: lengtf of s.
+ *    arr * s: array to factor.
  *
  *    Postcondition: 
  *      - u[l[i]] = s[i]
 */
-int** /* f[0] = lookup and f[1] = unique*/
-factor(int* s, int n) {
-  int i, j;
-  int** f;
-  f = malloc(2 * sizeof(int));
-  f[0] = malloc(n * sizeof(int));
-  f[1] = unique(s, n);
+arr ** /* f[0] = lookup and f[1] = unique*/
+factor(arr * s) {
+  arr ** f;
+  arr * u = unique(s);
+  arr * l = malloc(arr_size);
+  l->data = malloc(s->size * sizeof(int) + sizeof(int));
+  l->size = s->size;
   
-  for (i = 0; i < n; i++) {
-    j = 0;
-    while (f[1][j] > -2) {
-      if (f[1][j] == s[i]) {
-        f[0][i] = j;
+  for (int i = 0; i < s->size; i++) {
+    for (int j = 0; j < u->size; j++) {
+      if (u->data[j] == s->data[i]) {
+        l->data[i] = j;
+        break;
       }
-      j++;
     }
   }
+  f = malloc(2 * sizeof(arr *));
+  f[0] = l;
+  f[1] = u;
   return f;
 }
 
@@ -66,21 +69,23 @@ factor(int* s, int n) {
  *    Produces an array representing the nested loopup t[s[i]].
  *    Returns the array g such that g[i] == t[s[i]] where i is an index of s.
  *
- *    int* s: first array.
- *    int* t: second array.
- *    int  n: size of s.
+ *    arr * s: first array.
+ *    arr * t: second array.
  *
  *    The function is only defined for instances of s, where all 
  *    values of s is a valid index of t. Diviating from this might
  *    cause undefined behaviour.
  */
-int* gather(int* s, int* t, int n) {
-  int i;
-  int *g;
-  g =  malloc(n * sizeof(int));
-  
-  for (i = 0; i < n; i++) {
-    g[i] = t[s[i]];
+arr* gather(arr * s, arr * t) {
+  arr * g;
+  g = malloc(sizeof(arr));
+  g->data = malloc(s->size * sizeof(int));
+  g->size = s->size;
+  int * ga = g->data;
+  int * ta = t->data;
+  int * sa = t->data;
+  for (int i = 0; i < s->size; i++) {
+    ga[i] = ta[sa[i]];
   }
   
   return g;
@@ -94,24 +99,23 @@ int* gather(int* s, int* t, int n) {
  *
  *    Returns the array u of unique elements in s.
  *
- *    int* s: target array.
- *    int  n: length of s.
+ *    arr * s: target array.
  *
  *    The returned array will have the length n. 
  *    Any first index containing the value -2 indicates 
  *    the end of the sequence of unique values.
  */
-int* unique(int* s, int n) {
-  int i, j=0;
-  int * res;
-  res = malloc(n * sizeof(int));
-  for (i = 0; i < n; res[i++] = -2);
-  
-  for (i = 0; i < n; i++) {
-    if (!contains(res, s[i], n)) {
-      res[j++] = s[i];
+arr* unique(arr * s) {
+  arr * res;
+  res = malloc(sizeof(arr));
+  res->data = malloc(s->size * sizeof(int));
+  res->size = 0;
+
+  for (int i = 0; i < s->size; i++) {
+    if (!contains(res, s->data[i])) {
+      res->data[(res->size)++] = s->data[i];
     }
   }
-//  res = realloc(res, (j+1) * sizeof(int));
+  res->data = realloc(res->data, res->size * sizeof(int));
   return res;
 }

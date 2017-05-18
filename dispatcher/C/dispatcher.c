@@ -12,8 +12,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
-#include <sys/types.h>  //  To acces waitpid(2)
-#include <sys/wait.h>   //  --||--
 #include <unistd.h>
 #include <string.h>
 
@@ -23,14 +21,13 @@
 #include "util.h"
 #include "list.h"
 
-#define RETC_PRINT_USAGE     1
-#define RETC_PRINT_ERROR     2
+#define RETC_PRINT_USAGE      1
+#define RETC_PRINT_ERROR      2
 #define DEFAULT_SUFFIX_LENGTH 256
 
-typedef struct job_node {
+typedef struct {
   int chunk;
   int state;
-  int started;
 } job_t;
 
 char* target;
@@ -100,10 +97,9 @@ int did_accept(int state) {
  *    Pretty print job_node struct
  */
 void print_job(void* job) {
-  fprintf(stdout, "\033[1mjob\033[0m - c %i, s %i, b %i\n",
-          ((struct job_node*)job)->chunk,
-          ((struct job_node*)job)->state,
-          ((struct job_node*)job)->started);
+  fprintf(stdout, "\033[1mjob\033[0m - c %i, s %i\n",
+          ((job_t*)job)->chunk,
+          ((job_t*)job)->state);
 }
 
 /**
@@ -117,14 +113,16 @@ void print_job(void* job) {
  *    int offest:     offset in target where the chunk begins.
  *    int suffix_len: length of suffix.
  */
-int* suffix_analysis(long offset, long suffix_len) {
+arr* suffix_analysis(long offset, long suffix_len) {
   int i;
   char* suffix = target + offset - suffix_len;
-  int* map = malloc(state_count * sizeof(int));
+  arr * map = malloc(sizeof(arr));
+  map->size = state_count;
+  map->data = malloc(state_count * sizeof(int));
 
 #pragma omp parallel for
   for (i = 0; i < state_count; i++) {
-    map[i] = match(1, i, suffix, suffix_len);
+    map->data[i] = match(1, i, suffix, suffix_len);
   }
 
   return map;
@@ -173,7 +171,6 @@ void update_jobs(int** resultmap, int num_of_chunks, struct node ** job_list) {
   job_t * job = malloc(sizeof(job_t));
   job->chunk = chunk;
   job->state = idx;
-  job->started = 0;
 
   push(job_list, job, sizeof(job_t));
   free(job);
@@ -206,8 +203,8 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
   }
 
   /* DO SUFFIX ANALYSIS */
-  int ** chunkmap = malloc(num_of_chunks * sizeof(chunkmap));
-  #pragma omp parallel for
+  arr ** chunkmap = malloc(num_of_chunks * sizeof(chunkmap));
+#pragma omp parallel for
   for (i = 1; i < num_of_chunks; i++) {
     chunkmap[i] = suffix_analysis(chunk_offset[i], suffix_len);
   }
@@ -226,30 +223,25 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
   size_t job_size = sizeof(job_t);
 
   struct node * job_list = NULL;
-  struct job_node * job = malloc(job_size);
+  job_t * job = malloc(job_size);
 
-  for (i = num_of_chunks - 1; i > 0; i--) { // start at 1 as we know the start state of chunk 0.
-    int * ss = unique(chunkmap[i], state_count);
+  for (i = num_of_chunks - 1; i > 0; i--) { // end at 1 as we know the start state of chunk 0.
+    arr * ss = unique(chunkmap[i]);
     j = 0;
-    /* Can we do this in a neater way? */
-    while (ss[j] > -2) {
-      job = malloc(job_size);
-      job->chunk = i; job->state = ss[j]; job-> started = 0;
+    for (i = 0; i < ss->size; i++) {
+      job->chunk = i; job->state = ss->data[j];
       push(&job_list, job, job_size);
-      j++;
     }
   }
 
   /* Push job for chunk 0 */
-  job->chunk = 0; job->state = -1; job-> started = 0;
+  job->chunk = 0; job->state = -1;
   push(&job_list, job, job_size);
-
-  printList(job_list, &print_job);
 
   while (job_list != NULL) {
 #pragma omp parallel
     {
-      struct job_node * job;
+      job_t * job;
       long offset;
       int start_state, chunk;
 #pragma omp critical
@@ -257,7 +249,7 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
         /* GET NEXT JOB */
         /* THIS SHOULD BE DONE IN ANOTHER WAY */
         if (job_list != NULL) {
-          job = (struct job_node *)job_list->data;
+          job = (job_t *)job_list->data;
           chunk = job->chunk;
           start_state = job->state;
           pop(&job_list);
@@ -280,22 +272,13 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
     update_jobs(resultmap, num_of_chunks, &job_list);
   }
 
-  fprintf(stdout, "printing results:\n");
-  for (i = 0; i < num_of_chunks; i++) {
-    fprintf(stdout, "chunk %i: ", i);
-    for (j = 0; j < state_count; j++) {
-      fprintf(stdout, "%i, ", resultmap[i][j]);
-    }
-    fprintf(stdout, "\n");
-  }
-
   int final_state = map_output(resultmap, num_of_chunks);
 
   fprintf(stdout, "-p 1 -s %i\n", final_state);
   if(did_accept(final_state)) {
-    fprintf(stdout,"\033[1mDID ACCEPT\033[0m\n");
+    fprintf(stdout,"state %d - \033[1mACCEPT\033[0m\n", final_state);
   } else {
-    fprintf(stdout, "\033[1mDID NOT ACCEPT\033[0m\n");
+    fprintf(stdout,"state %d - \033[1mFAIL\033[0m\n", final_state);
   }
 }
 
@@ -416,8 +399,8 @@ int main(int argc, char *argv[]) {
     run_single_chunk();
     return 0;
   }
-
+  
   run_multi_chunk(num_of_chunks, suffix_len);
-
+  
   return 0;
 }

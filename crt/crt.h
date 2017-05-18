@@ -64,11 +64,11 @@ typedef struct {
 
 
 // State information
-struct state {
+typedef struct {
   int num;
   int accepting;
-};
-extern struct state state_table[];
+} state;
+extern state state_table[];
 extern int state_count;
 
 // Program interface
@@ -76,4 +76,3 @@ extern int state_count;
 void printCompilationInfo();
 void init();
 int match(int phase, int start_state, char* buf, long length);
-void print_state_table();
