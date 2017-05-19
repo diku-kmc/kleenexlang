@@ -76,7 +76,7 @@ state* parse(char* fp, int* l, int* ss) {
 
 // Simple visualization of the path tree, might not work currently.
 void vis_tree(node* n, FILE* fd) {
-    if (!n->leaf) {
+    if (n->lchild != NULL) {
         n->valuation->data[n->valuation->len] = '\0';
         fprintf(fd, "\"%p\" [shape=circle, label=\"%i\\n%p\\nData:\"];\n",
                 n,
@@ -113,8 +113,6 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
     // Stop and mark node for deletion, if the state has been previously
     // visited in current input iteration.
     if (visited[ind]) {
-        n->leaf = true;
-        n->del = true;
         nvector_push(del, n);
         return false;
     }
@@ -128,8 +126,6 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
                 n->lchild = (node*) malloc(sizeof(node));
                 n->lchild->valuation = cvector_create();
             }
-            n->lchild->del = false;
-            n->lchild->leaf = false;
             n->lchild->islchild = true;
 
             n->lchild->parent = n;
@@ -143,8 +139,6 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
                 n->rchild = (node*) malloc(sizeof(node));
                 n->rchild->valuation = cvector_create();
             }
-            n->rchild->del = false;
-            n->rchild->leaf = false;
             n->rchild->islchild = false;
 
 
@@ -162,7 +156,6 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             break;
                    }
         default: {
-            n->leaf = true;
             nvector_append(leafs, n);
             return true;
             break;
@@ -227,68 +220,6 @@ inline void delete(node* n, node** root) {
         nvector_push(pool, parent);
 }
 
-// Prunes the path tree, expects to be passed the root node as initial call.
-ret prune(node* n) {
-    struct ret a;
-    a.keep = true;
-    if (n->leaf) {
-        // Push node to pool, if it is marked for deletion.
-        if (n->del) {
-            a.keep = false;
-            n->del = false;
-            n->valuation->len = 0;
-            nvector_push(pool, n);
-        }
-
-        a.target = n;
-        return a;
-    }
-
-    struct ret left  = prune(n->lchild);
-    struct ret right = prune(n->rchild);
-
-    if (left.keep) {
-        if (right.keep) {
-            // Keeping both children, just update pointers to possibly new
-            // locations.
-            n->lchild = left.target;
-            n->rchild = right.target;
-            left.target->parent = n;
-            right.target->parent = n;
-            a.target = n;
-        } else {
-            // If only one child is to be kept, give that child back, and push
-            // current node to pool
-            node* target = left.target;
-            a.target = target;
-
-            cvector_prepend(target->valuation, n->valuation);
-            n->valuation->len = 0;
-            nvector_push(pool, n);
-        }
-    } else {
-        if (right.keep) {
-            // If only one child is to be kept, give that child back, and push
-            // current node to pool
-            node* target = right.target;
-            a.target = target;
-
-            cvector_prepend(target->valuation, n->valuation);
-            n->valuation->len = 0;
-            nvector_push(pool, n);
-        } else {
-            // None of the children are kept, there for nothing to keep.
-            a.keep = false;
-
-            n->valuation->len = 0;
-            nvector_push(pool, n);
-        }
-    }
-    return a;
-}
-
-
-
 
 int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
         bool* visited, node_vector* del) {
@@ -299,13 +230,11 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
                 if (input >= st.symbol.input[i].start && input <= st.symbol.input[i].end) {
                     n->node_ind = st.symbol.target;
                     if (st.symbol.output) cvector_append(n->valuation, input);
-                    n->leaf = false;
                     return follow_ep(nfst, n, leafs, visited, del); // Use truth value to determine deletion
                 }
             }
             } // Fallthrough
         case ACCEPT:
-            n->del = true;
             nvector_push(del, n);
             return 0;
         default:
@@ -316,7 +245,7 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
 // Mostly unused, just to free as much as possible, to have better use of
 // Valgrind for memory checks
 void free_tree(node* n) {
-    if (n->leaf) {
+    if (n->lchild == NULL) {
         cvector_free(n->valuation);
         free(n);
         return;
@@ -341,8 +270,6 @@ int main(int argc, char** argv) {
     node* root = (node*) malloc(sizeof(node));
     root->valuation = cvector_create();
     root->node_ind = ss;
-    root->del = false;
-    root->leaf = false;
 
     bool* visited = (bool*) malloc(sizeof(bool) * nlen);
 
