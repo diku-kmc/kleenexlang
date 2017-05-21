@@ -27,17 +27,17 @@ state* parse(char* fp, int* l, int* ss) {
                         nfst[ind] .choice.t2 = t2;
                         break;
             // Skip state
-            case 'S':   if (fscanf(fd, "%i %c", &t1, &tmp2) != 2) exit(3); // Parse target and sub type
+                        // Parse target and sub type
+            case 'S':   if (fscanf(fd, "%i %c", &t1, &tmp2) != 2) exit(3);
+                        nfst[ind] .s_type = SKIP;
                         nfst[ind] .skip.target = t1;
                         switch (tmp2) {
                             // Writing skip state
                             case 'W':   if (fscanf(fd, " %i\n", &t2) != 1) exit(3);
-                                        nfst[ind] .s_type = SKIPW;
                                         nfst[ind] .skip.output = (char) t2;
                                         break;
                             // No output state
                             case 'E':   if (fscanf(fd, "\n") != 0) exit(3);
-                                        nfst[ind] .s_type = SKIP;
                                         nfst[ind] .skip.output = '\0';
                                         break;
                             default: exit(2); // Not supported yet (Register actions)
@@ -149,10 +149,12 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             return follow_ep(nfst, rchild, leafs, visited, del);
                      }
         case SKIPW: {
-            cvector_append(n->valuation, st.skip.output);
                     }
         case SKIP: {
             n->node_ind = st.skip.target;
+            if (st.skip.output != '\0') {
+                cvector_append(n->valuation, st.skip.output);
+            }
             return follow_ep(nfst, n, leafs, visited, del);
             break;
                    }
