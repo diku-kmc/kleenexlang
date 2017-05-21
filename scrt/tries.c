@@ -28,15 +28,16 @@ state* parse(char* fp, int* l, int* ss) {
                         break;
             // Skip state
             case 'S':   if (fscanf(fd, "%i %c", &t1, &tmp2) != 2) exit(3); // Parse target and sub type
-                        nfst[ind] .s_type = SKIP;
                         nfst[ind] .skip.target = t1;
                         switch (tmp2) {
                             // Writing skip state
                             case 'W':   if (fscanf(fd, " %i\n", &t2) != 1) exit(3);
+                                        nfst[ind] .s_type = SKIPW;
                                         nfst[ind] .skip.output = (char) t2;
                                         break;
                             // No output state
                             case 'E':   if (fscanf(fd, "\n") != 0) exit(3);
+                                        nfst[ind] .s_type = SKIP;
                                         nfst[ind] .skip.output = '\0';
                                         break;
                             default: exit(2); // Not supported yet (Register actions)
@@ -120,37 +121,37 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
     state st = nfst[ind];
     switch (st.s_type) {
         case CHOICE: {
-            if (pool->len > 0) {
-                n->lchild = nvector_pop(pool);
+            node *lchild, *rchild;
+
+            // Allocate two nodes, from pool or heap.
+            if (pool->len > 1) {
+                lchild = nvector_pop(pool);
+                rchild = nvector_pop(pool);
             } else {
-                n->lchild = (node*) malloc(sizeof(node));
-                n->lchild->valuation = cvector_create();
+                lchild = (node*) malloc(sizeof(node));
+                lchild->valuation = cvector_create();
+
+                rchild = (node*) malloc(sizeof(node));
+                rchild->valuation = cvector_create();
             }
-            n->lchild->islchild = true;
+            n->lchild = lchild;
+            n->rchild = rchild;
 
-            n->lchild->parent = n;
-            n->lchild->node_ind = st.choice.t1;
+            lchild->islchild = true;
+            lchild->parent = n;
+            lchild->node_ind = st.choice.t1;
 
-            follow_ep(nfst, n->lchild, leafs, visited, del);
+            rchild->islchild = false;
+            rchild->parent = n;
+            rchild->node_ind = st.choice.t2;
 
-            if (pool->len > 0) {
-                n->rchild = nvector_pop(pool);
-            } else {
-                n->rchild = (node*) malloc(sizeof(node));
-                n->rchild->valuation = cvector_create();
-            }
-            n->rchild->islchild = false;
-
-
-            n->rchild->parent = n;
-            n->rchild->node_ind = st.choice.t2;
-
-            return follow_ep(nfst, n->rchild, leafs, visited, del);
+            follow_ep(nfst, lchild, leafs, visited, del);
+            return follow_ep(nfst, rchild, leafs, visited, del);
                      }
+        case SKIPW: {
+            cvector_append(n->valuation, st.skip.output);
+                    }
         case SKIP: {
-            if (st.skip.output != '\0') {
-                cvector_append(n->valuation, st.skip.output);
-            }
             n->node_ind = st.skip.target;
             return follow_ep(nfst, n, leafs, visited, del);
             break;
@@ -184,7 +185,7 @@ void output(node_vector* leafs, state* nfst) {
     //cvector_free(data);
 }
 
-inline void delete(node* n, node** root) {
+static inline void delete(node* n, node** root) {
     node* target;
     node* parent = n->parent;
 
@@ -194,30 +195,28 @@ inline void delete(node* n, node** root) {
     }
 
     if (n->islchild) {
-        parent->lchild = NULL;
         target = parent->rchild;
     } else {
-        parent->rchild = NULL;
         target = parent->lchild;
     }
 
     n->valuation->len = 0;
     nvector_push(pool, n);
 
-        cvector_prepend(target->valuation, parent->valuation);
-        target->parent = parent->parent;
-        target->islchild = parent->islchild;
-        if (parent->parent == NULL) {
-            *root = target;
+    cvector_prepend(target->valuation, parent->valuation);
+    target->parent = parent->parent;
+    target->islchild = parent->islchild;
+    if (parent->parent == NULL) {
+        *root = target;
+    } else {
+        if (parent->islchild) {
+            parent->parent->lchild = target;
         } else {
-            if (parent->islchild) {
-                parent->parent->lchild = target;
-            } else {
-                parent->parent->rchild = target;
-            }
+            parent->parent->rchild = target;
         }
-        parent->valuation->len = 0;
-        nvector_push(pool, parent);
+    }
+    parent->valuation->len = 0;
+    nvector_push(pool, parent);
 }
 
 
@@ -230,7 +229,7 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
                 if (input >= st.symbol.input[i].start && input <= st.symbol.input[i].end) {
                     n->node_ind = st.symbol.target;
                     if (st.symbol.output) cvector_append(n->valuation, input);
-                    return follow_ep(nfst, n, leafs, visited, del); // Use truth value to determine deletion
+                    return follow_ep(nfst, n, leafs, visited, del);
                 }
             }
             } // Fallthrough
@@ -280,9 +279,9 @@ int main(int argc, char** argv) {
     node_vector* del = nvector_create();
     follow_ep(nfst, root, leafs, visited, del);
     memset(visited, 0, sizeof(bool) * nlen);
-    char buffer[256];
+    char buffer[2048];
     int pos = 0;
-    int size = fread(buffer, 1, 256, stdin);
+    int size = fread(buffer, 1, 2048, stdin);
 
     char input;
     while (pos < size) {
@@ -305,15 +304,15 @@ int main(int argc, char** argv) {
         }
         del->len = 0;
 
-        fwrite(root->valuation->data, 1, root->valuation->len, stdout);
-        root->valuation->len = 0;
 
         // Reset visited array.
         memset(visited, 0, sizeof(bool) * nlen);
 
         pos++;
         if (pos >= size) {
-            size = fread(buffer, 1, 256, stdin);
+            fwrite(root->valuation->data, 1, root->valuation->len, stdout);
+            root->valuation->len = 0;
+            size = fread(buffer, 1, 2048, stdin);
             pos = 0;
         }
     }

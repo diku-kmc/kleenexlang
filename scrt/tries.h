@@ -35,7 +35,7 @@ typedef struct rangeset {
 } rangeset;
 
 // Enumeration for the different kinds of states.
-enum SType { CHOICE, ACCEPT, SKIP, SYMBOL };
+enum SType { CHOICE, ACCEPT, SKIP, SKIPW, SYMBOL };
 
 // Choice state.
 typedef struct choice_s {

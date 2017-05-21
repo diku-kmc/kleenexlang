@@ -55,7 +55,6 @@ void nvector_remove(node_vector* vec, int ind) {
 }
 
 node* nvector_pop(node_vector* vec) {
-    if (vec->len < 1) printf("WHAT!!!");
     vec->len -= 1;
     return vec->data[vec->len];
 }
