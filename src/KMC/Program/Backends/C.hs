@@ -16,6 +16,7 @@ import           System.Exit (ExitCode(..))
 import           System.IO
 import           System.Process
 import           Text.PrettyPrint
+import           Text.Printf
 
 import           KMC.Util.Coding
 import           KMC.Program.IL
@@ -42,7 +43,7 @@ progTemplate buString tablesString declsString infoString initString stateTable 
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
-  ++ [fileQ|crt/crt.h|] ++ "\n"
+--  ++ [fileQ|crt/crt.h|] ++ "\n"
   ++ [fileQ|crt/crt.c|] ++ "\n"
   ++ tablesString ++ "\n\n"
   ++ stateTable ++ "\n"
@@ -53,17 +54,17 @@ void printCompilationInfo()
   fprintf(stdout, |]++infoString++[strQ|);
 }
 
-void init()
+transducer_state* init(unsigned char* input, size_t input_size)
 {
 |]++initString ++[strQ|
 }
 
 |]++concat (zipWith matchTemplate progStrings [1..])++[strQ|
-int match(int phase, int start_state, char * buf, long length)
+int match(int phase, int start_state, transducer_state* tstate, void (*callback)(transducer_state*))
 {
   switch(phase) {
     |]++intercalate "\n" ["case " ++ show i ++ ":\n\
-    \      return match" ++ show i ++ "(phase, start_state, buf, length);\n\
+    \      return match" ++ show i ++ "(phase, start_state, tstate, callback);\n\
     \      break;"
                          | i <- [1..(length progStrings)] ]++
     [strQ|
@@ -76,7 +77,7 @@ int match(int phase, int start_state, char * buf, long length)
 
 matchTemplate :: String -> Int -> String
 matchTemplate progString n =
-  [strQ|int match|] ++ show n ++ [strQ|(int phase, int start_state, char * buf, long length)
+  [strQ|int match|] ++ show n ++ [strQ|(int phase, int start_state, transducer_state* tstate, void (*callback)(transducer_state*))
 {
 |]++progString++[strQ|
   //accept|]++show n++[strQ|:
@@ -174,7 +175,7 @@ tbl ctypectx ctypetbl (TableId n) i mx phase =
   in cast ctypectx ctypetbl
      $ hcat [text "tbl" <> int phase
             ,brackets $ int n
-            ,brackets $ text "next" <> brackets offsetdoc
+            ,brackets $ text "tstate->inbuf->next" <> brackets offsetdoc
             ]
 
 -- | Pretty print a block identifier
@@ -266,7 +267,7 @@ prettyAppendTbl buftype tbltype prog bid tid i mx phase =
 prettyAppendSym :: BufferId -> BufferId -> Int -> Maybe String -> Doc
 prettyAppendSym bid outBuf i mx =
     let offsetdoc = maybe (int i) (\s -> int i <+> text "+" <+> text s) mx
-        symb = text "next" <> brackets offsetdoc
+        symb = text "tstate->inbuf->next" <> brackets offsetdoc
     in if bid == outBuf then
         text "outputconst" <> parens (hcat [symb, comma, int 8]) <> semi
     else
@@ -319,10 +320,7 @@ prettyInstr buftype tbltype prog instr phase =
                           lbrace $+$
                           nest 3 (prettyBlock buftype tbltype prog is phase) $+$
                           rbrace
-    ConsumeI i         -> text "next +=" <+> int i <> semi <+> text "left -=" <+> int i <> semi
-    PushI              -> text "stack_push()" <> semi
-    PopI bid           -> text "stack_pop" <> parens (buf bid) <> semi
-    WriteI bid         -> text "stack_write" <> parens (buf bid) <> semi
+    ConsumeI i         -> text "consume" <> parens (hcat [text "tstate", comma, int i]) <> semi $$ text "left -=" <+> int i <> semi
 
 appendSpan :: BufferId -> TableId -> Int -> Block -> Maybe (Int, Block)
 appendSpan bid tid i is =
@@ -397,7 +395,7 @@ prettyStr = doubleQuotes . hcat . map prettyOrd
 prettyExpr :: Expr -> Doc
 prettyExpr e =
   case e of
-    SymE i            -> text "next" <> brackets (int i)
+    SymE i            -> text "tstate->inbuf->next" <> brackets (int i)
     AvailableSymbolsE -> text "left"
     CompareE i str    -> text "cmp"
                            <> parens (hcat $ punctuate comma
@@ -489,19 +487,34 @@ neededNonStreamBuffers pipeline = S.toList . S.unions $ case pipeline of
     needed prog = S.fromList $ filter (/= progStreamBuffer prog) $ progBuffers prog
 
 
--- | Pretty print initialization code. This is just a call to init_buffer() for
--- each buffer in the program.
+-- | Pretty print initialization code, which should allocate all needed buffers
 prettyInit :: Pipeline -> Doc
-prettyInit progs =
-  vcat (map bufferInit $ neededNonStreamBuffers progs)
+prettyInit progs = text $ printf [strQ|
+  transducer_state* tstate = malloc(sizeof(transducer_state));
+
+  // Init regular buffers
+  for (int i = 0; i < %d; i++) {
+    tstate->buffers[i] = init_buffer(INITIAL_BUFFER_SIZE);
+  }
+
+  // Init in/out buffers
+
+  if (input) {
+    tstate->outbuf = init_buffer(input_size);
+    tstate->inbuf  = init_input_buffer(input_size);
+    memcpy(tstate->inbuf->data, input, input_size);
+    tstate->inbuf->length = input_size;
+  }
+
+  return tstate;
+|] (length buffers)
   where
-    bufferInit bid = text "init_buffer" <> parens (buf bid) <> semi
+    buffers = neededNonStreamBuffers progs
 
 prettyProg :: Pipeline -> CType -> CType -> Program -> Int -> Doc
 prettyProg pipeline buftype tbltype prog phase =
      text "int state = 0;"
-  $$ text "long left = length;"
-  $$ text "unsigned char * next = (unsigned char *)buf;"
+  $$ text "long left = tstate->inbuf->length;"
   $$ text "if (start_state < 0) goto" <+> blck (progInitBlock prog) phase <> semi
   $$ prettyJumptable pipeline
   $$ vcat (map pblock (M.toList $ progBlocks prog))
@@ -615,7 +628,7 @@ programsToC buftype pipeline =
                                     $+$ nest 21 (doubleQuotes rbrack <> semi)
                     Right _ -> error "tjoooo..."
     stateTableVar = case pipeline of
-                    Left progs  ->  text "struct state state_table[] =" <+> lbrace
+                    Left progs  ->  text "state state_table[] =" <+> lbrace
                                     -- <+> doubleQuotes (lbrack <> brackets empty)
                                     $+$ nest 2 (vcat $ map prettyStateTable progs)
                                     $+$ rbrace <> semi

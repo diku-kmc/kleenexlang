@@ -1,39 +1,4 @@
-unsigned char *next;
-buffer_t outbuf;
-buffer_t *outbuf_ptr;
-size_t count = 0;
-
-unsigned char inbuf[INBUFFER_SIZE*2];
-size_t in_size = 0;
-int in_cursor = 0;
-#define avail (in_size - in_cursor)
-
-buf_stack outbuf_stack;
-
-void pushoutbuf(buffer_t *buf) {
-  if (outbuf_stack.size == outbuf_stack.capacity) {
-    outbuf_stack.capacity *= 2;
-    outbuf_stack.data = realloc(outbuf_stack.data, outbuf_stack.capacity*sizeof(buffer_t *));
-  }
-  outbuf_stack.data[outbuf_stack.size++] = outbuf_ptr;
-  outbuf_ptr = buf;
-}
-
-void popoutbuf() {
-  if (outbuf_stack.size <= 0) {
-    fprintf(stderr, "Error: Tried popping an empty buffer stack");
-    exit(1);
-  }
-  outbuf_ptr = outbuf_stack.data[--outbuf_stack.size];
-}
-
-void init_outbuf_stack()
-{
-  outbuf_ptr = &outbuf;
-  outbuf_stack.size = 0;
-  outbuf_stack.capacity = OUTBUFFER_STACK_SIZE;
-  outbuf_stack.data = malloc(OUTBUFFER_STACK_SIZE*sizeof(buffer_t *));
-}
+#include "crt.h"
 
 void buf_flush(buffer_t *buf)
 {
@@ -130,12 +95,25 @@ void reset(buffer_t *buf)
   buf->bitpos = 0;
 }
 
-void init_buffer(buffer_t *buf)
+buffer_t* init_buffer(size_t size)
 {
-  buf->data = malloc(INITIAL_BUFFER_SIZE);
-  buf->size = INITIAL_BUFFER_SIZE;
+  buffer_t *buf = malloc(sizeof(buffer_t));
+  buf->data = malloc(size);
+  buf->size = size;
   buf->bitpos = 0;
   buf->data[0] = 0;
+  return buf;
+}
+
+input_buffer* init_input_buffer(size_t size)
+{
+  input_buffer *inbuf = malloc(sizeof(input_buffer));
+  inbuf->data = malloc(size);
+  inbuf->size = size;
+  inbuf->cursor = 0;
+  inbuf->length = -1;
+  inbuf->next = inbuf->data;
+  return inbuf;
 }
 
 void destroy_buffer(buffer_t *buf)
@@ -143,18 +121,6 @@ void destroy_buffer(buffer_t *buf)
   if (buf->data != NULL)
     free(buf->data);
   buf->data = NULL;
-}
-
-INLINE
-void outputconst(buffer_unit_t w, size_t bits)
-{
-  if (buf_writeconst(outbuf_ptr, w, bits))
-  {
-    if (outbuf_stack.size == 0)
-    {
-      buf_flush(outbuf_ptr);
-    }
-  }
 }
 
 INLINE
@@ -192,19 +158,19 @@ void concat(buffer_t *dst, buffer_t *src)
 INLINE
 void outputarray(const buffer_unit_t *arr, size_t bits)
 {
-  int word_count = bits / BUFFER_UNIT_BITS;
-  // Write completed words
-  size_t word_index = 0;
-  for (word_index = 0; word_index < word_count; word_index++)
-  {
-    outputconst(arr[word_index], BUFFER_UNIT_BITS);
-  }
+  //int word_count = bits / BUFFER_UNIT_BITS;
+  //// Write completed words
+  //size_t word_index = 0;
+  //for (word_index = 0; word_index < word_count; word_index++)
+  //{
+  //  outputconst(arr[word_index], BUFFER_UNIT_BITS);
+  //}
 
-  int remaining = bits % BUFFER_UNIT_BITS;
-  if (remaining != 0)
-  {
-    outputconst(arr[bits / BUFFER_UNIT_BITS], remaining);
-  }
+  //int remaining = bits % BUFFER_UNIT_BITS;
+  //if (remaining != 0)
+  //{
+  //  outputconst(arr[bits / BUFFER_UNIT_BITS], remaining);
+  //}
 }
 
 INLINE
@@ -214,32 +180,10 @@ void output(buffer_t *buf)
 }
 
 INLINE
-void consume(int c)
+void consume(transducer_state *tstate, int c)
 {
-  count     += c;
-  in_cursor += c;
-  next      += c;
-}
-
-INLINE
-int readnext(int minCount, int maxCount)
-{
-  // We can always take epsilon transitions
-  if (minCount == 0) return 1;
-
-  if (avail < maxCount)
-  {
-    int remaining = avail;
-    memmove(&inbuf[INBUFFER_SIZE - remaining], &inbuf[INBUFFER_SIZE+in_cursor], remaining);
-    in_cursor = -remaining;
-    in_size = fread(&inbuf[INBUFFER_SIZE], 1, INBUFFER_SIZE, stdin);
-  }
-  if (avail < minCount)
-  {
-    return 0;
-  }
-  next = &inbuf[INBUFFER_SIZE+in_cursor];
-  return 1;
+  tstate->inbuf->next   += c;
+  tstate->inbuf->cursor += c;
 }
 
 INLINE
@@ -253,46 +197,3 @@ int cmp(unsigned char *str1, unsigned char *str2, int l)
   }
   return 1;
 }
-
-static void printUsage(char *name)
-{
-  fprintf(stdout, "Normal usage: %s < infile > outfile\n", name);
-  fprintf(stdout, "- \"%s\": reads from stdin and writes to stdout.\n", name);
-  fprintf(stdout, "- \"%s -i\": prints compilation info.\n", name);
-  fprintf(stdout, "- \"%s -t\": runs normally, but prints timing to stderr.\n", name);
-  fprintf(stdout, "- \"%s -o\": prints state table.\n", name);
-  fprintf(stdout, "- \"%s < infile > outfile -p n -s m\":\n\tStart processing input data from phase n state m.\n", name);
-}
-
-void flush_outbuf()
-{
-  if (outbuf.bitpos % BUFFER_UNIT_BITS != 0)
-  {
-    outputconst(0, BUFFER_UNIT_BITS);
-  }
-  if (outbuf_stack.size > 0)
-  {
-    fprintf(stderr, "Error: buffer stack ended non-empty\n");
-    exit(1);
-  }
-  buf_flush(&outbuf);
-}
-
-void init_outbuf()
-{
-  outbuf.size = OUTBUFFER_SIZE + BUFFER_UNIT_SIZE;
-  outbuf.data = malloc(outbuf.size);
-  reset(&outbuf);
-  init_outbuf_stack();
-}
-
-void run(int phase, int start_state)
-{
-  init_outbuf();
-  init();
-
-  // match(phase, start_state);
-
-  flush_outbuf();
-}
-

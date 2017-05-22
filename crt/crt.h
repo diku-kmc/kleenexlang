@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <inttypes.h>
-#include <getopt.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <stdio.h>
@@ -19,6 +18,8 @@
 #define INBUFFER_SIZE        (16*1024)
 #define INITIAL_BUFFER_SIZE  (4096*8)
 #define OUTBUFFER_STACK_SIZE (1024)
+#define avail (in_size - in_cursor)
+
 
 #ifdef FLAG_NOINLINE
 #define INLINE static
@@ -52,16 +53,22 @@ typedef struct {
   size_t bitpos;       /* bit offset from data  */
 } buffer_t;
 
+typedef struct {
+  buffer_unit_t *data;
+  size_t cursor;
+  size_t size;
+  long length;    // static length of input, -1 if unknown
+  buffer_unit_t *next; /* pointer to next data */
+} input_buffer;
+
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
 #define BUFFER_UNIT_BITS (BUFFER_UNIT_SIZE * 8)
 
-// Output buffer stack
 typedef struct {
-  buffer_t **data;
-  size_t capacity;
-  size_t size;
-} buf_stack;
-
+  buffer_t **buffers;
+  buffer_t *outbuf;
+  input_buffer *inbuf;
+} transducer_state;
 
 // State information
 typedef struct {
@@ -69,10 +76,12 @@ typedef struct {
   int accepting;
 } state;
 extern state state_table[];
-extern int state_count;
 
 // Program interface
 
+extern int state_count;
+
 void printCompilationInfo();
-void init();
-int match(int phase, int start_state, char* buf, long length);
+transducer_state *init();
+int match(int phase, int start_state, transducer_state *state, void (*callback)(transducer_state*));
+void print_state_table();
