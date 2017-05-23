@@ -148,8 +148,6 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             follow_ep(nfst, lchild, leafs, visited, del);
             return follow_ep(nfst, rchild, leafs, visited, del);
                      }
-        case SKIPW: {
-                    }
         case SKIP: {
             n->node_ind = st.skip.target;
             if (st.skip.output != '\0') {
