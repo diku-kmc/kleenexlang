@@ -105,7 +105,6 @@ data CProg =
   , cInit           :: Doc
   , cBufferUnit     :: Doc
   , cJumptable      :: Doc
-  , cStateTableJson :: Doc
   , cStateTableVar  :: Doc
   , cStateCountVar  :: Doc
   }
@@ -129,14 +128,14 @@ minUnsignedType n | n < 0   = Nothing
 
 -- | The prefix added to buffer identifiers.
 bufferPrefix :: String
-bufferPrefix = "buf_"
+bufferPrefix = "tstate->buffers"
 
 constPrefix :: String
 constPrefix = "const_"
 
 -- | Pretty print a buffer identifier (as reference)
 buf :: BufferId -> Doc
-buf (BufferId n) = text "&" <> text bufferPrefix <> int n
+buf (BufferId n) = text bufferPrefix <> brackets (int n)
 
 -- | Pretty print a constant identifier (as reference)
 cid :: ConstId -> Int -> Doc
@@ -257,22 +256,22 @@ prettyAppendTbl buftype tbltype prog bid tid i mx phase =
       bwidth    = progOutBits prog * (tblDigitSize $ progTables prog M.! tid)
       lendoc    = int bwidth
       streamBuf = progStreamBuffer prog
-  in if bid == streamBuf then
-         text "outputconst" <> parens (hcat [arg, comma, lendoc]) <> semi
-     else
-         text  "append"
-         <> parens (hcat [buf bid, comma, arg, comma, lendoc])
-         <> semi
+  in  text  "append"
+      <> parens (hcat [buf bid, comma, arg, comma, lendoc])
+      <> semi
+      $$ (if bid == streamBuf then
+            text "//Call callback"
+          else empty)
 
 prettyAppendSym :: BufferId -> BufferId -> Int -> Maybe String -> Doc
 prettyAppendSym bid outBuf i mx =
     let offsetdoc = maybe (int i) (\s -> int i <+> text "+" <+> text s) mx
         symb = text "tstate->inbuf->next" <> brackets offsetdoc
-    in if bid == outBuf then
-        text "outputconst" <> parens (hcat [symb, comma, int 8]) <> semi
-    else
-        text "append"
+    in text "append"
         <> parens (hcat [buf bid, comma, symb, comma, int 8]) <> semi
+        $$ (if bid == outBuf then
+              text "//Call callback"
+            else empty)
 
 
 -- | Pretty print an instruction. Note that the C runtime currently
@@ -290,22 +289,20 @@ prettyInstr buftype tbltype prog instr phase =
     NoMoveI            -> text "return -1;"
     AppendI bid constid ->
       let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
-      in if bid == streamBuf then
-             text "outputarray"
-               <> parens (hcat [cid constid phase, comma, lendoc])
-               <> semi
-         else
-             text "appendarray"
-               <> parens (hcat [buf bid, comma, cid constid phase, comma, lendoc])
-               <> semi
+      in  text "appendarray"
+          <> parens (hcat [buf bid, comma, cid constid phase, comma, lendoc])
+          <> semi
+          $$ (if bid == streamBuf then
+                text "//Call callback"
+              else empty)
     AppendTblI bid tid i -> prettyAppendTbl buftype tbltype prog bid tid i Nothing phase
     AppendSymI bid i   -> prettyAppendSym bid streamBuf i Nothing
-    ConcatI bid1 bid2  -> if bid1 == streamBuf then
-                              text "output" <> parens (buf bid2) <> semi
-                          else
-                              text "concat"
-                              <> parens (hcat [buf bid1, comma, buf bid2])
-                              <> semi
+    ConcatI bid1 bid2  -> text "concat"
+                          <> parens (hcat [buf bid1, comma, buf bid2])
+                          <> semi
+                          $$ (if bid1 == streamBuf then
+                                text "//Call callback"
+                              else empty)
     ResetI bid         -> text "reset" <> parens (buf bid) <> semi
     AlignI bid1 bid2   -> text "align"
                           <> parens (hcat [buf bid1, comma, buf bid2])
@@ -446,7 +443,7 @@ prettyBufferDecls :: Pipeline -> Doc
 prettyBufferDecls progs =
   vcat (map bufferDecl $ neededBuffers progs)
   where
-    bufferDecl (BufferId n) = text "buffer_t" <+> text bufferPrefix <> int n <> semi
+    bufferDecl (BufferId n) = empty -- text "buffer_t" <+> text bufferPrefix <> int n <> semi
 
 prettyConstantDecls :: CType -- ^ Buffer unit type
                     -> Pipeline
@@ -493,7 +490,8 @@ prettyInit progs = text $ printf [strQ|
   transducer_state* tstate = malloc(sizeof(transducer_state));
 
   // Init regular buffers
-  for (int i = 0; i < %d; i++) {
+  tstate->buffers = malloc(%d * sizeof(buffer_t *));
+  for (int i = 1; i < %d; i++) {
     tstate->buffers[i] = init_buffer(INITIAL_BUFFER_SIZE);
   }
 
@@ -501,13 +499,14 @@ prettyInit progs = text $ printf [strQ|
 
   if (input) {
     tstate->outbuf = init_buffer(input_size);
+    tstate->buffers[0] = tstate->outbuf;
     tstate->inbuf  = init_input_buffer(input_size);
     memcpy(tstate->inbuf->data, input, input_size);
     tstate->inbuf->length = input_size;
   }
 
   return tstate;
-|] (length buffers)
+|] ((length buffers) + 1) ((length buffers) + 1)
   where
     buffers = neededNonStreamBuffers progs
 
@@ -572,27 +571,6 @@ stateRes instrs state =
         NextI _ _ is' -> go is'
         _             -> go is
 
-prettyStateTableJson :: Program -> Doc
-prettyStateTableJson prog =
-  doubleQuotes (comma <> lbrack)
-  $+$ (vcat $ map doubleQuotes (punctuate comma (map pblock (M.toList $ progBlocks prog))))
-  $+$ doubleQuotes rbrack
-  where
-    pblock (blid, is) =
-      stateResJson is (stateNr blid)
-
--- | Pretty print a list of instructions.
-stateResJson :: Block -> Doc -> Doc
-stateResJson instrs state =
-  braces (text "\\\"state\\\"" <+> colon <+> state <> comma <+> go instrs)
-  where
-    go [] = empty
-    go (instr:is) = case instr of
-        AcceptI       -> text "\\\"accepting\\\" : true"
-        FailI         -> text "\\\"accepting\\\" : false"
-        NextI _ _ is' -> go is'
-        _             -> go is
-
 listBlockIds :: Pipeline -> [[BlockId]]
 listBlockIds pipeline = case pipeline of
     Left  progs -> map (M.keys . progBlocks) progs
@@ -611,7 +589,6 @@ programsToC buftype pipeline =
   , cProg           = map (nest 2) prettyProgs
   , cBufferUnit     = ctyp buftype
   , cJumptable      = prettyJumptable pipeline
-  , cStateTableJson = stateTableJson -- lagacy to support python dispatcher
   , cStateTableVar  = stateTableVar
   , cStateCountVar  = stateCountVar
   }
@@ -621,12 +598,6 @@ programsToC buftype pipeline =
                     Left progs  -> zipWith (prettyProg pipeline buftype tbltype) progs [1..]
                     Right progs -> concat $ zipWith combine progs [1,3..]
     combine (p,a) i = [prettyProg pipeline buftype tbltype p i, prettyProg pipeline buftype tbltype a (i+1)]
-    stateTableJson = case pipeline of
-                    Left progs  ->  text "char *stateTable ="
-                                    <+> doubleQuotes (lbrack <> brackets empty)
-                                    $+$ nest 21 (vcat $ map prettyStateTableJson progs)
-                                    $+$ nest 21 (doubleQuotes rbrack <> semi)
-                    Right _ -> error "tjoooo..."
     stateTableVar = case pipeline of
                     Left progs  ->  text "state state_table[] =" <+> lbrace
                                     -- <+> doubleQuotes (lbrack <> brackets empty)
