@@ -21,6 +21,7 @@
 #include "util.h"
 #include "list.h"
 
+#define DEBUGGING
 #define RETC_PRINT_USAGE      1
 #define RETC_PRINT_ERROR      2
 #define DEFAULT_SUFFIX_LENGTH 256
@@ -30,7 +31,7 @@ typedef struct {
   int state;
 } job_t;
 
-char* target;
+unsigned char* target;
 long target_size;
 
 
@@ -114,34 +115,41 @@ void print_job(void* job) {
  *    int suffix_len: length of suffix.
  */
 arr* suffix_analysis(long offset, long suffix_len) {
-  int i;
-  char* suffix = target + offset - suffix_len;
+#ifdef DEBUGGING
+  struct timeval time_before, time_after, time_result;
+  long int millis;
+  gettimeofday(&time_before, NULL);
+#endif
+  
+  unsigned char* suffix = target + offset - suffix_len;
   arr * map = malloc(sizeof(arr));
   map->size = state_count;
   map->data = malloc(state_count * sizeof(int));
 
 #pragma omp parallel for
-  for (i = 0; i < state_count; i++) {
-    map->data[i] = match(1, i, suffix, suffix_len);
+  for (int i = 0; i < state_count; i++) {
+    transducer_state * state = init(suffix, suffix_len);
+    map->data[i] = match(1, i, state, NULL);
   }
 
+#ifdef DEBUGGING
+  gettimeofday(&time_after, NULL);
+  timersub(&time_after, &time_before, &time_result);
+  // A timeval contains seconds and microseconds.
+  millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+  fprintf(stderr, "time (ms): %ld\n", millis);
+#endif
   return map;
 }
-
 
 /**
  *    Handles single chunk by processing entire file in one call to match.
  */
 void run_single_chunk() {
   int result;
-
-  result = match(1, -1, target, target_size);
-  fprintf(stdout, "-p 1 -s %i\n", result);
-  if(did_accept(result)) {
-    fprintf(stdout,"\033[1mDID ACCEPT\033[0m\n");
-  } else {
-    fprintf(stdout, "\033[1mDID NOT ACCEPT\033[0m\n");
-  }
+  transducer_state * state = init(target, target_size);
+  result = match(1, -1, state, NULL);
+  fprintf(stdout, "%s", state->outbuf->data);
 }
 
 
@@ -149,11 +157,10 @@ void run_single_chunk() {
  *    Remove removed outdated jobs based on content of result map.
  *    The resulting list contains remaining valid jobs.
  */
-void update_jobs(int** resultmap, int num_of_chunks, struct node ** job_list) {
-  int chunk = 0;
-  int idx = 0;
-  while (chunk < num_of_chunks && resultmap[chunk][idx] != -2) {
-    idx = resultmap[chunk][idx];
+void update_jobs(arr** resultmap, int num_of_chunks, node ** job_list) {
+  int chunk = 0, idx = 0;
+  while (chunk < num_of_chunks && resultmap[chunk]->data[idx] != -2) {
+    idx = resultmap[chunk]->data[idx];
     chunk++;
   }
 
@@ -176,6 +183,20 @@ void update_jobs(int** resultmap, int num_of_chunks, struct node ** job_list) {
   free(job);
 }
 
+void clean_output(arr ** resultmap, transducer_state*** outputmap, int num_of_chunks) {
+  int idx = resultmap[0]->data[0];
+  for (int i = 1; i < num_of_chunks; i++) {
+    if (idx == -2) break;
+    for (int j = 0; j < resultmap[i]->size; j++) {
+      if (j == idx) continue;
+      if (outputmap[i][j] == NULL) continue;
+      free_state(outputmap[i][j]);
+      outputmap[i][j] = NULL;
+    }
+    idx = resultmap[i]->data[idx];
+  }
+}
+
 
 int map_output(int** resultmap, int num_of_chunks) {
   int i, idx = 0;
@@ -192,7 +213,7 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
   /* SET UP */
   long chunk_size = target_size / num_of_chunks;
 
-  long * chunk_sizes = malloc(num_of_chunks * chunk_size);
+  long * chunk_sizes = malloc(num_of_chunks * sizeof(chunk_size));
   for (i = 0; i < num_of_chunks -1; chunk_sizes[i++] = chunk_size);
   chunk_sizes[num_of_chunks - 1] = target_size - chunk_size * (num_of_chunks - 1);
 
@@ -203,36 +224,39 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
   }
 
   /* DO SUFFIX ANALYSIS */
-  arr ** chunkmap = malloc(num_of_chunks * sizeof(chunkmap));
+  arr ** chunkmap = malloc(num_of_chunks * sizeof(arr*));
 #pragma omp parallel for
   for (i = 1; i < num_of_chunks; i++) {
     chunkmap[i] = suffix_analysis(chunk_offset[i], suffix_len);
   }
 
   // RUN KLEENEX
-  int ** resultmap = malloc(num_of_chunks * sizeof(resultmap)); // Map containing result of each chunk
+  arr ** resultmap = malloc(num_of_chunks * sizeof(arr*)); // Map containing result of each chunk
+  transducer_state *** outputmap = malloc(num_of_chunks * sizeof(transducer_state*));
 #pragma omp parallel for
   for (i = 0; i < num_of_chunks; i++) {                     // Initialize resultmap
-    int * temp = malloc(state_count * sizeof(temp));
-    for (j = 0; j < state_count; temp[j++] = -2);
+    arr * temp = init_arr(state_count);
+    for (j = 0; j < state_count; temp->data[j++] = -2);
     resultmap[i] = temp;
+    outputmap[i] = calloc(state_count, sizeof(transducer_state*));
   }
 
 
   // CREATE JOBS
   size_t job_size = sizeof(job_t);
 
-  struct node * job_list = NULL;
+  node * job_list = NULL;
   job_t * job = malloc(job_size);
 
   for (i = num_of_chunks - 1; i > 0; i--) { // end at 1 as we know the start state of chunk 0.
     arr * ss = unique(chunkmap[i]);
-    j = 0;
-    for (i = 0; i < ss->size; i++) {
+    for (j = 0; j < ss->size; j++) {
       job->chunk = i; job->state = ss->data[j];
       push(&job_list, job, job_size);
     }
   }
+
+  printList(job_list, &print_job);
 
   /* Push job for chunk 0 */
   job->chunk = 0; job->state = -1;
@@ -260,26 +284,37 @@ void run_multi_chunk(int num_of_chunks, int suffix_len) {
       if (chunk != -2) {
 
         offset = chunk * chunk_size;
-
+        transducer_state * state = init(target + chunk_offset[chunk], chunk_sizes[chunk]);
         if (chunk == 0) {
-          resultmap[chunk][0] = match(1, start_state, target, chunk_sizes[chunk]);
+          resultmap[chunk]->data[0] = match(1, start_state, state, NULL);
+          outputmap[chunk][0] = state;
         } else {
-          resultmap[chunk][start_state] = match(1, start_state, target + chunk_offset[chunk], chunk_sizes[chunk]);
+          resultmap[chunk]->data[start_state] = match(1, start_state, state, NULL);
+          outputmap[chunk][start_state] = state;
         }
       }
     }
     /* REMOVE OUTDATED JOBS */
     update_jobs(resultmap, num_of_chunks, &job_list);
+    clean_output(resultmap, outputmap, num_of_chunks);
   }
 
-  int final_state = map_output(resultmap, num_of_chunks);
-
-  fprintf(stdout, "-p 1 -s %i\n", final_state);
-  if(did_accept(final_state)) {
-    fprintf(stdout,"state %d - \033[1mACCEPT\033[0m\n", final_state);
-  } else {
-    fprintf(stdout,"state %d - \033[1mFAIL\033[0m\n", final_state);
+  int idx = 0;
+  for (int i = 0; i < num_of_chunks; i++) {
+    transducer_state* state = outputmap[i][idx];
+    fprintf(stdout, "%s", state->outbuf->data);
+//    fprintf(stdout, "chunk: %i, output length: %lu\n", i, state.outbuf->bitpos/8);
+    idx = resultmap[i]->data[idx];
   }
+
+//  int final_state = map_output(resultmap, num_of_chunks);
+
+//  fprintf(stdout, "-p 1 -s %i\n", final_state);
+//  if(did_accept(final_state)) {
+//    fprintf(stdout,"state %d - \033[1mACCEPT\033[0m\n", final_state);
+//  } else {
+//    fprintf(stdout,"state %d - \033[1mFAIL\033[0m\n", final_state);
+//  }
 }
 
 static struct option long_options[] = {
