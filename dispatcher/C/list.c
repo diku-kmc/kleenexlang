@@ -10,23 +10,23 @@
 #include "list.h"
 
 
-void push(struct node** head_ref, void *new_data, size_t data_size)
+void push(node** head_ref, void *new_data, size_t data_size)
 {
-  struct node* new_node = (struct node*)malloc(sizeof(struct node));
+  node* new_node = malloc(sizeof(node));
 
-  new_node->data  = malloc(data_size);
+  new_node->data = malloc(data_size);
   new_node->next = (*head_ref);
 
   int i;
   for (i=0; i<data_size; i++)
     *(char *)(new_node->data + i) = *(char *)(new_data + i);
 
-  (*head_ref)    = new_node;
+  (*head_ref) = new_node;
 }
 
-void append(struct node** head_ref, void * new_data, size_t data_size) {
-  struct node * cur;
-  struct node * new_node = (struct node*)malloc(sizeof(struct node));
+void append(node** head_ref, void * new_data, size_t data_size) {
+  node * cur;
+  node * new_node = malloc(sizeof(node));
 
   new_node->next = NULL;
   new_node->data = malloc(data_size);
@@ -49,14 +49,14 @@ void append(struct node** head_ref, void * new_data, size_t data_size) {
 
 }
 
-void pop(struct node** head_ref) {
-  struct node *old = (*head_ref);
+void pop(node** head_ref) {
+  node *old = (*head_ref);
   (*head_ref) = old->next;
   free(old->data);
   free(old);
 }
 
-void printList(struct node *node, void (*fptr)(void *))
+void printList(node *node, void (*fptr)(void *))
 {
   while (node != NULL)
   {

@@ -10,17 +10,17 @@
 #define list_h
 #include <stdlib.h>
 
-struct node {
+typedef struct node {
   void * data;
   struct node *next;
-};
+} node;
 
-void push(struct node** head_ref, void *new_data, size_t data_size);
+void push(node** head_ref, void *new_data, size_t data_size);
 
-void append(struct node** head_ref, void * new_data, size_t data_size);
+void append(node** head_ref, void * new_data, size_t data_size);
 
-void pop(struct node** head_ref);
+void pop(node** head_ref);
 
-void printList(struct node *node, void (*fptr)(void *));
+void printList(node *node, void (*fptr)(void *));
 
 #endif /* list_h */

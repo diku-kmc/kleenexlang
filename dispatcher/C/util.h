@@ -19,5 +19,5 @@ extern size_t arr_size;
 arr ** factor(arr *);
 arr * gather(arr *, arr *);
 arr * unique(arr *);
-
+arr * init_arr(int size);
 #endif /* util_h */

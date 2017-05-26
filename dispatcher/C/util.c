@@ -119,3 +119,10 @@ arr* unique(arr * s) {
   res->data = realloc(res->data, res->size * sizeof(int));
   return res;
 }
+
+arr* init_arr(int size) {
+  arr * a = malloc(sizeof(arr));
+  a->size = size;
+  a->data = malloc(size * sizeof(int));
+  return a;
+}
