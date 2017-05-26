@@ -75,13 +75,13 @@ typedef struct {
   int num;
   int accepting;
 } state;
-extern state state_table[];
 
 // Program interface
 
 extern int state_count;
+extern state state_table[];
 
 void printCompilationInfo();
-transducer_state *init();
+transducer_state *init(unsigned char* input, size_t input_size);
 int match(int phase, int start_state, transducer_state *state, void (*callback)(transducer_state*));
-void print_state_table();
+void free_state(transducer_state *);

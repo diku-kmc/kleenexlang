@@ -38,8 +38,8 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> String -> String -> [String] -> String
-progTemplate buString tablesString declsString infoString initString stateTable stateCount progStrings =
+progTemplate :: String -> String -> String -> String -> String -> String -> String -> String -> [String] -> String
+progTemplate buString tablesString declsString infoString initString freeString stateTable stateCount progStrings =
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
@@ -56,7 +56,12 @@ void printCompilationInfo()
 
 transducer_state* init(unsigned char* input, size_t input_size)
 {
-|]++initString ++[strQ|
+|] ++ initString ++ [strQ|
+}
+
+void free_state(transducer_state * tstate)
+{
+|] ++ freeString ++ [strQ|
 }
 
 |]++concat (zipWith matchTemplate progStrings [1..])++[strQ|
@@ -103,6 +108,7 @@ data CProg =
   , cDeclarations   :: Doc
   , cProg           :: [Doc]
   , cInit           :: Doc
+  , cFree           :: Doc
   , cBufferUnit     :: Doc
   , cJumptable      :: Doc
   , cStateTableVar  :: Doc
@@ -443,7 +449,8 @@ prettyBufferDecls :: Pipeline -> Doc
 prettyBufferDecls progs =
   vcat (map bufferDecl $ neededBuffers progs)
   where
-    bufferDecl (BufferId n) = empty -- text "buffer_t" <+> text bufferPrefix <> int n <> semi
+    bufferDecl _ = empty
+    -- bufferDecl (BufferId n) = text "buffer_t" <+> text bufferPrefix <> int n <> semi
 
 prettyConstantDecls :: CType -- ^ Buffer unit type
                     -> Pipeline
@@ -509,6 +516,31 @@ prettyInit progs = text $ printf [strQ|
 |] ((length buffers) + 1) ((length buffers) + 1)
   where
     buffers = neededNonStreamBuffers progs
+
+-- | Pretty print desctruction code, which should free all buffers
+prettyFree :: Pipeline -> Doc
+prettyFree progs = text $ printf [strQ|
+void free_state(transducer_state* tstate)
+{
+  for (int i = 0; i < %d; i++) {
+    free(tstate->buffers[i]->data);
+    tstate->buffers[i]->data = NULL;
+    free(tstate->buffers[i]);
+    tstate->buffers[i] = NULL;
+  }
+
+  tstate->inbuf->next = NULL;
+  free(tstate->inbuf->data);
+  free(tstate->inbuf);
+  tstate->inbuf = NULL;
+
+  tstate->outbuf = NULL;
+  tstate = NULL;
+}
+|] ((length buffers) + 1)
+  where
+    buffers = neededNonStreamBuffers progs
+
 
 prettyProg :: Pipeline -> CType -> CType -> Program -> Int -> Doc
 prettyProg pipeline buftype tbltype prog phase =
@@ -586,6 +618,7 @@ programsToC buftype pipeline =
   , cDeclarations   = prettyBufferDecls pipeline
                       $+$ prettyConstantDecls buftype pipeline
   , cInit           = prettyInit pipeline
+  , cFree           = prettyFree pipeline
   , cProg           = map (nest 2) prettyProgs
   , cBufferUnit     = ctyp buftype
   , cJumptable      = prettyJumptable pipeline
@@ -616,6 +649,7 @@ renderCProg compInfo cprog =
                (render $ cDeclarations cprog)
                compInfo
                (render $ cInit cprog)
+               (render $ cFree cprog)
                (render $ cStateTableVar cprog)
                (render $ cStateCountVar cprog)
                (map render $ cProg cprog)
