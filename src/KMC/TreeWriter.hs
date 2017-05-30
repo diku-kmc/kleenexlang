@@ -68,7 +68,7 @@ branch ts = TreeWriterT $ do
 returnTreeWriterT :: (Monoid w, Monad m) => a -> TreeWriterT w m a
 returnTreeWriterT a = TreeWriterT $ return (Just $ Tip mempty a)
 
-joinTreeWriterT :: (Monoid w, Monad m, Functor m) => TreeWriterT w m (TreeWriterT w m a) -> TreeWriterT w m a
+joinTreeWriterT :: (Monoid w, Monad m) => TreeWriterT w m (TreeWriterT w m a) -> TreeWriterT w m a
 joinTreeWriterT (TreeWriterT twt) = TreeWriterT $ do
   y <- twt
   case y of
@@ -87,7 +87,7 @@ joinTreeWriterT (TreeWriterT twt) = TreeWriterT $ do
        [t] -> return $ Just (tprepend w t)
        ts' -> return $ Just (Fork w ts')
 
-runTreeWriter :: Monoid w => TreeWriterT w Identity a -> Maybe (Tree w a)
+runTreeWriter :: TreeWriterT w Identity a -> Maybe (Tree w a)
 runTreeWriter = runIdentity . runTreeWriterT
 
 {------------------------------------------------------------------------------}

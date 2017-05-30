@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Desugaring(desugarProg,desugarRegex) where
+module KMC.Kleenex.Desugaring (desugarProg,desugarRegex) where
 
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -8,7 +8,6 @@ import qualified Data.ByteString as BS
 import           Data.Char (ord)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
-import           Data.Word
 import qualified Data.List as L
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Approximation

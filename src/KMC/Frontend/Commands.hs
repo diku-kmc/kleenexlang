@@ -11,8 +11,6 @@ import           KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser
 import           KMC.Kleenex.Syntax
 import qualified KMC.Kleenex.WellFormedness as WF
-import           KMC.Kleenex.Approximation
-import           KMC.Kleenex.ApproximationMetrics
 import           KMC.Program.Backends.C (compileProgram)
 import           KMC.Program.IL (elimIdTables)
 import           KMC.SSTCompiler (compile)

@@ -5,6 +5,7 @@ module KMC.Kleenex.Approximation( approxProg
 import qualified Data.Map as M
 import qualified Data.HashMap.Strict as HM
 import           KMC.Kleenex.ApproximationMetrics as AM
+import           KMC.Kleenex.Core
 import           KMC.Kleenex.Syntax
 
 -- | Makes a Reduced Program capable of approximate matching using the k-fold
@@ -46,12 +47,6 @@ translatePointers (x:xs) s k =
     Nothing  -> (c  :rids, AS n (HM.insert (x, k) c m) (c+1))
   where
     (rids,s'@(AS n m c)) = translatePointers xs s k
-
--- | Returns next relevant declaration
-getDecl :: RIdent -> Decls -> RTermAct
-getDecl rid decls = case HM.lookup rid decls of
-    Just (RSeq (x:[])) -> getDecl x decls
-    Just t             -> t
 
 -- | Used to create the start RSums between each k paths
 addStartSums :: RIdent -> ApproxState -> Int -> ApproxState
@@ -113,6 +108,7 @@ insertSum :: RIdent -> RTermAct -> ApproxState -> Int -> ApproxState
 insertSum rid (RSum xs) s k = insertTerm rid (RSum rids') s_ k
   where
     (rids', s_) = translatePointers xs s k
+insertSum _ _ _ _ = error "Illegal use of insertSum"
 
 -- | Creates a pointer to the produced epsilon ending
 insertEps :: RIdent -> ApproxState -> Int -> ApproxState

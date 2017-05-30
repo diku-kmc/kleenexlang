@@ -38,7 +38,7 @@ instance Pretty RegAction where
   pretty (Pop r) = "<pop." ++ show (fromRegIdent r) ++ ">"
   pretty (Write r) = "<wr." ++ show (fromRegIdent r) ++ ">"
 
-instance (Pretty e, Pretty dom, Pretty digit) => Pretty (CodeFunc e dom digit) where
+instance (Pretty e, Pretty digit) => Pretty (CodeFunc e dom digit) where
   pretty (CodeArg e) = "CODE(" ++ pretty e ++ ")"
   pretty (CodeConst bs) = concatMap pretty bs
 
@@ -115,8 +115,7 @@ fstGlobalAttrs :: [GV.GlobalAttributes]
 fstGlobalAttrs = [GV.GraphAttrs [GA.RankDir GA.FromLeft]
                  ,GV.NodeAttrs [GA.Shape GA.Circle]]
 
-formatNode :: (Ord st) => (st -> Bool) -> (st -> Bool) -> (st -> Bool) -> (st -> Bool)
-           -> (st, st) -> GA.Attributes
+formatNode :: (st -> Bool) -> (st -> Bool) -> (st -> Bool) -> (st -> Bool) -> (st, st) -> GA.Attributes
 formatNode isFinal isInitial isJoin isChoice (q, _) =
   let shapes = case (isInitial q, isFinal q) of
         (True, True) -> [ GA.Shape GA.DoubleOctagon ]
@@ -128,7 +127,7 @@ formatNode isFinal isInitial isJoin isChoice (q, _) =
         ++ [ GV.style GV.dashed | isChoice q ]
   in shapes ++ decorations
 
-formatFSTEdge :: (Ord st, Pretty pred, Pretty delta, Pretty func)
+formatFSTEdge :: (Pretty pred, Pretty delta, Pretty func)
               => (st, st, Either (pred, func) delta)
               -> GA.Attributes
 formatFSTEdge (_, _, l) =
@@ -152,7 +151,7 @@ fstToDot fst' = GV.graphElemsToDot params nodes edges
       nodes = map (\x -> (x,x)) (S.toList (fstS fst'))
       edges = [ (q, q', l) | (q, l, q') <- KMC.SymbolicFST.edgesToList (fstE fst') ]
 
-sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st, Pretty (Rng func), Pretty (Dom func))
+sstToDot :: (Pretty var, Pretty func, Pretty pred, Ord st, Pretty (Rng func))
          => SST st pred func var -> GV.DotGraph Int
 sstToDot sst = GV.graphElemsToDot params nodes edges
     where

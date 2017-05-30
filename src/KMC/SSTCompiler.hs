@@ -63,8 +63,7 @@ lcp xs | null xs || any (null . fst) xs = ([], xs)
 --   (1) Variable updates are linear (non-copying)
 --   (2) Within the block of updates, the updated buffer is not live.
 --       (I.e., no later update depends on it, so it is safe to modify it)
-compileAssignment :: (Ord st, Ord var, Ord tid, Rng func ~ [delta], Enum delta, Ord delta
-                     ,CompilableFunction func tid)
+compileAssignment :: (Ord st, Ord var, Ord tid, Rng func ~ [delta], Enum delta, CompilableFunction func tid)
                   => var                       -- ^ Variable to be updated
                   -> UpdateStringFunc var func -- ^ Update function
                   -> EnvReader st var tid Block
@@ -103,7 +102,7 @@ orderAssignments ru
       fv (VarA v:xs) = v:fv xs
       fv (_:xs) = fv xs
 
-compileRegisterUpdate :: (Ord st, Ord var, Ord tid, Rng func ~ [delta], Enum delta, Ord delta
+compileRegisterUpdate :: (Ord st, Ord var, Ord tid, Rng func ~ [delta], Enum delta
                          ,CompilableFunction func tid)
                       => RegisterUpdate var func   -- ^ Register update
                       -> EnvReader st var tid Block
@@ -205,7 +204,7 @@ compile sst =
 --------------------
 
 -- | Set of all constants occurring in a list of update strings
-constants :: (Ord delta, Enum delta, Rng func ~ [delta], CompilableFunction func tid) =>
+constants :: (Enum delta, Rng func ~ [delta], CompilableFunction func tid) =>
              [(st, pred, RegisterUpdate var func, st)]
           -> [UpdateString var [delta]]
           -> S.Set [Int]

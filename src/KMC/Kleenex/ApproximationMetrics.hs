@@ -35,21 +35,21 @@ rewriteEpsilon Hamming _ (rid,_) (AS n m c) =
 -- LCS and Levenshtein Rewrites
 --
 rewriteEpsilon _ Explicit (rid,frid) (AS n m c) =
-  AS (HM.union newDecls n) m $ c + 5
+  AS (HM.union ndcls n) m $ c + 5
   where
-    newDecls = HM.fromList [(rid, RSum   [c+3, c+4])
-                           ,(c  , RConst (Left 68)) -- Delete
-                           ,(c+1, RSeq   [c+2, frid])
-                           ,(c+2, RRead  RS.universe True)
-                           ,(c+3, RSeq   [c, c+1])
-                           ,(c+4, RSum   [])]
+    ndcls = HM.fromList [(rid, RSum   [c+3, c+4])
+                        ,(c  , RConst (Left 68)) -- Delete
+                        ,(c+1, RSeq   [c+2, frid])
+                        ,(c+2, RRead  RS.universe True)
+                        ,(c+3, RSeq   [c, c+1])
+                        ,(c+4, RSum   [])]
 rewriteEpsilon _ mode (rid,frid) (AS n m c) =
-  AS (HM.union newDecls n) m $ c + 3
+  AS (HM.union ndcls n) m $ c + 3
   where
-    newDecls = HM.fromList [(rid, RSum  [c+1, c+2])
-                           ,(c  , RRead RS.universe (mode == Matching))
-                           ,(c+1, RSeq  [c, frid])
-                           ,(c+2, RSeq  [])]
+    ndcls = HM.fromList [(rid, RSum  [c+1, c+2])
+                        ,(c  , RRead RS.universe (mode == Matching))
+                        ,(c+1, RSeq  [c, frid])
+                        ,(c+2, RSeq  [])]
 
 ---------------
 -- READ TERM --
@@ -89,7 +89,7 @@ rewriteRead LCS Correction (rid,rid',frid,frid') rt@(RRead rs True) (AS n m c) =
       , (c+4, RRead RS.universe False)
       , (c+5, RSeq [c+6, frid'] )
       , (c+6, RConst (Left (RS.findMin rs)))]
-rewriteRead LCS mode (rid,rid',frid,frid') rt@(RRead rs out) (AS n m c) =
+rewriteRead LCS mode (rid,rid',frid,frid') rt@(RRead _ out) (AS n m c) =
   AS (HM.union newElems n) m $ c+5
   where
     newElems = HM.fromList
@@ -126,7 +126,7 @@ rewriteRead Hamming Correction (rid,rid',_,frid') rt@(RRead rs True) (AS n m c) 
       , (c+3, RRead RS.universe False)
       , (c+4, RSeq [c+5, frid'])
       , (c+5, RConst (Left (RS.findMin rs)))]
-rewriteRead Hamming mode (rid,rid',_,frid') rt@(RRead rs out) (AS n m c) =
+rewriteRead Hamming mode (rid,rid',_,frid') rt@(RRead _ out) (AS n m c) =
   AS (HM.union newElems n) m $ c+4
   where
     newElems = HM.fromList
@@ -178,7 +178,7 @@ rewriteRead Levenshtein Correction (rid,rid',frid,frid') rt@(RRead rs True) (AS 
       , (c+9, RRead RS.universe False)
       , (c+10,RSeq [c+11, frid'])
       , (c+11,RConst (Left (RS.findMin rs)))]
-rewriteRead Levenshtein mode (rid,rid',frid,frid') rt@(RRead rs out) (AS n m c) =
+rewriteRead Levenshtein mode (rid,rid',frid,frid') rt@(RRead _ out) (AS n m c) =
   AS (HM.union newElems n) m $ c+8
   where
     newElems = HM.fromList
@@ -191,3 +191,5 @@ rewriteRead Levenshtein mode (rid,rid',frid,frid') rt@(RRead rs out) (AS n m c) 
      , (c+5, RSum [c+6, frid'])
      , (c+6, RSeq [c+7, frid])
      , (c+7, RRead RS.universe ((mode == Matching) && out))]
+
+rewriteRead appr mode _ _ _ = error $ "Current combination of approximation and mode not supported: " ++ show appr ++ ", " ++ show mode

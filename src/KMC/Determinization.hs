@@ -185,8 +185,7 @@ unabstract = fmap (mapOutput (constUpdateStringFunc))
 ---------------------
 
 specialize :: (Function func, Dom func ~ [sigma], Rng func ~ [delta]
-              ,Enumerable pred sigma
-              ,Ord st) =>
+              ,Enumerable pred sigma) =>
               [(st, [pred], [(var, UpdateStringFunc var func)], st)]
               -> [(st, [pred], [(var, UpdateStringFunc var func)], st)]
 specialize ts =
@@ -229,7 +228,7 @@ consumeTreeMany fst' preds = go 0 preds
 
 -- | Determinize the path tree simulation algorithm for some FST
 sstFromFST
-  :: (Bounded (Dom func), Enum (Dom func), Eq func, Eq delta,
+  :: (Bounded (Dom func), Enum (Dom func), Eq func,
       Eq (Rng func), Ord st, Ord pred, Monoid (Rng func),
       PartialOrder pred, Function func, Enumerable pred (Dom func),
       Boolean pred, Rng func ~ [delta]) =>
