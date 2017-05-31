@@ -13,6 +13,9 @@ build-type:          Simple
 extra-source-files:  README.md
                    , crt/crt.c
 cabal-version:       >=1.10
+source-repository head
+    type: git
+    location: git://github.com/diku-kmc/kleenexlang.git
 
 library
   default-extensions: TemplateHaskell
