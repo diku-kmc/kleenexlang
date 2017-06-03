@@ -99,4 +99,6 @@ data RTerm a b =
                             -- the output or not.
   | RSeq [RIdent]
   | RSum [RIdent]
+  | RSet Int
+  | RTest
   deriving (Eq, Ord, Show)

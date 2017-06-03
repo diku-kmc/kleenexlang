@@ -14,6 +14,7 @@ data ApproxState = AS { newDecls :: Decls
                       , mappings :: HM.HashMap (RIdent,Int) RIdent
                       , counter ::  Int } deriving (Show)
 
+data ApproxTechnique = Counter | Expand
 data ApproxMetric = LCS | Hamming | Levenshtein deriving (Show)
 data ApproxMode = Correction | Matching | Explicit deriving (Show, Eq)
 

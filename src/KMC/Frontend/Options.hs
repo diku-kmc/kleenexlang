@@ -28,6 +28,7 @@ data MainOptions =
     , optActionEnabled    :: Bool -- ^ Decompose into oracle/action
     , optSuppressBits     :: Bool -- ^ Don't generate bitcodes that can be safely suppressed
     , optIte              :: Bool -- ^ Use iterative approximation
+    , optCounters         :: Bool -- * Only usable for simul command, but is here for inclusion in Visualization
     , optApproxMetric     :: ApproxMetric -- ^ The metric used for approximation
     , optApproxMode       :: ApproxMode -- ^ Output mode for approximate matching
     }
@@ -161,6 +162,7 @@ instance Options MainOptions where
       <*> simpleOption "act" True "Enable actions in the language"
       <*> simpleOption "sb"  True "Avoid generating bits for suppressed terms whenever safe"
       <*> simpleOption "ite" False "Use iterative approximation"
+      <*> simpleOption "counters" False "Enable the use of counters (in approximate matching) only usable for the simul command"
       <*> defineOption approxMetricOptionType
                 (\o -> o { optionLongFlags = ["metric"]
                          , optionDefault = LCS

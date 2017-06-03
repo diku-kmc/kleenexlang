@@ -43,7 +43,8 @@ import           System.Exit (ExitCode(..),exitWith)
 import           System.FilePath (takeExtension)
 import           System.IO (hPutStrLn,stdout,stderr)
 
-createProgram :: String -> Frontend ProgramUnit
+createProgram :: String
+              -> Frontend ProgramUnit
 createProgram arg = do
   mainOpts <- ask
   case getCompileFlavor mainOpts arg of
@@ -58,7 +59,7 @@ createProgram arg = do
             Left err -> fatal $ WF.prettyPrintError err
             Right _metaData ->
               return ProgramUnit { puProgram = desugarProg ast
-                                   (optApproxMetric mainOpts) (optApproxMode mainOpts) (optIte mainOpts)
+                                   (optApproxMetric mainOpts) (optApproxMode mainOpts) (optIte mainOpts) (optCounters mainOpts)
                                  , puSourceName = arg
                                  , puSourceHash = md5s (Str kleenexSrc)
                                  }

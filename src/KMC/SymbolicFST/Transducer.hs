@@ -12,10 +12,12 @@ import           Data.Functor.Identity (Identity(..), runIdentity)
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
-import           KMC.Kleenex.Syntax (RIdent, RProg(..), RTerm(..))
+import           KMC.Kleenex.Syntax (RIdent, RProg(..), RTerm(..), RegIdent(..))
 import           KMC.RangeSet (RangeSet)
 import           KMC.SymbolicFST (FST(..), edgesFromList, edgesToList)
 import           KMC.Theories (Function(..))
+import           KMC.Kleenex.Actions
+import          Data.Word
 
 type Transducer st sigma gamma
   = FST st (RangeSet sigma) (CopyFunc sigma [gamma])
@@ -55,7 +57,7 @@ instance (Enum a, Bounded a) => Function (CopyFunc a [Identity a]) where
 
 -- | Converts a Kleenex program to a transducer.
 constructTransducer
-  :: (Rng (CopyFunc a [b]) ~ [b]) => RProg a b -> RIdent -> Transducer [RIdent] a b
+  :: (Rng (CopyFunc a [Either Word8 RegAction]) ~ [Either Word8 RegAction]) => RProg a (Either Word8 RegAction) -> RIdent -> Transducer [RIdent] a (Either Word8 RegAction)
 constructTransducer rprog initial =
   FST { fstS = allStates
       , fstE = edgesFromList allTransitions
@@ -89,6 +91,12 @@ constructTransducer rprog initial =
                 -- Indexed epsilons are implicitly represented by the transition order
                 trans' = [(i:is, Right [], q') | q' <- qs']
             in go (S.union (S.fromList qs') ws') states' (trans' ++ trans)
+          RSet k        ->
+            let q' = follow is
+            in go (S.insert q' ws') states' ((i:is, Right [Right (Write $ RegIdent ("Set " ++ show k))], q'):trans)
+          RTest         ->
+            let q' = follow is
+            in go (S.insert q' ws') states' ((i:is, Right [Right (Write $ RegIdent "Test")], q'):trans)
       | otherwise = error "impossible"
 
     -- Optimization: Reduce number of generated states by contracting
