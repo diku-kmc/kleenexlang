@@ -73,6 +73,17 @@ state* parse(char* fp, int* l, int* ss, int* ns) {
             case 'A':   nfst[ind] .s_type = ACCEPT;
                         *ns += 1;
                         break;
+            case 'I':   nfst[ind] .s_type = SET;
+                        if (fscanf(fd, "%i %i\n", &t1, &t2) != 2) exit(3);
+                        nfst[ind].set.target = t1;
+                        nfst[ind].set.k = t2;
+                        break;
+            case 'T':   nfst[ind].s_type = TEST;
+                        if (fscanf(fd, "%i\n", &t1) != 1) exit(3);
+                        nfst[ind].test.target = t1;
+                        break;
+            default: printf("Parse error, unkown state type");
+                     exit(11);
         }
 
     }
@@ -134,9 +145,11 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             } else {
                 lchild = (node*) malloc(sizeof(node));
                 lchild->valuation = cvector_create();
+                lchild->c = n->c;
 
                 rchild = (node*) malloc(sizeof(node));
                 rchild->valuation = cvector_create();
+                rchild->c = n->c;
             }
             n->lchild = lchild;
             n->rchild = rchild;
@@ -159,6 +172,21 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             }
             return follow_ep(nfst, n, leafs, visited, del);
             break;
+                   }
+        case SET: {
+            n->c = st.set.k;
+            n->node_ind = st.set.target;
+            return follow_ep(nfst, n, leafs, visited, del);
+                  }
+        case TEST: {
+            if (n->c > 0) {
+                n->c--;
+                n->node_ind = st.test.target;
+                return follow_ep(nfst, n, leafs, visited, del);
+            } else {
+                nvector_append(del, n);
+                return false;
+            }
                    }
         default: {
             nvector_append(leafs, n);
@@ -276,6 +304,7 @@ int main(int argc, char** argv) {
     node* root = mvector_get(ns);
     root->valuation = cvector_create();
     root->node_ind = ss;
+    root->c = 0;
 
     bool* visited = (bool*) malloc(sizeof(bool) * nlen);
 

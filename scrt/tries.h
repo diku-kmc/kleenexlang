@@ -21,6 +21,7 @@ struct node {
     int node_ind;           // Should probably be called state_ind; index into
                             // the NFST array.
 
+    int c;
     bool islchild;
     char_vector* valuation;
     struct node* lchild;
@@ -35,7 +36,7 @@ typedef struct rangeset {
 } rangeset;
 
 // Enumeration for the different kinds of states.
-enum SType { CHOICE, ACCEPT, SKIP, SYMBOL };
+enum SType { CHOICE, ACCEPT, SKIP, SYMBOL, SET, TEST };
 
 // Choice state.
 typedef struct choice_s {
@@ -59,6 +60,15 @@ typedef struct symbol_s {
     rangeset* input;
 } symbol_s;
 
+typedef struct set_s {
+    int target;
+    int k;
+} set_s;
+
+typedef struct test_s {
+    int target;
+} test_s;
+
 // Union state tagged with enum, accept state needs no data so it is not
 // represented in the union
 typedef struct state {
@@ -67,6 +77,8 @@ typedef struct state {
         choice_s choice;
         skip_s   skip;
         symbol_s symbol;
+        set_s    set;
+        test_s   test;
     };
 } state;
 
