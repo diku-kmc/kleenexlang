@@ -160,14 +160,14 @@ desugarTerm out counters k t =
   (Question t1) -> do it <- desugarTerm out counters k t1
                       ieps <- decl $ RSeq []
                       decl $ RSum [it, ieps]
-                    -- For some reason don't output if outer term is
-                    -- SuppressOutput
   (Approx e t1)  -> case (counters, k) of
                         (True, 0)  -> do
                                         i   <- desugarTerm out counters e t1
                                         set <- decl $ RSet e
                                         decl $ RSeq [set, i]
                         (True, _)  -> error "Non!"
+                        -- For some reason don't output if outer term is
+                        -- SuppressOutput
                         (False, _) -> if not out
                                       then desugarTerm out counters k t1
                                       else do i1 <- desugarTerm out counters k t1

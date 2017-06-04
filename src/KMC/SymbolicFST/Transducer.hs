@@ -91,6 +91,7 @@ constructTransducer rprog initial =
                 -- Indexed epsilons are implicitly represented by the transition order
                 trans' = [(i:is, Right [], q') | q' <- qs']
             in go (S.union (S.fromList qs') ws') states' (trans' ++ trans)
+          -- Temporarily using RegWrite to indicate the Set or Test states, should be removed later.
           RSet k        ->
             let q' = follow is
             in go (S.insert q' ws') states' ((i:is, Right [Right (Write $ RegIdent ("Set " ++ show k))], q'):trans)
