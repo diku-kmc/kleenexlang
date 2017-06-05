@@ -46,7 +46,7 @@ instance (Enum dom, Bounded dom, Enum digit, Bounded digit, Enumerable enum dom)
 -- output labels on symbol transitions; and adding bit code outputs to every
 -- non-deterministic transition.
 oracle :: forall st sigma gamma digit.
-          (Ord st, Ord sigma, Enum sigma, Bounded sigma, Enum digit, Bounded digit
+          (Ord st, Ord sigma, Enum sigma, Enum digit, Bounded digit
           ,Rng (CopyFunc sigma [gamma]) ~ [gamma])
        => Transducer st sigma gamma -> OracleMachine st sigma digit
 oracle = mapEdges symsym symeps epssym epseps

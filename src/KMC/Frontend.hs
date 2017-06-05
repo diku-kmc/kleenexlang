@@ -5,7 +5,6 @@ import           KMC.Frontend.Options
 import           KMC.Determinization (SSTFunc)
 import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Approximation
-import           KMC.Kleenex.Desugaring as DS
 import qualified KMC.RangeSet as RS
 import qualified KMC.SymbolicFST.ActionMachine as A
 import           KMC.SymbolicFST.OracleMachine (CodeFunc)

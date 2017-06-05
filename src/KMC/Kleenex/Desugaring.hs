@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
-module KMC.Kleenex.Desugaring(desugarProg,desugarRegex) where
+module KMC.Kleenex.Desugaring (desugarProg,desugarRegex) where
 
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -47,7 +47,7 @@ insertDecl i t = do modify $ \ds -> ds { dsDecls    = M.insert i t (dsDecls ds)
 insertApproxDecl :: MonadState DesugarState m => RIdent -> RIdent -> Int -> m RIdent
 insertApproxDecl i1 i2 k = do
   _ <- insertDecl i2 $ RSeq [i1]
-  modify $ \ds -> ds { dsApprox = (i1,i2,k) : dsApprox ds }
+  modify $ \ds -> ds { dsApprox = (i1,i2,k):(dsApprox ds) }
   return i2
 
 decl :: MonadState DesugarState m => RTermAct -> m RIdent
@@ -245,12 +245,10 @@ applyApproximation ds m mode ite = fst $ foldl go (dsDecls ds, dsFresh ds) $ dsA
     approxIds = map (\(_,i,_) -> i) $ dsApprox ds
 
     -- c is dsFresh aka first available decl "index"
-    go (decls,c) (i1,i2,k)
-      | k < 1 = (decls, c)
-      | null (approxIds `L.intersect` calculateReach i1 decls []) =
-        addApproxStms decls c i2 (applyOnce decls i1 k c)
-      | otherwise = error
-        "Approximated sub-programs cannot contain approximation terms"
+    go (decls,c) (i1,i2,k) = if k < 1 then (decls,c) else
+      if null (L.intersect approxIds (calculateReach i1 decls []))
+      then addApproxStms decls c i2 (applyOnce decls i1 k c)
+      else error "Approximated sub-programs cannot contain approximation terms"
 
 calculateReach :: RIdent -> M.Map RIdent RTermAct -> [RIdent] -> [RIdent]
 calculateReach r terms rs =
@@ -259,7 +257,7 @@ calculateReach r terms rs =
     RSeq ids -> foldl go rs ids
     _        -> rs
   where
-    go rs' r' = if r' `elem` rs' then rs
+    go rs' r' = if (elem r' rs') then rs
                 else calculateReach r' terms (r':rs')
 
 desugarRegex :: E.Regex -> RProgAct

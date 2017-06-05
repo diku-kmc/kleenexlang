@@ -181,15 +181,15 @@ instance (Ord a, Enum a, Bounded a) => Boolean (RangeSet a) where
   conj = RS.intersection
   disj = RS.union
 
-instance (Ord a, Enum a, Bounded a) => SetLike (RangeSet a) a where
+instance (Ord a) => SetLike (RangeSet a) a where
   member = RS.member
 
-instance (Ord a, Enum a, Bounded a) => Enumerable (RangeSet a) a where
+instance (Ord a, Enum a) => Enumerable (RangeSet a) a where
   indexOf = RS.indexOf
   lookupIndex = RS.lookupIndex
   size = RS.size
 
-instance (Ord a, Enum a, Bounded a) => PartialOrder (RangeSet a) where
+instance (Ord a) => PartialOrder (RangeSet a) where
     lte = RS.isSubsetOf
     eq = (==)
 

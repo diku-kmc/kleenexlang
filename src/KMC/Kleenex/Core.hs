@@ -1,11 +1,11 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module KMC.Kleenex.Core (stdToCore) where
+module KMC.Kleenex.Core (stdToCore, getDecl) where
 
 import           Control.Monad.State
 import qualified Data.Map as M
 import qualified Data.HashMap.Strict as HM
-import           KMC.Kleenex.Approximation (Decls, RTermAct, RProgAct)
+import           KMC.Kleenex.ApproximationMetrics (Decls, RTermAct, RProgAct)
 import           KMC.Kleenex.Syntax
 
 data StdToCoreState = SC { scDecls   :: M.Map RIdent RTermAct
@@ -35,9 +35,9 @@ decl t st = do
 
 -- | Returns next relevant declaration
 getDecl :: RIdent -> Decls -> RTermAct
-getDecl rid decls = case HM.lookup rid decls of
-    Just (RSeq (x:[])) -> getDecl x decls
-    Just t             -> t
+getDecl rid decls = case decls HM.! rid of
+    (RSeq (x:[])) -> getDecl x decls
+    t             -> t
 
 -- | Looks if the current id stack has already been visited
 visited :: MonadState StdToCoreState m => [RIdent] -> m RIdent
@@ -47,6 +47,7 @@ visited ids = do
 
 -- | Rewrite each declaration
 rewrite :: Decls -> [RIdent] -> StdToCore RIdent
+rewrite _ [] = error "Empty stack during declaration rewrite"
 rewrite decls (stack@(s:s')) =
   do vis <- visited stack
      if  vis > 0 then return vis else

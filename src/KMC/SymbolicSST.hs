@@ -238,7 +238,7 @@ updateAbstractValuationWeak rho kappa =
                kappa
   in M.union rho' rho
 
-applyAbstractValuation :: (Ord var, {- necessary? -} Function func, Rng func ~ [delta]) => 
+applyAbstractValuation :: (Ord var, Rng func ~ [delta]) =>
                           AbstractValuation var delta
                        -> UpdateStringFunc var func
                        -> UpdateStringFunc var func
@@ -297,7 +297,7 @@ abstractInterpretation weak sst = go (sstS sst)
       go states gamma i = let (gamma', states') = updateAbstractEnvironment weak sst states gamma
                           in go states' gamma' (i+1)
 
-applyAbstractEnvironment :: (Ord st, Ord var, Function func, Rng func ~ [delta]) =>
+applyAbstractEnvironment :: (Ord st, Ord var, Rng func ~ [delta]) =>
                             AbstractEnvironment st var delta
                          -> SST st pred func var
                          -> SST st pred func var
@@ -329,7 +329,7 @@ optimize level sst =
       (gamma, i) = abstractInterpretation weak sst
   in if applyOpt then (applyAbstractEnvironment gamma sst, i) else (sst, 0)
 
-enumerateStates :: (Ord k, Ord var) => SST k pred func var -> SST Int pred func var
+enumerateStates :: (Ord k) => SST k pred func var -> SST Int pred func var
 enumerateStates sst =
     SST
     { sstS = S.fromList $ M.elems states

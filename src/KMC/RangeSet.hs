@@ -105,7 +105,7 @@ size :: (Enum a) => RangeSet a -> Int
 size (RangeSet []) = 0
 size (RangeSet ((l, h):rs)) = 1 + (fromEnum h - fromEnum l) + size (RangeSet rs)
 
-intersection :: (Enum a, Bounded a, Ord a) => RangeSet a -> RangeSet a -> RangeSet a
+intersection :: (Ord a) => RangeSet a -> RangeSet a -> RangeSet a
 intersection (RangeSet bc) (RangeSet bc') = RangeSet $ go bc bc'
     where
         go [] _ = []
