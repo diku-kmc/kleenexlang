@@ -11,8 +11,6 @@ import           KMC.Kleenex.Desugaring as DS
 import           KMC.Kleenex.Parser
 import           KMC.Kleenex.Syntax
 import qualified KMC.Kleenex.WellFormedness as WF
-import           KMC.Kleenex.Approximation
-import           KMC.Kleenex.ApproximationMetrics
 import           KMC.Program.Backends.C (compileProgram)
 import           KMC.Program.IL (elimIdTables)
 import           KMC.SSTCompiler (compile)
@@ -382,7 +380,6 @@ simul :: SimulOptions -> ProgramUnit -> Frontend (IO ExitCode)
 simul sOpts pu = do
   let prog = puProgram pu
   let pu' = pu { puProgram = prog { rprogPipeline = [rprogPipeline prog !! 0] } }
-  tu <- buildTransducers pu'
   let nfst = constructNFST (puProgram pu') (head $ rprogPipeline (puProgram pu'))
   let csv = nfstToCsv $ enumerateNFST $ nfst
   --_ <- measure "aoeu" $ liftIO $ print (head $ tuTransducers tu)
