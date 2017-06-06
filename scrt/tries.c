@@ -145,12 +145,13 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
             } else {
                 lchild = (node*) malloc(sizeof(node));
                 lchild->valuation = cvector_create();
-                lchild->c = n->c;
 
                 rchild = (node*) malloc(sizeof(node));
                 rchild->valuation = cvector_create();
-                rchild->c = n->c;
             }
+            lchild->c = n->c;
+            rchild->c = n->c;
+
             n->lchild = lchild;
             n->rchild = rchild;
 
@@ -208,9 +209,13 @@ void output(node_vector* leafs, state* nfst) {
                 cvector_prepend(data, n->valuation);
                 n = n->parent;
             }
-            break;
+            goto end;
         }
     }
+    printf("Reject!");
+    exit(0);
+
+end:
     for (int i = 0; i < data->len; ++i) {
         putchar(data->data[i]);
     }
