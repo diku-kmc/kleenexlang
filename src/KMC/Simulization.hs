@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module KMC.Simulization where
 
@@ -16,8 +15,6 @@ import           KMC.Kleenex.Actions
 import           KMC.Kleenex.Syntax
 import           KMC.Theories (Function(..))
 import           KMC.RangeSet
-import Debug.Trace
-
 
 data Out =
   Sym Word8
@@ -41,10 +38,8 @@ type NFST st = (st, [IState st])
 
 type Tr = Transducer Int Word8 (Either Word8 RegAction)
 
-debug = flip trace
-
 -- | Substitute state type by any enumerable type.
-enumerateNFST :: (Ord st, Enum a, Show st, Show a) => NFST st -> NFST a
+enumerateNFST :: (Ord st, Enum a) => NFST st -> NFST a
 enumerateNFST (initial, states) = (aux initial, [ (aux q, saux state) | (q, state) <- states ])
   where
     statesMap = M.fromList (zip (map fst states) [toEnum 0..])
@@ -52,16 +47,18 @@ enumerateNFST (initial, states) = (aux initial, [ (aux q, saux state) | (q, stat
 
     saux (Choice t1 t2) = Choice (aux t1) (aux t2)
     saux (Skip t o)     = Skip (aux t) o
-    saux s@(Symbol t r o) = Symbol (aux t) r o
+    saux (Symbol t r o) = Symbol (aux t) r o
     saux (Accept)       = Accept
     saux (Set t k)      = Set (aux t) k
     saux (Test t)       = Test (aux t)
 
-constructNFST
-  :: (Rng (CopyFunc a [Either Word8 RegAction]) ~ [Either Word8 RegAction], a ~ Word8) => RProg a (Either Word8 RegAction) -> RIdent -> ([RIdent], [([RIdent], TState [RIdent])])
+constructNFST :: (Rng (CopyFunc a [Either Word8 RegAction]) ~ [Either Word8 RegAction], a ~ Word8)
+                => RProg a (Either Word8 RegAction)
+                -> RIdent
+                -> ([RIdent], [([RIdent], TState [RIdent])])
 constructNFST rprog initial = ([initial], allTransitions)
   where
-    (allStates, allTransitions) = go (S.singleton [initial]) S.empty []
+    (_, allTransitions) = go (S.singleton [initial]) S.empty []
     go ws states trans
       | S.null ws                         = (states, trans)
       | (q, ws') <- S.deleteFindMin ws, S.member q states
@@ -81,8 +78,7 @@ constructNFST rprog initial = ([initial], allTransitions)
             in go (S.insert q' ws') states' ((i:is, Symbol q' (ranges p) (Just Empty)):trans)
           RRead p True  ->
             let q' = follow is
-            in if q' == [] then go (S.insert q' ws') states' ((i:is, Symbol q' (ranges p) Nothing):trans)
-                else go (S.insert q' ws') states' ((i:is, Symbol q' (ranges p) Nothing):trans)
+            in go (S.insert q' ws') states' ((i:is, Symbol q' (ranges p) Nothing):trans)
           RSeq js       ->
             let q' = follow (js ++ is)
             in go (S.insert q' ws') states' ((i:is, Skip q' Empty):trans)
@@ -120,15 +116,15 @@ constructNFST rprog initial = ([initial], allTransitions)
 convState :: Tr -> Int -> IState Int
 convState fst' k = let i = fromEnum k in
   case M.lookup k (eForward (fstE fst')) of
-    Just ((p, CopyArg, t) : _) -> (i, Symbol t (ranges p) (Nothing))
+    Just ((p, CopyArg, t) : _) -> (i, Symbol t (ranges p) Nothing)
     Just ((p, CopyConst (Left w : _), t) : _) -> (i, Symbol t (ranges p) (Just (Sym w)))
     Just ((p, CopyConst (Right r : _), t) : _) -> (i, Symbol t (ranges p) (Just (Reg r)))
     Just ((p, CopyConst [], t) : _) -> (i, Symbol t (ranges p) (Just Empty))
     Just []              -> error "No edges for state"
     Nothing -> case M.lookup k (eForwardEpsilon (fstE fst')) of
-      Just (((Left w : _), t) : [])  -> (i, Skip t (Sym w))
-      Just (((Right r : _), t) : []) -> (i, Skip t (Reg r))
-      Just (([], t) : [])            -> (i, Skip t Empty)
+      Just [(Left w : _, t)]  -> (i, Skip t (Sym w))
+      Just [(Right r : _, t)] -> (i, Skip t (Reg r))
+      Just [([], t)]                 -> (i, Skip t Empty)
       Just ((_, t1) : (_, t2) : _)   -> (i, Choice t1 t2)
       Just []                        -> error "No epsilon edges for state"
       Nothing                        -> (i, Accept) -- Should be guranteed
@@ -147,14 +143,14 @@ stToString (i, st) =
     Choice t1 t2 -> printf "%i C %i %i\n" i t1 t2
     Skip t a       -> let pe = printf "%i S %i " i t in
                         case a of
-                            (Sym w) -> pe ++ (printf "W %i\n" w)
-                            (Reg r) -> pe ++ (printf "R %s\n" (show r))
+                            (Sym w) -> pe ++ printf "W %i\n" w
+                            (Reg r) -> pe ++ printf "R %s\n" (show r)
                             Empty   -> pe ++ "E\n"
     Symbol t p a -> let pe = printf "%i R %i %i %s " i t (length p) (show p) in
                         case a of
                             Nothing -> pe ++ "C\n"
-                            (Just (Sym w)) -> pe ++ (printf "W %i\n" w)
-                            (Just (Reg r)) -> pe ++ (printf "R %s\n" (show r))
+                            (Just (Sym w)) -> pe ++ printf "W %i\n" w
+                            (Just (Reg r)) -> pe ++ printf "R %s\n" (show r)
                             (Just Empty)   -> pe ++ "E\n"
     Accept       -> printf "%i A\n" i
     Set t k      -> printf "%i I %i %i\n" i t k
@@ -164,4 +160,4 @@ nfstToCsv :: NFST Int -> String
 nfstToCsv (i, nfst') = let
   line1 = printf "%i %i\n" (length nfst') i
   sts   = map stToString nfst'
-  in line1 ++ foldl (++) "" sts
+  in line1 ++ concat sts

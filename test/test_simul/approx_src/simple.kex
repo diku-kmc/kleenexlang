@@ -1,0 +1,11 @@
+// Expects LCS metric and correction mode
+// IN:aabbb
+// IN:aaabb
+// IN:aaabbc
+// IN:aabcb
+// OUT:aaabbb
+// OUT:aaabbb
+// OUT:aaabbb
+// OUT:aaabbb
+
+main := (/aaa/<1> /bbb/<2> /\n/)+
