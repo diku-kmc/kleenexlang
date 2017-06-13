@@ -70,68 +70,51 @@ lookupIdent ident out =
 
 desugarRE :: Bool        -- ^ Indicates if input symbols are to be written as actions
           -> E.Regex     -- ^ Regular expression to desugar
-          -> Int
           -> Desugar RIdent -- ^ Identifier of nonterminal representing desugared RE
-desugarRE out re k =
+desugarRE out re =
   case re of
   E.One            -> decl $ RSeq []
   E.Dot            -> decl $ RRead RS.universe out
-  E.Chr a          -> sequence [ approx_read (RS.singleton b) | b <- encodeChar a ] >>= decl . RSeq
-  E.Group _ e      -> desugarRE out e k
-  E.Concat e1 e2   -> sequence [ desugarRE out e1 k, desugarRE out e2 k ] >>= decl . RSeq
-  E.Branch e1 e2   -> sequence [ desugarRE out e1 k, desugarRE out e2 k ] >>= decl . RSum
+  E.Chr a          -> sequence [ decl $ RRead (RS.singleton b) out | b <- encodeChar a ] >>= decl . RSeq
+  E.Group _ e      -> desugarRE out e
+  E.Concat e1 e2   -> sequence [ desugarRE out e1, desugarRE out e2 ] >>= decl . RSeq
+  E.Branch e1 e2   -> sequence [ desugarRE out e1, desugarRE out e2 ] >>= decl . RSum
   E.Class pos ers  -> let rs  = (if pos then id else RS.complement)
                                 $ RS.rangeSet [ (toEnum (ord lo), toEnum (ord hi)) | (lo, hi) <- ers ]
-                      in approx_read rs -- decl $ RRead rs out
+                      in decl $ RRead rs out
   E.Star e         -> star e
   E.LazyStar e     -> star e
-  E.Plus e         -> do ie <- desugarRE out e k
-                         istar <- desugarRE out (E.Star e) k
+  E.Plus e         -> do ie <- desugarRE out e
+                         istar <- desugarRE out (E.Star e)
                          decl $ RSeq [ie, istar]
-  E.LazyPlus e     -> do ie <- desugarRE out e k
-                         istar <- desugarRE out (E.LazyStar e) k
+  E.LazyPlus e     -> do ie <- desugarRE out e
+                         istar <- desugarRE out (E.LazyStar e)
                          decl $ RSeq [ie, istar]
-  E.Question e     -> do ie <- desugarRE out e k
+  E.Question e     -> do ie <- desugarRE out e
                          ieps <- decl $ RSeq []
                          decl $ RSum [ie, ieps]
-  E.LazyQuestion e -> do ie <- desugarRE out e k
+  E.LazyQuestion e -> do ie <- desugarRE out e
                          ieps <- decl $ RSeq []
                          decl $ RSum [ieps, ie]
   E.Range e n m    -> do
-    ie <- desugarRE out e k
+    ie <- desugarRE out e
     case m of
-      Nothing -> do istar <- desugarRE out (E.Star e) k
+      Nothing -> do istar <- desugarRE out (E.Star e)
                     decl $ RSeq (replicate n ie ++ [istar])
       Just m' -> if n == m' then
                    decl $ RSeq (replicate n ie)
                  else
-                   do iquest <- desugarRE out (E.Question e) k
+                   do iquest <- desugarRE out (E.Question e)
                       decl $ RSeq (replicate n ie ++ replicate m' iquest)
-  E.Suppress e     -> desugarRE False e k
+  E.Suppress e     -> desugarRE False e
   E.NamedSet _ _   -> error "named sets not supported"
   E.LazyRange{}    -> error "lazy ranges not supported"
   where
-    star e = do ie     <- desugarRE out e k
+    star e = do ie     <- desugarRE out e
                 ieps   <- decl $ RSeq []
                 i      <- getFresh
                 iloop  <- decl $ RSeq [ie, i]
                 insertDecl i $ RSum [ieps, iloop]
-    approx_read rs = if k == 0 then
-                          decl $ RRead rs out
-                     else
-                          do end      <- decl $ RSeq []
-                             fchoice  <- getFresh
-                             test_del <- decl RTest
-                             delete   <- decl $ RRead RS.universe False
-                             r        <- decl $ RRead rs out
-                             readc    <- decl $ RSeq [r, end]
-                             ff       <- decl $ RSeq [test_del, delete, fchoice]
-                             testi    <- decl RTest
-                             i        <- decl $ RConst (Left $ RS.findMin rs)
-                             insert   <- decl $ RSeq [testi, i, end]
-                             schoice  <- decl $ RSum [ff, insert]
-                             insertDecl fchoice $ RSum [readc, schoice]
-
 
 ---------------------
 -- Kleenex desugaring
@@ -139,61 +122,53 @@ desugarRE out re k =
 
 desugarTerm :: Bool           -- ^ Indicates if input symbols are to be written as actions
             -> Bool           -- ^ Indicates use of counters
-            -> Int            -- ^ Current allowed approximation error
             -> Term i         -- ^ Term to be desugared
             -> Desugar RIdent -- ^ Identifier of nonterminal representing desugared term
-desugarTerm out counters k t =
+desugarTerm out counters t =
   case t of
   (Var ident)   -> lookupIdent ident out
   (Constant bs) -> mapM (decl . RConst . Left) (if out then BS.unpack bs else []) >>= decl . RSeq
-  (RE e)        -> desugarRE out e k
-  (Seq _ _)     -> mapM (desugarTerm out counters k) (flattenSeq t) >>= decl . RSeq
-  (Sum _ _)     -> mapM (desugarTerm out counters k) (flattenSum t) >>= decl . RSum
-  (Star t1)     -> do it <- desugarTerm out counters k t1
-                      ieps <- decl $ RSeq [] -- Contiunue or accept?
+  (RE e)        -> desugarRE out e
+  (Seq _ _)     -> mapM (desugarTerm out counters) (flattenSeq t) >>= decl . RSeq
+  (Sum _ _)     -> mapM (desugarTerm out counters) (flattenSum t) >>= decl . RSum
+  (Star t1)     -> do it <- desugarTerm out counters t1
+                      ieps <- decl $ RSeq [] -- Contiunue / Accept
                       i <- getFresh
                       iloop <- decl $ RSeq [it, i]
                       insertDecl i $ RSum [iloop, ieps]
-  (Plus t1)     -> do it <- desugarTerm out counters k t1
-                      istar <- desugarTerm out counters k (Star t1)
+  (Plus t1)     -> do it <- desugarTerm out counters t1
+                      istar <- desugarTerm out counters (Star t1)
                       decl $ RSeq [it, istar]
-  (Question t1) -> do it <- desugarTerm out counters k t1
+  (Question t1) -> do it <- desugarTerm out counters t1
                       ieps <- decl $ RSeq []
                       decl $ RSum [it, ieps]
-  (Approx e t1)  -> case (counters, k) of
-                        (True, 0)  -> do
-                                        i   <- desugarTerm out counters e t1
-                                        set <- decl $ RSet e
-                                        decl $ RSeq [set, i]
-                        (True, _)  -> error "Non!"
-                        -- For some reason don't output if outer term is
-                        -- SuppressOutput
-                        (False, _) -> if not out
-                                      then desugarTerm out counters k t1
-                                      else do i1 <- desugarTerm out counters k t1
-                                              i2 <- getFresh
-                                              insertApproxDecl i1 i2 e
-  (Range m' n' t1) -> do it <- desugarTerm out counters k t1
+                    -- For some reason don't approximate if we don't output
+  (Approx e t1)  -> if not out
+                    then desugarTerm out counters t1
+                    else do i1 <- desugarTerm out counters t1
+                            i2 <- getFresh
+                            insertApproxDecl i1 i2 e
+  (Range m' n' t1) -> do it <- desugarTerm out counters t1
                          let m = fromMaybe 0 m'
                          case n' of
                            Nothing -> do
-                             istar <- desugarTerm out counters k (Star t1)
+                             istar <- desugarTerm out counters (Star t1)
                              decl $ RSeq (replicate m it ++ [istar])
                            Just n | n < m -> error $ "invalid range: {" ++ show m ++ "," ++ show n ++ "}"
                                   | n == m -> decl $ RSeq (replicate m it)
                                   | otherwise -> do
-                                      iquest <- desugarTerm out counters k (Question t1)
+                                      iquest <- desugarTerm out counters (Question t1)
                                       decl $ RSeq (replicate m it ++ replicate (n-m) iquest)
-  (SuppressOutput t1) -> desugarTerm False counters k t1
+  (SuppressOutput t1) -> desugarTerm False counters t1
   One                 -> decl $ RSeq []
   UpdateReg r str     -> mapM (decl . RConst) (Right Push
                                                :(str >>= dsUpdateSym)
                                                ++ [Right $ Pop r]) >>= decl . RSeq
   WriteReg r          -> decl $ RConst (Right (Write r))
-  RedirectReg r t1    -> do it <- desugarTerm out counters k t1
+  RedirectReg r t1    -> do it <- desugarTerm out counters t1
                             [ipush, ipop] <- mapM (decl . RConst . Right) [Push, Pop r]
                             decl $ RSeq [ipush,it,ipop]
-  TermInfo _ t1       -> desugarTerm out counters k t1
+  TermInfo _ t1       -> desugarTerm out counters t1
   where
     flattenSeq (Seq t1 t2) = flattenSeq t1 ++ flattenSeq t2
     flattenSeq t'          = [t']
@@ -206,11 +181,12 @@ desugarTerm out counters k t =
 desugarProg :: (Show i) => Prog i -> ApproxMetric -> ApproxMode -> Bool -> Bool -> RProgAct
 desugarProg prog m mode ite counters =
   RProg { rprogPipeline = [ lu ident | ident <- progPipeline prog ]
-          , rprogDecls    = applyApproximation ds m mode ite
+          , rprogDecls    = applyApproximation ds m mode ite counters
           }
   where
     ds        = execState (runReaderT (go (progDecls prog)) initDC) initDS
-    identMap  = M.fromList $ zip [ (declIdent d, out) | d <- progDecls prog, out <- [True, False] ] [0..]
+    identMap  = M.fromList $ zip [ (declIdent d, out) | d <- progDecls prog,
+                                                        out <- [True, False] ] [0..]
     nextFresh = M.size identMap + 1
     initDS    = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = nextFresh, dsApprox = []}
     initDC    = DC { dcIdents = identMap }
@@ -218,15 +194,14 @@ desugarProg prog m mode ite counters =
     declIdent (Decl ident _) = ident
     declIdent (DeclInfo _ d) = declIdent d
 
--- Looks up terms with output or without, desugars and inserts Decl for the
--- exsisting one.
+-- Looks up terms with output and without, and desugars for each one.
     go [] = return ()
     go (DeclInfo _ d:decls) = go (d:decls)
     go (Decl ident t:decls) = do
       i <- lookupIdent ident True
       j <- lookupIdent ident False
-      i' <- desugarTerm True counters 0 t
-      j' <- desugarTerm False counters 0 t
+      i' <- desugarTerm True counters t
+      j' <- desugarTerm False counters t
       _ <- insertDecl i (RSeq [i'])
       _ <- insertDecl j (RSeq [j'])
       go decls
@@ -236,11 +211,10 @@ desugarProg prog m mode ite counters =
 
 -- Goes through the list of ApproxDecls and applies the approximation
 -- techniques
-applyApproximation :: DesugarState -> ApproxMetric -> ApproxMode -> Bool -> M.Map RIdent RTermAct
-applyApproximation ds m mode ite = fst $ foldl go (dsDecls ds, dsFresh ds) $ dsApprox ds
+applyApproximation :: DesugarState -> ApproxMetric -> ApproxMode -> Bool -> Bool -> M.Map RIdent RTermAct
+applyApproximation ds m mode ite counters = fst $ foldl go (dsDecls ds, dsFresh ds) $ dsApprox ds
   where
-    applyOnce decls pl k c = rprogDecls $
-      (if ite then approxProgIt else approxProg) (stdToCore (RProg [pl] decls)) k c m mode
+    applyOnce decls pl k c = rprogDecls $ approxFunc ( (RProg [pl] decls)) k c m mode
     addApproxStms dold c i dnew = (M.insert i (RSeq [c]) (M.union dold dnew) , c + M.size dnew)
     approxIds = map (\(_,i,_) -> i) $ dsApprox ds
 
@@ -251,6 +225,12 @@ applyApproximation ds m mode ite = fst $ foldl go (dsDecls ds, dsFresh ds) $ dsA
         addApproxStms decls c i2 (applyOnce decls i1 k c)
       | otherwise =
         error "Approximated sub-programs cannot contain approximation terms"
+
+    approxFunc = case (counters, ite) of
+                    (True, _) -> approxCount
+                    (False, True) -> approxProgIt
+                    (False, False) -> approxProg
+
 
 calculateReach :: RIdent -> M.Map RIdent RTermAct -> [RIdent] -> [RIdent]
 calculateReach r terms rs =
@@ -268,6 +248,6 @@ desugarRegex re =
           , rprogDecls    = dsDecls ds
           }
   where
-    (initIdent, ds) = runState (runReaderT (desugarRE True re 0) initDC) initDS
+    (initIdent, ds) = runState (runReaderT (desugarRE True re) initDC) initDS
     initDC = DC { dcIdents = M.empty }
     initDS = DS { dsDecls = M.empty, dsRevDecls = M.empty, dsFresh = 0, dsApprox = [] }

@@ -1,12 +1,15 @@
 module KMC.Kleenex.Approximation( approxProg
                                 , approxProgIt
+                                , approxCount
                                 , module AM) where
 
 import qualified Data.Map as M
+import           Data.Maybe (fromMaybe)
 import qualified Data.HashMap.Strict as HM
 import           KMC.Kleenex.ApproximationMetrics as AM
 import           KMC.Kleenex.Core
 import           KMC.Kleenex.Syntax
+import qualified KMC.RangeSet as RS
 
 -- | Makes a Reduced Program capable of approximate matching using the k-fold
 -- approach
@@ -24,6 +27,55 @@ approxProg p k offset m mode = prog
 approxProgIt :: RProgAct -> Int -> Int -> ApproxMetric -> ApproxMode -> RProgAct
 approxProgIt p k offset m mode = foldl (\s _ -> approx s) p [1..k]
   where approx s = approxProg s 1 offset m mode
+
+approxCount :: RProgAct -> Int -> Int -> ApproxMetric -> ApproxMode -> RProgAct
+approxCount rprog k offset metric mode = prog
+  where
+    prog = RProg [offset] (M.union (start_terms offset)
+                            (snd $ go [start] M.empty (offset+2) M.empty))
+    start = head $ rprogPipeline rprog
+    decls = HM.fromList $ M.toList $ rprogDecls rprog
+    go [] m _ ndecls = (m, ndecls)
+    go (i : is) m c ndecls
+      | M.member i m = go is m c ndecls
+      | otherwise =
+          case (getDecl i (decls)) of
+          term@(RConst y) -> go is (M.insert i c m) (c+1) (M.insert c term ndecls)
+          RSeq js -> let (mm, tmp) = go (js ++ is) (M.insert i c m) (c+1) (ndecls)
+                         term = RSeq [lo j mm | j <- js]
+                     in (M.insert i c mm, M.insert c term tmp)
+          RSum js -> let (mm, tmp) = go (js ++ is) (M.insert i c m) (c+1) (ndecls)
+                         term = RSum [lo j mm | j <- js]
+                     in (M.insert i c mm, M.insert c term tmp)
+          RRead rs cp -> go is (M.insert i c m) (c+11)
+                            (M.union (M.fromList $ approx_read c rs cp) ndecls)
+          term -> error $ "internal error: got RSet or RTest in approxTerm: " ++ (show term)
+
+    start_terms c = M.fromList [(c, RSeq [c+1, c+2]), (c+1, RSet k)]
+
+    approx_read c rs cp =
+                        let
+                            [begin, end, test_del,delete,r,readc,ff,test_ins,ins,insert,schoice] = [c .. c+10]
+                        in
+                            [(begin,     RSum [readc, schoice])          -- First choice
+                            ,(test_del, RTest)                          -- Delete test
+                            ,(delete,   RRead RS.universe False)        -- Delete character
+                            ,(r,        RRead rs cp)                    -- Read normally
+                            ,(readc,    RSeq [r, end])                  -- Read and continue
+                            ,(ff,       RSeq [test_del, delete, begin])  -- Delete and try again
+                            ,(test_ins, RTest)                          -- Insert test
+                            ,(ins,      RConst (Left $ RS.findMin rs))  -- Insert character
+                            ,(insert,   RSeq [test_ins, ins, end])      -- Test, insert and continue
+                            ,(schoice,  RSum [ff, insert])               -- Second choice
+                            ,(end,      RSeq [])]                       -- Accept / Continue
+
+    lo i m =
+      fromMaybe (error $ "internal error: lookup: " ++ show i)
+        $ M.lookup i m
+    {-getDecl i =
+      fromMaybe (error $ "internal error: identifier without declaration: " ++ show i)
+        $ M.lookup i (rprogDecls rprog)
+        -}
 
 -------------
 -- Utility --
