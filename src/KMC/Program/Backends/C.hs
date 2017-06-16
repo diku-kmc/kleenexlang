@@ -38,23 +38,23 @@ padL width s = replicate (width - length s) ' ' ++ s
 padR :: Int -> String -> String
 padR width s = s ++ replicate (width - length s) ' '
 
-progTemplate :: String -> String -> String -> String -> String -> String -> String -> String -> [String] -> String
-progTemplate buString tablesString declsString infoString initString freeString stateTable stateCount progStrings =
+progTemplate :: String -> String -> String -> String -> String -> String -> String -> String -> [String] -> [String] -> String
+progTemplate buString tablesString declsString infoString initString freeString stateTable stateCount progStrings silentProgStrings =
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
 --  ++ [fileQ|crt/crt.h|] ++ "\n"
   ++ [fileQ|crt/crt.c|] ++ "\n"
   ++ tablesString ++ "\n\n"
-  ++ stateTable ++ "\n"
-  ++ stateCount ++ "\n\n"
+  ++ stateCount ++ "\n"
+  ++ stateTable ++ "\n\n"
   ++ declsString ++ [strQ|
 void printCompilationInfo()
 {
   fprintf(stdout, |]++infoString++[strQ|);
 }
 
-transducer_state* init(unsigned char* input, size_t input_size)
+transducer_state* init(unsigned char* input, size_t input_size, int add_symbols)
 {
 |] ++ initString ++ [strQ|
 }
@@ -65,13 +65,28 @@ void free_state(transducer_state * tstate)
 }
 
 |]++concat (zipWith matchTemplate progStrings [1..])++[strQ|
-int match(int phase, int start_state, transducer_state* tstate, void (*callback)(transducer_state*))
+void match(int phase, transducer_state* tstate, void (*callback)(transducer_state*))
 {
   switch(phase) {
     |]++intercalate "\n" ["case " ++ show i ++ ":\n\
-    \      return match" ++ show i ++ "(phase, start_state, tstate, callback);\n\
+    \      return match" ++ show i ++ "(tstate, callback);\n\
     \      break;"
                          | i <- [1..(length progStrings)] ]++
+    [strQ|
+    default:
+      fprintf(stderr, "Invalid phase: %d given\n", phase);
+      exit(1);
+  }
+}
+
+|]++concat (zipWith silentMatchTemplate silentProgStrings [1..])++[strQ|
+int silent_match(int phase, int start_state, unsigned char * buf, long length)
+{
+  switch(phase) {
+    |]++intercalate "\n" ["case " ++ show i ++ ":\n\
+    \      return silent_match" ++ show i ++ "(start_state, buf, length);\n\
+    \      break;"
+                         | i <- [1..(length silentProgStrings)] ]++
     [strQ|
     default:
       fprintf(stderr, "Invalid phase: %d given\n", phase);
@@ -82,7 +97,7 @@ int match(int phase, int start_state, transducer_state* tstate, void (*callback)
 
 matchTemplate :: String -> Int -> String
 matchTemplate progString n =
-  [strQ|int match|] ++ show n ++ [strQ|(int phase, int start_state, transducer_state* tstate, void (*callback)(transducer_state*))
+  [strQ|void match|] ++ show n ++ [strQ|(transducer_state* tstate, void (*callback)(transducer_state*))
 {
 |]++progString++[strQ|
   //accept|]++show n++[strQ|:
@@ -93,6 +108,18 @@ matchTemplate progString n =
 }
 |]
 
+silentMatchTemplate :: String -> Int -> String
+silentMatchTemplate progString n =
+  [strQ|int silent_match|] ++ show n ++ [strQ|(int start_state, unsigned char * buf, long length)
+{
+|]++progString++[strQ|
+  //accept|]++show n++[strQ|:
+  //  return;
+  //fail|]++show n++[strQ|:
+  //  fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", count, next[0]);
+  //  exit(1);
+}
+|]
 
 {- Types -}
 
@@ -107,10 +134,10 @@ data CProg =
   { cTables         :: Doc
   , cDeclarations   :: Doc
   , cProg           :: [Doc]
+  , cSilentProg     :: [Doc]
   , cInit           :: Doc
   , cFree           :: Doc
   , cBufferUnit     :: Doc
-  , cJumptable      :: Doc
   , cStateTableVar  :: Doc
   , cStateCountVar  :: Doc
   }
@@ -138,6 +165,22 @@ bufferPrefix = "tstate->buffers"
 
 constPrefix :: String
 constPrefix = "const_"
+
+callbackPrefix :: String
+callbackPrefix = "callback"
+
+invokeCallback :: Doc
+invokeCallback =  text "if" <+> parens (text callbackPrefix) <+> ( braces $ text callbackPrefix <> parens (text "tstate") <> semi)
+
+startStateOutput :: String
+startStateOutput = "tstate->curr_state"
+
+startStateSilent :: String
+startStateSilent = "start_state"
+
+startState :: Bool -> Doc
+startState silence =
+      if silence then text startStateSilent else text startStateOutput
 
 -- | Pretty print a buffer identifier (as reference)
 buf :: BufferId -> Doc
@@ -187,9 +230,12 @@ tbl ctypectx ctypetbl (TableId n) i mx phase =
 blck :: BlockId -> Int -> Doc
 blck (BlockId n) phase  = text "l" <> int phase <> text "_" <> int n
 
+stateNo :: BlockId -> Int
+stateNo (BlockId n) = n
+
 -- | Pretty print a block id (state only)
-stateNr :: BlockId -> Doc
-stateNr (BlockId n) = int n
+prettyStateNo :: BlockId -> Doc
+prettyStateNo (BlockId n) = int n
 
 -- | Render a numeral value of some bith length as a C numeral, such that the
 -- most significant bit of the value is the most significant bit of the C type.
@@ -266,7 +312,7 @@ prettyAppendTbl buftype tbltype prog bid tid i mx phase =
       <> parens (hcat [buf bid, comma, arg, comma, lendoc])
       <> semi
       $$ (if bid == streamBuf then
-            text "//Call callback"
+            invokeCallback <+> text "//Call callback"
           else empty)
 
 prettyAppendSym :: BufferId -> BufferId -> Int -> Maybe String -> Doc
@@ -276,9 +322,8 @@ prettyAppendSym bid outBuf i mx =
     in text "append"
         <> parens (hcat [buf bid, comma, symb, comma, int 8]) <> semi
         $$ (if bid == outBuf then
-              text "//Call callback"
+              invokeCallback <+> text "//Call callback"
             else empty)
-
 
 -- | Pretty print an instruction. Note that the C runtime currently
 -- distinguishes between regular buffers and the output buffer, and hence the
@@ -286,44 +331,63 @@ prettyAppendSym bid outBuf i mx =
 prettyInstr :: CType          -- ^ The buffer unit type
             -> CType          -- ^ The table unit type
             -> Program        -- ^ The surrounding program
-            -> Instr -> Int -> Doc
-prettyInstr buftype tbltype prog instr phase =
+            -> Instr -> Int -> Int -> Bool -> Doc
+prettyInstr buftype tbltype prog instr phase state silence =
   let streamBuf = progStreamBuffer prog in
-  case instr of
-    AcceptI            -> text "return state; //accept"
-    FailI              -> text "return state; //fail"
-    NoMoveI            -> text "return -1;"
-    AppendI bid constid ->
-      let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
-      in  text "appendarray"
-          <> parens (hcat [buf bid, comma, cid constid phase, comma, lendoc])
-          <> semi
-          $$ (if bid == streamBuf then
-                text "//Call callback"
-              else empty)
-    AppendTblI bid tid i -> prettyAppendTbl buftype tbltype prog bid tid i Nothing phase
-    AppendSymI bid i   -> prettyAppendSym bid streamBuf i Nothing
-    ConcatI bid1 bid2  -> text "concat"
-                          <> parens (hcat [buf bid1, comma, buf bid2])
-                          <> semi
-                          $$ (if bid1 == streamBuf then
-                                text "//Call callback"
-                              else empty)
-    ResetI bid         -> text "reset" <> parens (buf bid) <> semi
-    AlignI bid1 bid2   -> text "align"
-                          <> parens (hcat [buf bid1, comma, buf bid2])
-                          <> semi
-    IfI e is           -> text "if" <+> parens (prettyExpr e) $$
-                          lbrace $+$
-                          nest 3 (prettyBlock buftype tbltype prog is phase) $+$
-                          rbrace
-    GotoI blid         -> text "goto" <+> blck blid phase <> semi
-    NextI minL _ is -> text "if"
+  if silence then
+    case instr of
+      AcceptI            -> text "return" <+> int state <> semi <+> text "//accept"
+      FailI              -> text "return" <+> int state <> semi <+> text "//fail"
+      NoMoveI            -> text "return -1;"
+      IfI e is           -> text "if" <+> parens (prettyExpr e silence) $$
+                            lbrace $+$
+                            nest 3 (prettyBlock buftype tbltype prog is phase state silence) $+$
+                            rbrace
+      GotoI blid         -> text "goto" <+> blck blid phase <> semi
+      NextI minL _ is    -> text "if"
                             <+> parens (text "left <" <+> int minL) $$
-                          lbrace $+$
-                          nest 3 (prettyBlock buftype tbltype prog is phase) $+$
-                          rbrace
-    ConsumeI i         -> text "consume" <> parens (hcat [text "tstate", comma, int i]) <> semi $$ text "left -=" <+> int i <> semi
+                            lbrace $+$
+                            nest 3 (prettyBlock buftype tbltype prog is phase state silence) $+$
+                            rbrace
+      ConsumeI i         -> text "next +=" <+> int i <> semi $$ text "left -=" <+> int i <> semi
+      _ -> empty
+  else
+    case instr of
+      AcceptI            -> startState silence <+> text "=" <+> int state <> semi $+$ text "return; //accept"
+      FailI              -> startState silence <+> text "=" <+> int state <> semi $+$ text "return; //fail"
+      NoMoveI            -> startState silence <+> text "= -1" <> semi $+$ text "return;"
+      AppendI bid constid ->
+        let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
+        in  text "appendarray"
+            <> parens (hcat [buf bid, comma, cid constid phase, comma, lendoc])
+            <> semi
+            $$ (if bid == streamBuf then
+                  invokeCallback
+                else empty)
+      AppendTblI bid tid i -> prettyAppendTbl buftype tbltype prog bid tid i Nothing phase
+      AppendSymI bid i   -> prettyAppendSym bid streamBuf i Nothing
+      ConcatI bid1 bid2  -> text "concat"
+                            <> parens (hcat [buf bid1, comma, buf bid2])
+                            <> semi
+                            $$ (if bid1 == streamBuf then
+                                  invokeCallback
+                                else empty)
+      ResetI bid         -> text "reset" <> parens (buf bid) <> semi
+      AlignI bid1 bid2   -> text "align"
+                            <> parens (hcat [buf bid1, comma, buf bid2])
+                            <> semi
+      IfI e is           -> text "if" <+> parens (prettyExpr e silence) $$
+                            lbrace $+$
+                            nest 3 (prettyBlock buftype tbltype prog is phase state silence) $+$
+                            rbrace
+      GotoI blid         -> text "goto" <+> blck blid phase <> semi
+      NextI minL _ is    -> text "if"
+                            <+> parens (text "left <" <+> int minL) $$
+                            lbrace $+$
+                            nest 3 (prettyBlock buftype tbltype prog is phase state silence) $+$
+                            rbrace
+      ConsumeI i         -> text "consume" <> parens (hcat [text "tstate", comma, int i])
+                            <> semi $$ text "left -=" <+> int i <> semi
 
 appendSpan :: BufferId -> TableId -> Int -> Block -> Maybe (Int, Block)
 appendSpan bid tid i is =
@@ -352,13 +416,13 @@ appendSymSpan bid i is =
       isAppendSym _ = False
 
 -- | Pretty print a list of instructions.
-prettyBlock :: CType -> CType -> Program -> Block -> Int -> Doc
-prettyBlock buftype tbltype prog instrs phase = go instrs
+prettyBlock :: CType -> CType -> Program -> Block -> Int -> Int -> Bool -> Doc
+prettyBlock buftype tbltype prog instrs phase state silence = go instrs
   where
     go [] = empty
     go (app@(AppendSymI bid i):is) =
         case appendSymSpan bid i is of
-          Nothing -> prettyInstr buftype tbltype prog app phase $+$ go is
+          Nothing -> prettyInstr buftype tbltype prog app phase state silence $+$ go is
           Just (n, is') ->
               vcat [ hcat [ text "for"
                           , parens (text "i = 0; i < " <> int (n+1) <> text "; i++")
@@ -370,7 +434,7 @@ prettyBlock buftype tbltype prog instrs phase = go instrs
                    ]
     go (app@(AppendTblI bid tid i):is) =
       case appendSpan bid tid i is of
-        Nothing       -> prettyInstr buftype tbltype prog app phase $+$ go is
+        Nothing       -> prettyInstr buftype tbltype prog app phase state silence $+$ go is
         Just (n, is') ->
           vcat [hcat [text "for"
                      ,parens (text "i = 0; i < " <> int (n+1) <> text "; i++")]
@@ -380,7 +444,7 @@ prettyBlock buftype tbltype prog instrs phase = go instrs
                ,rbrace
                ,go is'
                ]
-    go (instr:is) = prettyInstr buftype tbltype prog instr phase $+$ go is
+    go (instr:is) = prettyInstr buftype tbltype prog instr phase state silence $+$ go is
 
 prettyStr :: [Int] -> Doc
 prettyStr = doubleQuotes . hcat . map prettyOrd
@@ -395,14 +459,14 @@ prettyStr = doubleQuotes . hcat . map prettyOrd
                       doubleQuotes . doubleQuotes $ text "\\x" <> text (showHex n "")
 
 -- | Pretty print a test expression.
-prettyExpr :: Expr -> Doc
-prettyExpr e =
+prettyExpr :: Expr -> Bool -> Doc
+prettyExpr e silence =
   case e of
-    SymE i            -> text "tstate->inbuf->next" <> brackets (int i)
+    SymE i            -> next <> brackets (int i)
     AvailableSymbolsE -> text "left"
     CompareE i str    -> text "cmp"
                            <> parens (hcat $ punctuate comma
-                                        [text "&next" <> brackets (int i)
+                                        [text "&" <> next <> brackets (int i)
                                         ,text "(unsigned char *)" <+> prettyStr str
                                         ,int (length str)])
     ConstE n          -> let c = chr n in
@@ -419,11 +483,11 @@ prettyExpr e =
     EqE e1 e2         -> op "==" e1 e2
     OrE e1 e2         -> op "||" e1 e2
     AndE e1 e2        -> op "&&" e1 e2
-    NotE e1           -> text "!" <> parens (prettyExpr e1)
+    NotE e1           -> text "!" <> parens (prettyExpr e1 silence)
 
   where
-    op str e1 e2 = parens (prettyExpr e1 <+> text str <+> prettyExpr e2)
-
+    op str e1 e2 = parens (prettyExpr e1 silence <+> text str <+> prettyExpr e2 silence)
+    next = if silence then text "next" else text "tstate->inbuf->next"
 -- | Pretty print all table declarations.
 prettyTableDecl :: CType                 -- ^ Table unit type
                 -> Pipeline              -- ^ Programs
@@ -494,12 +558,21 @@ neededNonStreamBuffers pipeline = S.toList . S.unions $ case pipeline of
 -- | Pretty print initialization code, which should allocate all needed buffers
 prettyInit :: Pipeline -> Doc
 prettyInit progs = text $ printf [strQ|
+  int i;
   transducer_state* tstate = malloc(sizeof(transducer_state));
 
   // Init regular buffers
   tstate->buffers = malloc(%d * sizeof(buffer_t *));
-  for (int i = 1; i < %d; i++) {
+  for (i = 1; i < %d; i++) {
     tstate->buffers[i] = init_buffer(INITIAL_BUFFER_SIZE);
+    tstate->buffers[i]->symbols = NULL;
+    if (add_symbols) {
+      symbol * sym = malloc(sizeof(symbol));
+      sym->next = NULL;
+      sym->position = 0;
+      sym->reg = i;
+      tstate->buffers[i]->symbols = sym;
+    }
   }
 
   // Init in/out buffers
@@ -507,11 +580,14 @@ prettyInit progs = text $ printf [strQ|
   if (input) {
     tstate->outbuf = init_buffer(input_size);
     tstate->buffers[0] = tstate->outbuf;
+    tstate->buffers[0]->symbols = NULL;
     tstate->inbuf  = init_input_buffer(input_size);
     memcpy(tstate->inbuf->data, input, input_size);
     tstate->inbuf->length = input_size;
+    tstate->output_cursor = 0;
   }
-
+  tstate->nextPtr = NULL;
+  tstate->src = NULL;
   return tstate;
 |] ((length buffers) + 1) ((length buffers) + 1)
   where
@@ -520,9 +596,9 @@ prettyInit progs = text $ printf [strQ|
 -- | Pretty print desctruction code, which should free all buffers
 prettyFree :: Pipeline -> Doc
 prettyFree progs = text $ printf [strQ|
-void free_state(transducer_state* tstate)
-{
-  for (int i = 0; i < %d; i++) {
+  int i;
+
+  for (i = 0; i < %d; i++) {
     free(tstate->buffers[i]->data);
     tstate->buffers[i]->data = NULL;
     free(tstate->buffers[i]);
@@ -535,60 +611,69 @@ void free_state(transducer_state* tstate)
   tstate->inbuf = NULL;
 
   tstate->outbuf = NULL;
+  tstate->nextPtr = NULL;
   tstate = NULL;
-}
 |] ((length buffers) + 1)
   where
     buffers = neededNonStreamBuffers progs
 
 
-prettyProg :: Pipeline -> CType -> CType -> Program -> Int -> Doc
-prettyProg pipeline buftype tbltype prog phase =
-     text "int state = 0;"
-  $$ text "long left = tstate->inbuf->length;"
-  $$ text "if (start_state < 0) goto" <+> blck (progInitBlock prog) phase <> semi
-  $$ prettyJumptable pipeline
+prettyProg :: CType -> CType -> Bool -> Program -> Int -> Doc
+prettyProg buftype tbltype silence prog phase =
+ (if silence
+  then
+       text "long left = length;"
+    $$ text "unsigned char * next = (unsigned char *)buf;"
+  else
+    text "long left = tstate->inbuf->length;")
+  $$ text "if" <+> parens ( state <+> text "< 0" )
+  <+> text "goto" <+> blck (progInitBlock prog) phase <> semi
+  $$ prettyJumptable prog phase silence
   $$ vcat (map pblock (M.toList $ progBlocks prog))
   where
     pblock (blid, is) =
-      blck blid phase <>  char ':' $+$
-                      text "state = " <> stateNr blid <> semi
-                      $$ prettyBlock buftype tbltype prog is phase
+      blck blid phase <>  char ':'
+                      $$ prettyBlock buftype tbltype prog is phase (stateNo blid) silence
+    state = startState silence
 
-prettyJumptable :: Pipeline -> Doc
-prettyJumptable progs =
-  vcat [ text "switch" <+> parens (text "phase") <+> lbrace
-       , nest 2 $ vcat (map switchPhase [1..pipelineLength])
-       , rbrace
-       ]
+prettyJumptable :: Program -> Int -> Bool -> Doc
+prettyJumptable progs phase silence =
+  vcat  [ text "switch" <+> parens stateVar <+> lbrace
+        , nest 2 $ vcat (map (switchState) ((M.keys $ progBlocks progs)))
+        , nest 2 defaultCase
+        , rbrace ]
   where
-    pipelineLength = case progs of
-      Left xs  -> length xs
-      Right xs -> length xs
-    blockids = listBlockIds progs
-    switchPhase phase =
-         text "case" <+> int phase <> colon
-      $$ nest 2 (text "switch" <+> parens (text "start_state") <+> lbrace)
-      $$ nest 4 (vcat (map (switchState phase) (blockids !! (phase-1))))
-      $$ nest 4 defaultCase
-      $$ nest 2 rbrace
-    switchState phase state =
+    switchState state =
          text "case" <+> (int $ getBlockId state) <> colon
       $$ nest 2 (text "goto" <+> blck state phase <> semi)
     defaultCase =
-         text "default:"
-      -- $$ nest 2 (text "fprintf(stdout, \"-p %i -s %i\", phase, -1)" <> semi)
-      $$ nest 2 (text "return -1" <> semi)
+      if silence
+        then
+             text "default:"
+          $$ nest 2 (text "return -1" <> semi)
+        else
+             text "default:"
+          $$ nest 2 (stateVar <+> text "= -1" <> semi $$ text "return;")
+    stateVar = startState silence
 
-prettyStateTable :: Program -> Doc
-prettyStateTable prog =
-  -- doubleQuotes (comma <> lbrack)
-  -- $+$
-  (vcat $ punctuate comma (map pblock (M.toList $ progBlocks prog)))
-  -- $+$ doubleQuotes rbrack
+prettyStateTable :: [Program] -> Doc
+prettyStateTable progs =
+      text "void init_state_table" <> parens empty <+> lbrace
+  $+$ nest 2 (st <+> text "=" <+> text "malloc" <> parens ((int (length progs)) <+> text "* sizeof(state*)") <> semi)
+  $+$ nest 2 (vcat (map entry (zip progs [0,1..])))
+  $+$ rbrace
   where
-    pblock (blid, is) =
-      stateRes is (stateNr blid)
+    st =
+      text "state_table"
+    sc =
+      text "state_count"
+    entry (prog, phase) =
+      vcat  [ st <> brackets (int phase) <+> text "=" <+> malloc phase
+            , vcat (map (subentry phase) (M.toList $ progBlocks prog)) ]
+    subentry phase (blid, is) =
+      st <> brackets (int phase) <> brackets (prettyStateNo blid) <+> text "=" <+> parens ( parens ( text "state") <> stateRes is (prettyStateNo blid)) <> semi
+    malloc phase =
+      text "malloc" <> parens ( sc <> brackets (int phase) <+> text "* sizeof(state)") <> semi
 
 -- | Pretty print a list of instructions.
 -- | relies on check for eof is the appeas firs in each state.
@@ -619,28 +704,35 @@ programsToC buftype pipeline =
                       $+$ prettyConstantDecls buftype pipeline
   , cInit           = prettyInit pipeline
   , cFree           = prettyFree pipeline
-  , cProg           = map (nest 2) prettyProgs
+  , cProg           = map (nest 2) (prettyProgs False)
+  , cSilentProg     = map (nest 2) (prettyProgs True)
   , cBufferUnit     = ctyp buftype
-  , cJumptable      = prettyJumptable pipeline
   , cStateTableVar  = stateTableVar
   , cStateCountVar  = stateCountVar
   }
   where
     tbltype = UInt8T
-    prettyProgs = case pipeline of
-                    Left progs  -> zipWith (prettyProg pipeline buftype tbltype) progs [1..]
-                    Right progs -> concat $ zipWith combine progs [1,3..]
-    combine (p,a) i = [prettyProg pipeline buftype tbltype p i, prettyProg pipeline buftype tbltype a (i+1)]
+    prettyProgs silence =
+      case pipeline of
+        Left progs  -> zipWith (prettyProg buftype tbltype silence) progs [1..]
+        Right progs -> concat $ zipWith (combine silence) progs [1,3..]
+    combine b (p,a) i = [prettyProg buftype tbltype b p i, prettyProg buftype tbltype b a (i+1)]
     stateTableVar = case pipeline of
-                    Left progs  ->  text "state state_table[] =" <+> lbrace
-                                    -- <+> doubleQuotes (lbrack <> brackets empty)
-                                    $+$ nest 2 (vcat $ map prettyStateTable progs)
-                                    $+$ rbrace <> semi
-                    Right _ -> error "tjoooo..."
+                    Left progs -> prettyStateTable progs
+                    Right progs -> prettyStateTable (merge progs)
+    stateCount prog =
+      int (length (progBlocks prog))
     stateCountVar = case pipeline of
-                    Left (p:_) -> text "int state_count =" <+> int (length (progBlocks p)) <> semi
-                    Left _     -> empty -- multi phase not supported
-                    Right _    -> error "tjoooo..."
+                    Left progs    -> stateCountStr progs
+                    Right progs   -> stateCountStr (merge progs)
+    stateCountStr progs =
+                    text "int state_count" <> brackets (int (length progs))
+                <+> text "=" <+> braces (hcat (punctuate comma (map stateCount progs))) <> semi
+                $+$ text "int phases =" <+> int (length progs) <> semi
+
+merge :: [(a, a)] -> [a]
+merge  ((o,a):xs) =  a : o : merge xs
+merge _           = []
 
 renderCProg :: String -> CProg -> String
 renderCProg compInfo cprog =
@@ -653,6 +745,7 @@ renderCProg compInfo cprog =
                (render $ cStateTableVar cprog)
                (render $ cStateCountVar cprog)
                (map render $ cProg cprog)
+               (map render $ cSilentProg cprog)
 
 ccVersion :: (MonadIO m) => FilePath -> m String
 ccVersion comp = do

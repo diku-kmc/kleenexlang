@@ -1,4 +1,5 @@
 #include "crt.h"
+state ** state_table;
 
 void buf_flush(buffer_t *buf)
 {
@@ -93,6 +94,7 @@ void reset(buffer_t *buf)
 {
   buf->data[0] = 0;
   buf->bitpos = 0;
+  buf->symbols = NULL;
 }
 
 buffer_t* init_buffer(size_t size)
@@ -152,31 +154,30 @@ void append(buffer_t *buf, buffer_unit_t w, size_t bits)
 INLINE
 void concat(buffer_t *dst, buffer_t *src)
 {
+  size_t old_pos = dst->bitpos;
+  symbol *src_sym, *dst_sym;
   appendarray(dst, src->data, src->bitpos);
-}
 
-INLINE
-void outputarray(const buffer_unit_t *arr, size_t bits)
-{
-  //int word_count = bits / BUFFER_UNIT_BITS;
-  //// Write completed words
-  //size_t word_index = 0;
-  //for (word_index = 0; word_index < word_count; word_index++)
-  //{
-  //  outputconst(arr[word_index], BUFFER_UNIT_BITS);
-  //}
+  if (src->symbols) {
+    /* Get end of symbol list */
+    for (src_sym = src->symbols;
+         src_sym != NULL;
+         src_sym = src_sym->next) {
+      src_sym->position += old_pos;
+    }
+    if (dst->symbols) {
+      /* Get end of symbol list */
+      for (dst_sym = dst->symbols;
+           dst_sym->next != NULL;
+           dst_sym = dst_sym->next);
 
-  //int remaining = bits % BUFFER_UNIT_BITS;
-  //if (remaining != 0)
-  //{
-  //  outputconst(arr[bits / BUFFER_UNIT_BITS], remaining);
-  //}
-}
-
-INLINE
-void output(buffer_t *buf)
-{
-  outputarray(buf->data, buf->bitpos);
+      dst_sym->next = src->symbols;
+    }
+    else
+    {
+      dst->symbols = src->symbols;
+    }
+  }
 }
 
 INLINE

@@ -45,12 +45,18 @@
 #define  READ_FD 0
 #define WRITE_FD 1
 
+typedef struct symbol {
+  size_t position;
+  int reg;
+  struct symbol * next;
+} symbol;
 
 typedef BUFFER_UNIT_T buffer_unit_t;
 typedef struct {
   buffer_unit_t *data;
   size_t size;         /* size in bytes */
   size_t bitpos;       /* bit offset from data  */
+  symbol * symbols;
 } buffer_t;
 
 typedef struct {
@@ -64,10 +70,14 @@ typedef struct {
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
 #define BUFFER_UNIT_BITS (BUFFER_UNIT_SIZE * 8)
 
-typedef struct {
+typedef struct t_state {
   buffer_t **buffers;
   buffer_t *outbuf;
+  size_t output_cursor;
   input_buffer *inbuf;
+  int curr_state;
+  struct t_state ** nextPtr;
+  struct t_state * src;
 } transducer_state;
 
 // State information
@@ -78,10 +88,27 @@ typedef struct {
 
 // Program interface
 
-extern int state_count;
-extern state state_table[];
+extern int state_count[];
+extern state ** state_table;
+extern int phases;
+void init_state_table();
 
 void printCompilationInfo();
-transducer_state *init(unsigned char* input, size_t input_size);
-int match(int phase, int start_state, transducer_state *state, void (*callback)(transducer_state*));
+
+/*
+ *    Initializes a tranducer state.
+ *
+ *    unsigned char* input: input for SST to process
+ *    size_t input_size:    size of input
+ *    int add_symbols:      specifies is symbols representing
+ */
+transducer_state *init(unsigned char* input, size_t input_size, int add_symbols);
+
+/*
+ *    Frees a transducer state and its content.
+ */
 void free_state(transducer_state *);
+
+void match(int phase, transducer_state *state, void (*callback)(transducer_state*));
+int silent_match(int phase, int start_state, unsigned char * buf, long length);
+
