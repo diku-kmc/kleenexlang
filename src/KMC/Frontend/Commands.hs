@@ -381,7 +381,7 @@ simul sOpts pu = do
   let prog = puProgram pu
   let pu' = pu { puProgram = prog { rprogPipeline = [rprogPipeline prog !! 0] } }
   let nfst = constructNFST (puProgram pu') (head $ rprogPipeline (puProgram pu'))
-  let csv = nfstToCsv $ enumerateNFST $ nfst
+  let csv = nfstToCsv $ enumerateNFST $ condenseSkip nfst
   --_ <- measure "aoeu" $ liftIO $ print (head $ tuTransducers tu)
   case optSimOut sOpts of
     Just fp -> do
