@@ -214,7 +214,7 @@ desugarProg prog m mode ite counters =
 applyApproximation :: DesugarState -> ApproxMetric -> ApproxMode -> Bool -> Bool -> M.Map RIdent RTermAct
 applyApproximation ds m mode ite counters = fst $ foldl go (dsDecls ds, dsFresh ds) $ dsApprox ds
   where
-    applyOnce decls pl k c = rprogDecls $ approxFunc ( (RProg [pl] decls)) k c m mode
+    applyOnce decls pl k c = rprogDecls $ approxFunc (stdToCore (RProg [pl] decls)) k c m mode
     addApproxStms dold c i dnew = (M.insert i (RSeq [c]) (M.union dold dnew) , c + M.size dnew)
     approxIds = map (\(_,i,_) -> i) $ dsApprox ds
 

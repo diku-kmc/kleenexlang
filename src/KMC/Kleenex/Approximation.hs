@@ -3,6 +3,7 @@ module KMC.Kleenex.Approximation( approxProg
                                 , approxCount
                                 , module AM) where
 
+import           Data.Word
 import qualified Data.Map as M
 import           Data.Maybe (fromMaybe)
 import qualified Data.HashMap.Strict as HM
@@ -28,7 +29,7 @@ approxProgIt :: RProgAct -> Int -> Int -> ApproxMetric -> ApproxMode -> RProgAct
 approxProgIt p k offset m mode = foldl (\s _ -> approx s) p [1..k]
   where approx s = approxProg s 1 offset m mode
 
-approxCount :: RProgAct -> Int -> Int -> ApproxMetric -> ApproxMode -> RProgAct
+approxCount :: RProgAct -> Int -> RIdent -> ApproxMetric -> ApproxMode -> RProgAct
 approxCount rprog k offset metric mode = prog
   where
     prog = RProg [offset] (M.union (start_terms offset)
@@ -40,42 +41,160 @@ approxCount rprog k offset metric mode = prog
       | M.member i m = go is m c ndecls
       | otherwise =
           case (getDecl i (decls)) of
-          term@(RConst y) -> go is (M.insert i c m) (c+1) (M.insert c term ndecls)
+          term@(RConst _) -> go is (M.insert i c m) (c+1) (M.insert c term ndecls)
           RSeq js -> let (mm, tmp) = go (js ++ is) (M.insert i c m) (c+1) (ndecls)
                          term = RSeq [lo j mm | j <- js]
                      in (M.insert i c mm, M.insert c term tmp)
           RSum js -> let (mm, tmp) = go (js ++ is) (M.insert i c m) (c+1) (ndecls)
                          term = RSum [lo j mm | j <- js]
                      in (M.insert i c mm, M.insert c term tmp)
-          RRead rs cp -> go is (M.insert i c m) (c+11)
-                            (M.union (M.fromList $ approx_read c rs cp) ndecls)
+          RRead rs cp -> let (nc, nd) = approxRead c rs cp metric mode in
+                             go is (M.insert i c m) (nc)
+                             (M.union (M.fromList nd) ndecls)
           term -> error $ "internal error: got RSet or RTest in approxTerm: " ++ (show term)
 
     start_terms c = M.fromList [(c, RSeq [c+1, c+2]), (c+1, RSet k)]
 
-    approx_read c rs cp =
-                        let
-                            [begin, end, test_del,delete,r,readc,ff,test_ins,ins,insert,schoice] = [c .. c+10]
-                        in
-                            [(begin,     RSum [readc, schoice])          -- First choice
-                            ,(test_del, RTest)                          -- Delete test
-                            ,(delete,   RRead RS.universe False)        -- Delete character
-                            ,(r,        RRead rs cp)                    -- Read normally
-                            ,(readc,    RSeq [r, end])                  -- Read and continue
-                            ,(ff,       RSeq [test_del, delete, begin])  -- Delete and try again
-                            ,(test_ins, RTest)                          -- Insert test
-                            ,(ins,      RConst (Left $ RS.findMin rs))  -- Insert character
-                            ,(insert,   RSeq [test_ins, ins, end])      -- Test, insert and continue
-                            ,(schoice,  RSum [ff, insert])               -- Second choice
-                            ,(end,      RSeq [])]                       -- Accept / Continue
-
     lo i m =
       fromMaybe (error $ "internal error: lookup: " ++ show i)
         $ M.lookup i m
-    {-getDecl i =
-      fromMaybe (error $ "internal error: identifier without declaration: " ++ show i)
-        $ M.lookup i (rprogDecls rprog)
-        -}
+
+approxRead :: RIdent                            -- ^ Latest ident
+           -> RS.RangeSet Word8                 -- ^ RangeSet to read
+           -> Bool                              -- * Indicates whether to output or not.
+           -> ApproxMetric
+           -> ApproxMode
+           -> (RIdent, [(RIdent, RTermAct)])    -- ^ Latest ident after the new decls.
+approxRead c rs False LCS _ =
+    let next = c + 8
+        [begin,end,test,delete,r,readc,ff,insert,schoice] = [c .. next]
+    in
+        (next+1                                      -- Next ident.
+        ,[(begin,    RSum [readc, schoice])          -- First choice
+         ,(test,     RTest)                          -- Delete test
+         ,(delete,   RRead RS.universe False)        -- Delete character
+         ,(r,        RRead rs False)                 -- Read normally
+         ,(readc,    RSeq [r, end])                  -- Read and continue
+         ,(ff,       RSeq [test, delete, begin])     -- Delete and try again
+         ,(insert,   RSeq [test, end])               -- Test, insert and continue
+         ,(schoice,  RSum [ff, insert])              -- Second choice
+         ,(end,      RSeq [])])                      -- Accept / Continue
+approxRead c rs True LCS Correction =
+    let next = c + 9
+        [begin,end,test,delete,r,readc,ff,ins,insert,schoice] = [c .. next]
+    in
+        (next+1
+        ,[(begin,    RSum [readc, schoice])          -- First choice
+         ,(test,     RTest)                          -- Delete test
+         ,(delete,   RRead RS.universe False)        -- Delete character
+         ,(r,        RRead rs True)                  -- Read normally
+         ,(readc,    RSeq [r, end])                  -- Read and continue
+         ,(ff,       RSeq [test, delete, begin])     -- Delete and try again
+         ,(ins,      RConst (Left $ RS.findMin rs))  -- Insert character
+         ,(insert,   RSeq [test, ins, end])          -- Test, insert and continue
+         ,(schoice,  RSum [ff, insert])              -- Second choice
+         ,(end,      RSeq [])])                      -- Accept / Continue
+approxRead c rs True LCS Matching =
+    let next = c + 8
+        [begin,end,test,delete,r,readc,ff,insert,schoice] = [c .. next]
+    in
+        (next+1
+        ,[(begin,    RSum [readc, schoice])          -- First choice
+         ,(test,     RTest)                          -- Test
+         ,(delete,   RRead RS.universe True)         -- Delete character
+         ,(r,        RRead rs True)                  -- Read normally
+         ,(readc,    RSeq [r, end])                  -- Read and continue
+         ,(ff,       RSeq [test, delete, begin])     -- Delete and try again
+         ,(insert,   RSeq [test, end])               -- Test, insert and continue
+         ,(schoice,  RSum [ff, insert])              -- Second choice
+         ,(end,      RSeq [])])                      -- Accept / Continue
+approxRead c rs True LCS Explicit =
+    let next = c + 11
+        [begin,end,test,del,delete,r,readc,ff,i,ins,insert,schoice] = [c .. next]
+    in
+        (next+1
+        ,[(begin,   RSum [readc, schoice])          -- First choice
+         ,(test,    RTest)                          -- Test
+         ,(del,     RConst (Left 68))               -- Write 'D' to indicate delete
+         ,(delete,  RRead RS.universe False)        -- Delete character
+         ,(r,       RRead rs True)                  -- Read normally
+         ,(readc,   RSeq [r, end])                  -- Read and continue
+         ,(ff,      RSeq [test, del, delete, begin])-- Delete and try again
+         ,(i,       RConst (Left 73))               -- Write 'I' to indicate insert
+         ,(ins,     RConst (Left $ RS.findMin rs))  -- Insert character
+         ,(insert,  RSeq [test, i, ins, end])       -- Test, insert and continue
+         ,(schoice, RSum [ff, insert])              -- Second choice
+         ,(end,     RSeq [])])                      -- Accept / Continue
+approxRead c rs False Hamming _ =
+    let next = c + 6
+        [begin,end,test,r,readc,replace,rep] = [c .. next]
+    in
+        (next+1                                 -- Next ident.
+        ,[(begin,   RSum [readc, rep])          -- First choice
+         ,(test,    RTest)                      -- Test
+         ,(r,       RRead rs False)             -- Read normally
+         ,(readc,   RSeq [r, end])              -- Read and continue
+         ,(replace, RRead RS.universe False)    -- Replace (read anything)
+         ,(rep,     RSeq [test, replace, end])  -- Test, replace and continue
+         ,(end,     RSeq [])])                  -- Accept / Continue
+approxRead c rs True Hamming Correction =
+    let next = c + 7
+        [begin,end,test,r,readc,replace,rep,rp] = [c .. next]
+    in
+        (next+1                                     -- Next ident.
+        ,[(begin,   RSum [readc, rep])              -- First choice
+         ,(test,    RTest)                          -- Test
+         ,(r,       RRead rs True)                  -- Read normally
+         ,(readc,   RSeq [r, end])                  -- Read and continue
+         ,(replace, RRead RS.universe False)        -- Replace (read anything)
+         ,(rp,      RConst (Left $ RS.findMin rs))   -- Write correction
+         ,(rep,     RSeq [test, replace, rp, end])  -- Test, replace and continue
+         ,(end,     RSeq [])])                      -- Accept / Continue
+approxRead c rs True Hamming Matching =
+    let next = c + 6
+        [begin,end,test,r,readc,replace,rep] = [c .. next]
+    in
+        (next+1                                     -- Next ident.
+        ,[(begin,   RSum [readc, rep])              -- First choice
+         ,(test,    RTest)                          -- Test
+         ,(r,       RRead rs True)                  -- Read normally
+         ,(readc,   RSeq [r, end])                  -- Read and continue
+         ,(replace, RRead RS.universe True)        -- Replace (read anything)
+         ,(rep,     RSeq [test, replace, end])  -- Test, replace and continue
+         ,(end,     RSeq [])])                      -- Accept / Continue
+approxRead c rs True Hamming Explicit =
+    let next = c + 7
+        [begin,end,test,r,readc,replace,rep,rp] = [c .. next]
+    in
+        (next+1                                     -- Next ident.
+        ,[(begin,   RSum [readc, rep])              -- First choice
+         ,(test,    RTest)                          -- Test
+         ,(r,       RRead rs True)                  -- Read normally
+         ,(readc,   RSeq [r, end])                  -- Read and continue
+         ,(replace, RRead RS.universe True)        -- Replace (read anything)
+         ,(rp,      RConst (Left 82))
+         ,(rep,     RSeq [test, rp, replace, end])  -- Test, replace and continue
+         ,(end,     RSeq [])])                      -- Accept / Continue
+approxRead c rs False Levenshtein _ =
+    let next = c + 11
+        [begin,end,test,delete,r,readc,ff,insert,schoice,rchoice,replace,rep] = [c .. next]
+    in
+        (next+1                                      -- Next ident.
+        ,[(begin,   RSum [rchoice, schoice])          -- First choice
+         ,(rchoice, RSum [readc, rep])
+         ,(replace, RRead RS.universe False)
+         ,(rep,     RSeq [test, replace, end])
+         ,(test,    RTest)                          -- Delete test
+         ,(delete,  RRead RS.universe False)        -- Delete character
+         ,(r,       RRead rs False)                 -- Read normally
+         ,(readc,   RSeq [r, end])                  -- Read and continue
+         ,(ff,      RSeq [test, delete, begin])     -- Delete and try again
+         ,(insert,  RSeq [test, end])               -- Test, insert and continue
+         ,(schoice, RSum [ff, insert])              -- Second choice
+         ,(end,     RSeq [])])                      -- Accept / Continue
+approxRead _ _ True Levenshtein Correction = error "Levenshtein not yet supported"
+approxRead _ _ True Levenshtein Matching = error "Levenshtein not yet supported"
+approxRead _ _ True Levenshtein Explicit = error "Levenshtein not yet supported"
 
 -------------
 -- Utility --
