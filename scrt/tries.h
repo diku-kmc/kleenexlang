@@ -48,7 +48,7 @@ typedef struct choice_s {
 // Assumes that output is not '\0'.
 typedef struct skip_s {
     int target;
-    char output;
+    char_vector* output;
 } skip_s;
 
 // Symbol state.
