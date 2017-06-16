@@ -1,6 +1,8 @@
 # The KMC Kleenex compiler - Parallel Dispatcher #
 
-In its current state the dispatcher can process a target file in parallel by dividing the target file into a specified number of chunks. The dispatcher currently only work on Kleenex programs that generate no output - (DFA's).
+In its current state the dispatcher can process a target file in parallel by 
+dividing the target file into a specified number of chunks. The dispatcher 
+currently only work on Kleenex programs that generate no output - (DFA's).
 
 ## Build ##
 
@@ -21,13 +23,12 @@ simpleEmail := /[a-z0-9!#$%&'*+\/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+\/=?^_`{|}~-]+)
 Next compile a transducer using the `kexc` executable:
 
 ```
-> kexc compile email.kex --srcout email.c --act=false --la=false --hf=true
+> kexc compile email.kex --srcout kleenex.c --act=false --la=false --hf=true
 ```
-This will generate a source file `email.c` and the header file `email.h`.
 
 Next compile the dispatcher:
 ```
-> gcc -fopenmp -o dispatcher dispatcher.c email.c util.c list.c -I.
+> gcc -O3 -pthread -o dispatcher dispatcher.c kleenex.c thr_pool.c -I.
 ```
 
 Finally run the dispatcher:

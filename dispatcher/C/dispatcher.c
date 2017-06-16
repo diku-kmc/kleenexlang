@@ -15,56 +15,114 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <omp.h>
-
+#include "thr_pool.h"
 #include "crt.h"
-#include "util.h"
-#include "list.h"
 
-#define DEBUGGING
+//#define DEBUGGING
 #define RETC_PRINT_USAGE      1
 #define RETC_PRINT_ERROR      2
 #define DEFAULT_SUFFIX_LENGTH 256
 
-typedef struct {
+typedef struct job_t {
+  struct job_t *next;
+  int start_state;
   int chunk;
-  int state;
+  int phase;
+  int completed;
+  int cancled;
+  job_id job;
+  transducer_state *tstate;
 } job_t;
+
+typedef struct {
+  int phase;
+  int chunk;
+  size_t offset;
+  size_t chunk_lengt;
+  size_t suffix_length;
+  thr_pool_t * pool;
+} task_gen_arg_t;
+
+/* Mutex */
+static pthread_mutex_t job_list_lock = PTHREAD_MUTEX_INITIALIZER; /* Protects job list */
+static pthread_mutex_t path_lock = PTHREAD_MUTEX_INITIALIZER; /* Protects job list */
+
 
 unsigned char* target;
 long target_size;
 
+int num_of_chunks;
 
-/**
- *    Print usage text to stdout.
- */
-void print_usage(char *name)
+transducer_state **** outputmap;
+thr_pool_t *pool;
+
+
+/* job list keeping track of active jobs */
+job_t **joblist;
+
+transducer_state **path;
+
+/* Function declarations */
+void print_usage(char *);
+void enqueue_job(job_t *);
+
+/* thread jobs */
+void *calculate(void *);
+void *generate_tasks(void *);
+void *update_path_and_clean(void *);
+
+void *update_path_and_clean(void *arg)
 {
-  fprintf(stdout,
-          "usage: %s --file <file> --chunks <num>\n\n"
-          "Help Options:\n"
-          "  -h, --help\n"
-          "    Displays this help text.\n"
-          "\n"
-          "Required Arguments:\n"
-          "  -f, --file :: string\n"
-          "    Specifies the path of the target file.\n"
-          "  -c, --chunks :: int\n"
-          "    Specifies number of threads to utilize.\n"
-          "\n"
-          "Optional Arguments\n"
-          "  -l, --len-suffix :: int\n"
-          "    Specifies the length of the suffixes used for suffix analysis.\n"
-          "    default: 256\n",
-          name);
-}
+  job_t *job = (job_t *)arg;
+  job_t *head = NULL, *next = NULL;
 
+  (void) pthread_mutex_lock(&job_list_lock);
 
-/**
- *    Helper function for allocating shared memory.
- */
-void* ammap(size_t len) {
-  return mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+  /* Check that job has finished */
+  if (! job->completed) {
+    (void) pthread_mutex_unlock(&job_list_lock);
+    return (0);
+  }
+
+  (void) pthread_mutex_lock(&path_lock);
+
+  /* If job is not on path stop */
+  if (path[job->chunk] != job->tstate){
+    (void) pthread_mutex_unlock(&path_lock);
+    (void) pthread_mutex_unlock(&job_list_lock);
+    return (0);
+  }
+
+  for (head = joblist[job->chunk];
+       head != NULL;)
+  {
+    next = head->next;
+    if (head->job != job->job && !job->completed)
+    {
+      thr_pool_dequeue(pool, job->job);
+    }
+    head = next;
+  }
+
+  if (job->completed && job->tstate->nextPtr != NULL) {
+    path[job->chunk+1] = *(job->tstate->nextPtr);
+  }
+
+  if (job->chunk < num_of_chunks-1) {
+    for (head = joblist[job->chunk+1];
+         head != NULL;
+         head = head->next)
+    {
+      thr_pool_queue_prioritized(pool, update_path_and_clean, head);
+    }
+
+  }
+  joblist[job->chunk] = NULL;
+
+  (void) pthread_mutex_unlock(&path_lock);
+  (void) pthread_mutex_unlock(&job_list_lock);
+
+  return (0);
 }
 
 /**
@@ -84,237 +142,279 @@ void init_target(char* file_name)
   target = mmap(NULL, target_size + 1, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, 0);
 }
 
-int did_accept(int state) {
-  if (0 <= state && state < state_count ) {
-    return state_table[state].accepting;
-  }
-
-  fprintf(stderr, "State %i does not exist.", state);
-  exit(EXIT_FAILURE);
+buffer_unit_t *output_pos(transducer_state * tstate) {
+  return tstate->outbuf->data + tstate->output_cursor;
 }
 
 
-/**
- *    Pretty print job_node struct
- */
-void print_job(void* job) {
-  fprintf(stdout, "\033[1mjob\033[0m - c %i, s %i\n",
-          ((job_t*)job)->chunk,
-          ((job_t*)job)->state);
-}
+void output(transducer_state *tstate) {
+  symbol *sym;
+  size_t position;
+  int chunk = 0;
 
-/**
- *    (OBS!!!) Assuming that states are starts from 0 and are consequtive.
- *
- *    Performs suffix analysis of chunk starting at the specified offset.
- *
- *    Returns an array mapping start state (index) to a final state (value),
- *    for the specified suffix.
- *
- *    int offest:     offset in target where the chunk begins.
- *    int suffix_len: length of suffix.
- */
-arr* suffix_analysis(long offset, long suffix_len) {
-#ifdef DEBUGGING
-  struct timeval time_before, time_after, time_result;
-  long int millis;
-  gettimeofday(&time_before, NULL);
-#endif
-  
-  unsigned char* suffix = target + offset - suffix_len;
-  arr * map = malloc(sizeof(arr));
-  map->size = state_count;
-  map->data = malloc(state_count * sizeof(int));
+  if (!tstate) return;
 
-#pragma omp parallel for
-  for (int i = 0; i < state_count; i++) {
-    transducer_state * state = init(suffix, suffix_len);
-    map->data[i] = match(1, i, state, NULL);
+
+  for (sym = tstate->outbuf->symbols;
+       sym != NULL;
+       sym = sym->next) {
+
+    /* Print from output until position of next symbol */
+    tstate->output_cursor += fprintf(stdout, "%.*s",
+                                     (int)(sym->position/BUFFER_UNIT_SIZE - tstate->output_cursor),
+                                     output_pos(tstate));
+
+    /* Print content of symbol */
+    fprintf(stdout, "%s", tstate->src->buffers[sym->reg]->data);
   }
 
+  /* Print remaining content */
+  tstate->output_cursor += fprintf(stdout, "%s", output_pos(tstate));
+
+
+  /* Delete all symbols */
+  sym = tstate->outbuf->symbols;
+  while (sym != NULL) {
+    sym = sym->next;
+    free(tstate->outbuf->symbols);
+    tstate->outbuf->symbols = sym;
+  }
+
+  /* Handle fail state */
+  if (tstate->curr_state == -1) {
+    for (chunk = 0; chunk < num_of_chunks && path[chunk] != tstate && path[chunk] != NULL; chunk++);
+    position = (target_size / num_of_chunks) * chunk + tstate->inbuf->cursor;
+    fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", position, tstate->inbuf->next[0]);
+    return;
+  }
+
+  if (tstate->nextPtr != NULL) {
+    /* Set current state as source for next state */
+    (*tstate->nextPtr)->src = tstate;
+    output(*tstate->nextPtr);
+  }
+}
+
+void init_outputmap()
+{
+  int p, c;
+
+  outputmap = malloc(sizeof(transducer_state*) * phases);
+
+  for (p = 0; p < phases; p++) {
+    outputmap[p] = malloc(sizeof(transducer_state*) * num_of_chunks);
+    for (c = 0 ; c < num_of_chunks; c++)
+    {
+      outputmap[p][c] = calloc(state_count[p], sizeof(transducer_state*));
+    }
+  }
+}
+
+/*
+ *    Cancel all queued and running jobs.
+ *
+ *    This is inteted to terminate the program
+ *    if a fail state is reached during output generation.
+ */
+void abort_process() {
+  thr_pool_destroy(&pool);
+}
+
+
+/*
+ *    Generates jobs for a specified chunk.
+ *    A suffix analysis is made to identify relevant start states.
+ */
+void *generate_tasks(void *arg) {
+  int phase, chunk, start_state, *started, i;
+  size_t length, offset, suffix_length;
+  unsigned char *suffix, *start;
+  task_gen_arg_t *info = (task_gen_arg_t *)arg;
+
+
+  phase = info->phase;
+  chunk = info->chunk;
+  suffix_length = info->suffix_length;
+  length = info->chunk_lengt;
+  offset = info->offset;
+
+  free(info);
+
+  suffix = target + offset - suffix_length;
+  start = target + offset;
+
+  started = calloc(sizeof(start_state), state_count[phase]);
+
+  for (i = 0; i < state_count[phase]; i++) {
+    start_state = silent_match(phase+1, i, suffix, suffix_length);
+    if (start_state < 0) continue; /* We do not start from a fail state */
+    if (! started[start_state]) {
+      //CREATE JOB
+      job_t * task = malloc(sizeof(job_t));
+      task->cancled = 0;
+      task->completed = 0;
+      task->chunk = chunk;
+      task->next = NULL;
+      task->phase = phase;
+      task->tstate = init(start, length, 1);
+      task->tstate->curr_state = start_state;
+      task->tstate->output_cursor = 0;
+      enqueue_job(task);
 #ifdef DEBUGGING
-  gettimeofday(&time_after, NULL);
-  timersub(&time_after, &time_before, &time_result);
-  // A timeval contains seconds and microseconds.
-  millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
-  fprintf(stderr, "time (ms): %ld\n", millis);
+      fprintf(stdout, "Created job: phase: %i, chunk: %i, state: %i\n", phase, chunk, start_state);
 #endif
-  return map;
+      started[start_state] = 1;
+      outputmap[phase][chunk][start_state] = task->tstate;
+    }
+  }
+
+  free(started);
+  return (0);
+}
+
+
+/*
+ *    Function for processing a chunk of data.
+ */
+void *calculate(void *arg)
+{
+  int old_state;
+  job_t * task = (job_t *)arg;
+  int phase, chunk;
+  transducer_state *tstate;
+
+  if (task->completed) return (0);
+
+  if (task->cancled)
+  {
+    task = NULL;
+    return (0);
+  }
+
+  phase = task->phase;
+  chunk = task->chunk;
+  tstate = task->tstate;
+
+  match(phase+1, tstate, NULL);
+
+  if (chunk < num_of_chunks-1)
+  {
+    tstate->nextPtr = &outputmap[phase][chunk+1][tstate->curr_state];
+  }
+
+  task->completed = 1;
+  /* Prevent thread from beeing canceled while holding a lock */
+  /* NB! The thread might still terminate due other causes */
+  (void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
+
+  (void) pthread_mutex_lock(&path_lock);
+  if (path[chunk] == tstate && tstate->nextPtr != NULL)
+  {
+    path[chunk+1] = *(tstate->nextPtr);
+  }
+  (void) pthread_mutex_unlock(&path_lock);
+
+  thr_pool_queue_prioritized(pool, update_path_and_clean, task);
+
+  /* Reset teh cancel state of the thread */
+  (void) pthread_setcancelstate(old_state, NULL);
+
+#ifdef DEBUGGING
+  fprintf(stdout, "Job: phase: %i, chunk: %i, ended at state: %i\n", phase, chunk, tstate->curr_state);
+#endif
+
+  // SIGNAL THAT WE CAN COMBINE OUTPUT
+  task = NULL;
+
+  return (0);
+}
+
+
+/*
+ *    Adds a job to the pool queue and registers it in the joblist
+ */
+void enqueue_job(job_t *task)
+{
+  (void) pthread_mutex_lock(&job_list_lock);
+
+  task->next = joblist[task->chunk];
+  joblist[task->chunk] = task;
+  thr_pool_queue(pool, calculate, task, &task->job);
+
+  (void) pthread_mutex_unlock(&job_list_lock);
+}
+
+void run_multi_chunk(int suffix_len) {
+  int i;
+  job_t *init_task;
+  /* SET UP */
+  long chunk_size = target_size / num_of_chunks;
+
+  size_t * chunk_sizes = malloc(num_of_chunks * sizeof(size_t));
+  for (i = 0; i < num_of_chunks -1; chunk_sizes[i++] = chunk_size);
+  chunk_sizes[num_of_chunks - 1] = target_size - chunk_size * (num_of_chunks - 1);
+
+  /* CALCULATE OFFSET FOR EACH CHUNK */
+  size_t * chunk_offset = malloc(num_of_chunks * sizeof(size_t));
+  for(i = 0; i < num_of_chunks; i++) {
+    chunk_offset[i] = i * chunk_size;
+  }
+
+  init_outputmap();
+  joblist = calloc(num_of_chunks * sizeof(job_t*), 1);
+  path = calloc(num_of_chunks * sizeof(job_t*), 1);
+
+  pool = thr_pool_create(num_of_chunks, num_of_chunks, 10, NULL);
+
+  init_task = malloc(sizeof(job_t));
+
+  init_task->cancled = 0;
+  init_task->completed = 0;
+  init_task->start_state = -1;
+  init_task->phase = 0;
+  init_task->chunk = 0;
+  init_task->tstate = init(target, chunk_sizes[0], 0);
+  init_task->tstate->curr_state = -1;
+
+  outputmap[0][0][0] = path[0] = init_task->tstate;
+
+  enqueue_job(init_task);
+
+  for (i = 1; i  < num_of_chunks; i++) {
+    task_gen_arg_t * arg = malloc(sizeof(task_gen_arg_t));
+    arg->chunk = i;
+    arg->offset = chunk_offset[i];
+    arg->phase = 0;
+    arg->suffix_length = suffix_len;
+    arg->pool = pool;
+    arg->chunk_lengt = chunk_sizes[i];
+
+    thr_pool_queue_prioritized(pool, generate_tasks, arg);
+  }
+
+  thr_pool_wait(pool);
+
+  if (pool)
+  {
+    thr_pool_destroy(&pool);
+  }
+
+  output(outputmap[0][0][0]);
+
+  /* Clean up */
+  free(chunk_sizes);
+  free(chunk_offset);
 }
 
 /**
  *    Handles single chunk by processing entire file in one call to match.
  */
 void run_single_chunk() {
-  int result;
-  transducer_state * state = init(target, target_size);
-  result = match(1, -1, state, NULL);
+  transducer_state * state = init(target, target_size, 0);
+  state->curr_state = -1;
+  match(1, state, NULL);
   fprintf(stdout, "%s", state->outbuf->data);
-}
-
-
-/**
- *    Remove removed outdated jobs based on content of result map.
- *    The resulting list contains remaining valid jobs.
- */
-void update_jobs(arr** resultmap, int num_of_chunks, node ** job_list) {
-  int chunk = 0, idx = 0;
-  while (chunk < num_of_chunks && resultmap[chunk]->data[idx] != -2) {
-    idx = resultmap[chunk]->data[idx];
-    chunk++;
-  }
-
-  while (*job_list != NULL) {
-    job_t * job = (*job_list)->data;
-    if (job->chunk <= chunk) {
-      pop(job_list);
-    } else {
-      break;
-    }
-  }
-
-  if (chunk >= num_of_chunks) return;
-
-  job_t * job = malloc(sizeof(job_t));
-  job->chunk = chunk;
-  job->state = idx;
-
-  push(job_list, job, sizeof(job_t));
-  free(job);
-}
-
-void clean_output(arr ** resultmap, transducer_state*** outputmap, int num_of_chunks) {
-  int idx = resultmap[0]->data[0];
-  for (int i = 1; i < num_of_chunks; i++) {
-    if (idx == -2) break;
-    for (int j = 0; j < resultmap[i]->size; j++) {
-      if (j == idx) continue;
-      if (outputmap[i][j] == NULL) continue;
-      free_state(outputmap[i][j]);
-      outputmap[i][j] = NULL;
-    }
-    idx = resultmap[i]->data[idx];
-  }
-}
-
-
-int map_output(int** resultmap, int num_of_chunks) {
-  int i, idx = 0;
-  for (i = 0; i < num_of_chunks; i++) {
-    idx = resultmap[i][idx];
-  }
-  return idx;
-}
-
-
-void run_multi_chunk(int num_of_chunks, int suffix_len) {
-  int i, j;
-
-  /* SET UP */
-  long chunk_size = target_size / num_of_chunks;
-
-  long * chunk_sizes = malloc(num_of_chunks * sizeof(chunk_size));
-  for (i = 0; i < num_of_chunks -1; chunk_sizes[i++] = chunk_size);
-  chunk_sizes[num_of_chunks - 1] = target_size - chunk_size * (num_of_chunks - 1);
-
-  /* CALCULATE OFFSET FOR EACH CHUNK */
-  long * chunk_offset = malloc(num_of_chunks * sizeof(chunk_offset));
-  for(i = 0; i < num_of_chunks; i++) {
-    chunk_offset[i] = i * chunk_size;
-  }
-
-  /* DO SUFFIX ANALYSIS */
-  arr ** chunkmap = malloc(num_of_chunks * sizeof(arr*));
-#pragma omp parallel for
-  for (i = 1; i < num_of_chunks; i++) {
-    chunkmap[i] = suffix_analysis(chunk_offset[i], suffix_len);
-  }
-
-  // RUN KLEENEX
-  arr ** resultmap = malloc(num_of_chunks * sizeof(arr*)); // Map containing result of each chunk
-  transducer_state *** outputmap = malloc(num_of_chunks * sizeof(transducer_state*));
-#pragma omp parallel for
-  for (i = 0; i < num_of_chunks; i++) {                     // Initialize resultmap
-    arr * temp = init_arr(state_count);
-    for (j = 0; j < state_count; temp->data[j++] = -2);
-    resultmap[i] = temp;
-    outputmap[i] = calloc(state_count, sizeof(transducer_state*));
-  }
-
-
-  // CREATE JOBS
-  size_t job_size = sizeof(job_t);
-
-  node * job_list = NULL;
-  job_t * job = malloc(job_size);
-
-  for (i = num_of_chunks - 1; i > 0; i--) { // end at 1 as we know the start state of chunk 0.
-    arr * ss = unique(chunkmap[i]);
-    for (j = 0; j < ss->size; j++) {
-      job->chunk = i; job->state = ss->data[j];
-      push(&job_list, job, job_size);
-    }
-  }
-
-  printList(job_list, &print_job);
-
-  /* Push job for chunk 0 */
-  job->chunk = 0; job->state = -1;
-  push(&job_list, job, job_size);
-
-  while (job_list != NULL) {
-#pragma omp parallel
-    {
-      job_t * job;
-      long offset;
-      int start_state, chunk;
-#pragma omp critical
-      {
-        /* GET NEXT JOB */
-        /* THIS SHOULD BE DONE IN ANOTHER WAY */
-        if (job_list != NULL) {
-          job = (job_t *)job_list->data;
-          chunk = job->chunk;
-          start_state = job->state;
-          pop(&job_list);
-        } else {
-          chunk = -2;
-        }
-      }
-      if (chunk != -2) {
-
-        offset = chunk * chunk_size;
-        transducer_state * state = init(target + chunk_offset[chunk], chunk_sizes[chunk]);
-        if (chunk == 0) {
-          resultmap[chunk]->data[0] = match(1, start_state, state, NULL);
-          outputmap[chunk][0] = state;
-        } else {
-          resultmap[chunk]->data[start_state] = match(1, start_state, state, NULL);
-          outputmap[chunk][start_state] = state;
-        }
-      }
-    }
-    /* REMOVE OUTDATED JOBS */
-    update_jobs(resultmap, num_of_chunks, &job_list);
-    clean_output(resultmap, outputmap, num_of_chunks);
-  }
-
-  int idx = 0;
-  for (int i = 0; i < num_of_chunks; i++) {
-    transducer_state* state = outputmap[i][idx];
-    fprintf(stdout, "%s", state->outbuf->data);
-//    fprintf(stdout, "chunk: %i, output length: %lu\n", i, state.outbuf->bitpos/8);
-    idx = resultmap[i]->data[idx];
-  }
-
-//  int final_state = map_output(resultmap, num_of_chunks);
-
-//  fprintf(stdout, "-p 1 -s %i\n", final_state);
-//  if(did_accept(final_state)) {
-//    fprintf(stdout,"state %d - \033[1mACCEPT\033[0m\n", final_state);
-//  } else {
-//    fprintf(stdout,"state %d - \033[1mFAIL\033[0m\n", final_state);
-//  }
+  // TODO: print error text if we did not reach a accept state;
 }
 
 static struct option long_options[] = {
@@ -322,6 +422,7 @@ static struct option long_options[] = {
   { "file"        , required_argument, 0, 'f' },
   { "help"        , no_argument      , 0, 'h' },
   { "len-suffix"  , required_argument, 0, 'l' },
+  { "time"        , no_argument      , 0, 't' },
   { 0, 0, 0, 0 }
 };
 
@@ -329,8 +430,8 @@ static struct option long_options[] = {
 int main(int argc, char *argv[]) {
   int c;
   int option_index = 0;
-  int num_of_chunks = 0;
   int chunks_provided = 0;
+  int do_timing = 0;
   int suffix_len = DEFAULT_SUFFIX_LENGTH;
   char* file_name = NULL;
 
@@ -339,7 +440,7 @@ int main(int argc, char *argv[]) {
     return RETC_PRINT_USAGE;
   }
 
-  while ((c = getopt_long(argc, argv, ":hl:f:c:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, ":htl:f:c:", long_options, &option_index)) != -1) {
     switch (c)
     {
       case 'f':
@@ -364,6 +465,11 @@ int main(int argc, char *argv[]) {
           print_usage(argv[0]);
           return RETC_PRINT_ERROR;
         }
+        break;
+
+      case 't':
+        /* handle -t and --time */
+        do_timing = 1;
         break;
 
       case ':':
@@ -426,16 +532,62 @@ int main(int argc, char *argv[]) {
     return RETC_PRINT_ERROR;
   }
 
+  struct timeval time_before, time_after, time_result;
+  long int millis;
+  if (do_timing) {
+    gettimeofday(&time_before, NULL);
+  }
+
   /* Handle multiple chunks */
   init_target(file_name);
 
   /* Handle single chunk */
   if (num_of_chunks == 1) {
     run_single_chunk();
+    if (do_timing) {
+      gettimeofday(&time_after, NULL);
+      timersub(&time_after, &time_before, &time_result);
+      // A timeval contains seconds and microseconds.
+      millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+      fprintf(stderr, "time (ms): %ld\n", millis);
+    }
     return 0;
   }
-  
-  run_multi_chunk(num_of_chunks, suffix_len);
-  
+
+  run_multi_chunk(suffix_len);
+
+  if (do_timing) {
+    gettimeofday(&time_after, NULL);
+    timersub(&time_after, &time_before, &time_result);
+    // A timeval contains seconds and microseconds.
+    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+    fprintf(stderr, "time (ms): %ld\n", millis);
+  }
   return 0;
+}
+
+/**
+ *    Print usage text to stdout.
+ */
+void print_usage(char *name)
+{
+  fprintf(stdout,
+          "usage: %s --file <file> --chunks <num>\n\n"
+          "Help Options:\n"
+          "  -h, --help\n"
+          "    Displays this help text.\n"
+          "\n"
+          "Required Arguments:\n"
+          "  -f, --file :: string\n"
+          "    Specifies the path of the target file.\n"
+          "  -c, --chunks :: int\n"
+          "    Specifies number of threads to utilize.\n"
+          "\n"
+          "Optional Arguments\n"
+          "  -l, --len-suffix :: int\n"
+          "    Specifies the length of the suffixes used for suffix analysis.\n"
+          "    default: 256\n"
+          "  -t, --time\n"
+          "    Times execution and writes time to stderr\n",
+          name);
 }
