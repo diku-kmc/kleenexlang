@@ -15,6 +15,7 @@ import           KMC.Kleenex.Syntax
 import           KMC.Theories (Function(..))
 import           KMC.RangeSet
 
+
 data Out a =
   Sym [a]
   | Reg RegAction
@@ -45,6 +46,10 @@ condenseSkip nfst@(start, states) = (start, go states M.empty S.empty)
             (Skip t (Sym o)) ->
               let (o', t', del') = follow o t del in
               go sts' (M.insert k (Skip t' (Sym o')) nsts) del'
+            (Skip t Empty) ->
+              let (o', t', del') = follow [] t del
+                  out = if (length o') == 0 then Empty else Sym o'
+              in go sts' (M.insert k (Skip t' out) nsts) del'
             _ -> go sts' (M.insert k e nsts) del
     follow symOut i s =
       if (length $ from i) /= 1
@@ -88,13 +93,13 @@ enumerateNFST (initial, states) = (aux initial, M.mapKeys aux (M.map saux states
     saux (Set t k)      = Set (aux t) k
     saux (Test t)       = Test (aux t)
 
-constructNFST :: (Rng (CopyFunc a [Either a RegAction]) ~ [Either a RegAction])
+constructNFST :: (Rng (CopyFunc a [Either a RegAction]) ~ [Either a RegAction], Show a)
                 => RProg a (Either a RegAction)
                 -> RIdent
                 -> (NFST [RIdent] a)
-constructNFST rprog initial = ([initial], allTransitions)
+constructNFST rprog initial = (follow [initial], allTransitions)
   where
-    (_, allTransitions) = go (S.singleton [initial]) S.empty M.empty
+    (_, allTransitions) = go (S.singleton (follow [initial])) S.empty M.empty
     go ws states trans
       | S.null ws                         = (states, trans)
       | (q, ws') <- S.deleteFindMin ws, S.member q states
@@ -119,7 +124,7 @@ constructNFST rprog initial = ([initial], allTransitions)
           RSeq js       ->
             let q' = follow (js ++ is)
             in go (S.insert q' ws') states' (M.insert (i:is) (Skip q' Empty) trans)
-          RSum (js : jss : _)       ->
+          RSum (js : [jss])       ->
             let q1 = follow (js:is)
                 q2 = follow (jss:is)
                 -- indexed epsilons are implicitly represented by the transition order
