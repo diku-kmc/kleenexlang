@@ -1,0 +1,7 @@
+// Expects LCS metric and correction mode, prioitises delete before insert
+// IN:abcabbc
+// IN:abcabcabc
+// OUT:abcabcabcabcabc
+
+main := (test<1>* /\n/)*
+test := /abc/

@@ -36,6 +36,7 @@ for tst in $(ls $test_dir); do
     fi
 done
 
+# Test approximate matching for LCS with Correction mode (Default)
 for tst in $(ls $test_approx); do
     if [[ $tst != *".kex" ]]; then  #
         continue

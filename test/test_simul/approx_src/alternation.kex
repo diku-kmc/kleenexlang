@@ -1,0 +1,13 @@
+// Expects LCS metric and correction mode
+// IN:abcdef
+// OUT:0
+// IN:abef
+// OUT:2
+// IN:aacdef
+// OUT:2
+// IN:abcde
+// OUT:1
+
+main := ((~test "0" | ~test<1> "1" | ~test<2> "2") /\n/)+
+
+test := /abcdef/
