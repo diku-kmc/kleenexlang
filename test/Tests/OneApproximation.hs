@@ -35,7 +35,7 @@ type MDecls = M.Map RIdent RTermAct
 createRProg :: String -> RProgAct
 createRProg s =
       case HP.parseKleenex "" s of
-      Right p -> desugarProg p LCS Correction False
+      Right p -> desugarProg p LCS Correction False False
       Left  e -> error $ show e
 
 oneApproximationTests :: [TS.Test]

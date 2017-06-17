@@ -133,7 +133,7 @@ kleenexIdTest prog str = kleenexIOTest prog [(str, str)]
 kleenexDesugarProg :: String -> (String -> IO a) -> (RProgAct -> IO a) -> IO a
 kleenexDesugarProg prog kfail kret = case parseKleenex "verbatim" prog of
     Left err -> kfail (show err)
-    Right p  -> kret (desugarProg p LCS Correction False)
+    Right p  -> kret (desugarProg p LCS Correction False False)
 
 kleenexIOTest :: String -> [(String, String)] -> IO TS.Result
 kleenexIOTest prog cases =
