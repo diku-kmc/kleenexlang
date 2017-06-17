@@ -130,10 +130,10 @@ void cvector_remove(char_vector* vec, int ind) {
     vec->len--;
 }
 
-void cvector_concat(char_vector* vec1, char_vector* vec2) {
-    cvector_grow(vec1, vec1->len + vec2->len);
-    memcpy(vec1->data + (vec1->len), vec2->data, (vec2->len) * sizeof(char));
-    vec1->len += vec2->len;
+void cvector_concat(char_vector* vec1, char* vec2, int len) {
+    cvector_grow(vec1, vec1->len + len);
+    memcpy(vec1->data + (vec1->len), vec2, len * sizeof(char));
+    vec1->len += len;
 }
 
 void cvector_prepend(char_vector* vec1, char_vector* vec2) {

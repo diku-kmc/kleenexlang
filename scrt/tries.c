@@ -36,18 +36,20 @@ state* parse(char* fp, int* l, int* ss, int* ns) {
                         switch (tmp2) {
                             // Writing skip state
                             case 'W':   if (fscanf(fd, " %i [", &t2) != 1) exit(3);
-                                        char_vector* output = cvector_create();
+                                        char* output = malloc(t2 * sizeof(char));
                                         char tmp3;
                                         for (int i = 0; i < t2-1; ++i) {
                                             if (fscanf(fd, "%hhi,", &tmp3) != 1) exit(3);
-                                            cvector_append(output, tmp3);
+                                            output[i] = tmp3;
                                         }
                                         if (fscanf(fd, "%hhi]\n", &tmp3) != 1) exit(3);
-                                        cvector_append(output, tmp3);
+                                        output[t2-1] = tmp3;
                                         nfst[ind] .skip.output = output;
+                                        nfst[ind] .skip.len = t2;
                                         break;
                             // No output state
                             case 'E':   if (fscanf(fd, "\n") != 0) exit(3);
+                                        exit(4);
                                         nfst[ind] .skip.output = NULL;
                                         break;
                             default: exit(2); // Not supported yet (Register actions)
@@ -176,9 +178,7 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
                      }
         case SKIP: {
             n->node_ind = st.skip.target;
-            if (st.skip.output != NULL) {
-                cvector_concat(n->valuation, st.skip.output);
-            }
+            cvector_concat(n->valuation, st.skip.output, st.skip.len);
             return follow_ep(nfst, n, leafs, visited, del);
             break;
                    }
