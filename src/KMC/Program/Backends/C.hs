@@ -372,6 +372,7 @@ prettyInstr buftype tbltype prog instr phase state silence =
                             $$ (if bid1 == streamBuf then
                                   invokeCallback
                                 else empty)
+                            $$ text "reset" <> parens (buf bid2) <> semi
       ResetI bid         -> text "reset" <> parens (buf bid) <> semi
       AlignI bid1 bid2   -> text "align"
                             <> parens (hcat [buf bid1, comma, buf bid2])
