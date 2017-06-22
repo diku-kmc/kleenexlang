@@ -385,44 +385,39 @@ int main(int argc, char** argv) {
 
     int nlen;
     nfst_s* nfsts = parse(argv[1], &nlen);
-    nfst_s nfst = nfsts[0];
 
 
-    if (nlen == 1) {
-        simulate(nfst, stdin, stdout);
-    } else {
-        FILE* cur_ifile = stdin;
-        FILE* cur_ofile, *next_ifile;
-        pid_t childpid;
+    FILE* cur_ifile = stdin;
+    FILE* cur_ofile, *next_ifile;
+    pid_t childpid;
 
-        for (int i = 0; i < nlen-1; ++i) {
-            // Last iteration?
-            int fd[2];
-            if(pipe(fd) == -1) {
-                perror("Failed call to pipe()");
-                exit(1);
-            }
-            cur_ofile = fdopen(fd[1], "w");
-            next_ifile = fdopen(fd[0], "r");
-
-            if ((childpid = fork()) == -1) {
-                perror("Failed fork()");
-                exit(1);
-            }
-
-            // Child
-            if (childpid == 0) {
-                fclose(next_ifile);
-                simulate(nfsts[i], cur_ifile, cur_ofile);
-                exit(0);
-            } else {
-                fclose(cur_ofile);
-                fclose(cur_ifile);
-                cur_ifile = next_ifile;
-            }
+    for (int i = 0; i < nlen-1; ++i) {
+        // Last iteration?
+        int fd[2];
+        if(pipe(fd) == -1) {
+            perror("Failed call to pipe()");
+            exit(1);
         }
-        simulate(nfsts[nlen-1], cur_ifile, stdout);
+        cur_ofile = fdopen(fd[1], "w");
+        next_ifile = fdopen(fd[0], "r");
+
+        if ((childpid = fork()) == -1) {
+            perror("Failed fork()");
+            exit(1);
+        }
+
+        // Child
+        if (childpid == 0) {
+            fclose(next_ifile);
+            simulate(nfsts[i], cur_ifile, cur_ofile);
+            exit(0);
+        } else {
+            fclose(cur_ofile);
+            fclose(cur_ifile);
+            cur_ifile = next_ifile;
+        }
     }
+    simulate(nfsts[nlen-1], cur_ifile, stdout);
 
     //fprintf(stderr, "Leafs: %i\n", leafs->len);
 
