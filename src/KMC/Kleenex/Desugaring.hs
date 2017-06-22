@@ -114,7 +114,7 @@ desugarRE out re =
                 ieps   <- decl $ RSeq []
                 i      <- getFresh
                 iloop  <- decl $ RSeq [ie, i]
-                insertDecl i $ RSum [ieps, iloop]
+                insertDecl i $ RSum [iloop, ieps]
 
 ---------------------
 -- Kleenex desugaring
