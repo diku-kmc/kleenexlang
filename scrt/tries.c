@@ -6,33 +6,28 @@
 node_vector* pool;
 mvector* ns;
 
-state* parse(char* fp, int* l, int* ss, int* ns) {
-    FILE* fd = fopen(fp, "r");
-    int len, starts;
-    if (fscanf(fd, "%i %i\n", &len, &starts) != 2) exit(3);
-    state* nfst = (state*) malloc(len * sizeof(state));
-    *l = len;
-    *ss = starts;
-    *ns = 0;
+void parse_nfst(FILE* fd, nfst_s* nfst) {
+    state* states = nfst->states;
 
     // Parse states
+    int ns = 0;
     int ind, t1, t2;
     char tmp, tmp2;
-    for (int i = 0; i < len; ++i) {
+    for (int i = 0; i < nfst->len; ++i) {
         if (fscanf(fd, "%i %c", &ind, &tmp) != 2) exit(3); // Parse state index and type
         if (ferror(fd)) exit(2);
         switch (tmp) {
             // Choice state
             case 'C':   if (fscanf(fd, "%i %i\n", &t1, &t2) != 2) exit(3); // Parse the two targets
-                        nfst[ind] .s_type = CHOICE;
-                        nfst[ind] .choice.t1 = t1;
-                        nfst[ind] .choice.t2 = t2;
+                        states[ind] .s_type = CHOICE;
+                        states[ind] .choice.t1 = t1;
+                        states[ind] .choice.t2 = t2;
                         break;
             // Skip state
                         // Parse target and sub type
             case 'S':   if (fscanf(fd, "%i %c", &t1, &tmp2) != 2) exit(3);
-                        nfst[ind] .s_type = SKIP;
-                        nfst[ind] .skip.target = t1;
+                        states[ind] .s_type = SKIP;
+                        states[ind] .skip.target = t1;
                         switch (tmp2) {
                             // Writing skip state
                             case 'W':   if (fscanf(fd, " %i [", &t2) != 1) exit(3);
@@ -44,13 +39,13 @@ state* parse(char* fp, int* l, int* ss, int* ns) {
                                         }
                                         if (fscanf(fd, "%hhi]\n", &tmp3) != 1) exit(3);
                                         output[t2-1] = tmp3;
-                                        nfst[ind] .skip.output = output;
-                                        nfst[ind] .skip.len = t2;
+                                        states[ind] .skip.output = output;
+                                        states[ind] .skip.len = t2;
                                         break;
                             // No output state
                             case 'E':   if (fscanf(fd, "\n") != 0) exit(3);
                                         exit(4);
-                                        nfst[ind] .skip.output = NULL;
+                                        states[ind] .skip.output = NULL;
                                         break;
                             default: exit(2); // Not supported yet (Register actions)
                         }
@@ -72,33 +67,50 @@ state* parse(char* fp, int* l, int* ss, int* ns) {
                         rs[t2-1] .end   = (char) b;
 
                         if (fscanf(fd, "%c\n", &tmp2) != 1) exit(3); // Parse sub type
-                        nfst[ind] .s_type = SYMBOL;
-                        nfst[ind] .symbol.target = t1;
-                        nfst[ind] .symbol.ilen = t2;
-                        nfst[ind] .symbol.input = rs;
-                        nfst[ind] .symbol.output = (tmp2 == 'C'); // No output unless its CopyArg (no register actions)
-                        *ns += 1;
+                        states[ind] .s_type = SYMBOL;
+                        states[ind] .symbol.target = t1;
+                        states[ind] .symbol.ilen = t2;
+                        states[ind] .symbol.input = rs;
+                        states[ind] .symbol.output = (tmp2 == 'C'); // No output unless its CopyArg (no register actions)
+                        ns += 1;
                         break;
             // Accept state
-            case 'A':   nfst[ind] .s_type = ACCEPT;
-                        *ns += 1;
+            case 'A':   states[ind] .s_type = ACCEPT;
+                        ns += 1;
                         break;
-            case 'I':   nfst[ind] .s_type = SET;
+            case 'I':   states[ind] .s_type = SET;
                         if (fscanf(fd, "%i %i\n", &t1, &t2) != 2) exit(3);
-                        nfst[ind].set.target = t1;
-                        nfst[ind].set.k = t2;
+                        states[ind].set.target = t1;
+                        states[ind].set.k = t2;
                         break;
-            case 'T':   nfst[ind].s_type = TEST;
+            case 'T':   states[ind].s_type = TEST;
                         if (fscanf(fd, "%i\n", &t1) != 1) exit(3);
-                        nfst[ind].test.target = t1;
+                        states[ind].test.target = t1;
                         break;
             default: printf("Parse error, unkown state type");
                      exit(11);
         }
 
     }
-    return nfst;
+    nfst->num_ras = ns;
 }
+
+nfst_s* parse(char* fp, int* len) {
+    FILE* fd = fopen(fp, "r");
+    int slen, starts;
+    if (fscanf(fd, "%i %i\n", &slen, &starts) != 2) exit(3);
+    nfst_s* nfsts = (nfst_s*) malloc(sizeof(nfst_s));
+    state* nfst = (state*) malloc(slen * sizeof(state));
+    nfsts[0].len    = slen;
+    nfsts[0].start  = starts;
+    nfsts[0].states = nfst;
+    parse_nfst(fd, nfsts + 0);
+
+    *len = 1;
+
+    return nfsts;
+}
+
 
 // Simple visualization of the path tree, might not work currently.
 void vis_tree(node* n, FILE* fd) {
@@ -153,10 +165,10 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
                 lchild = nvector_pop(pool);
                 rchild = nvector_pop(pool);
             } else {
-                lchild = (node*) malloc(sizeof(node));
+                lchild = mvector_get(ns);
                 lchild->valuation = cvector_create();
 
-                rchild = (node*) malloc(sizeof(node));
+                rchild = mvector_get(ns);
                 rchild->valuation = cvector_create();
             }
             lchild->c = n->c;
@@ -305,29 +317,30 @@ int main(int argc, char** argv) {
         exit(23);
     }
 
-    const int interval = 8;
-
     pool = nvector_create();
 
-    int nlen, ss, num_ras;
-    state* nfst = parse(argv[1], &nlen, &ss, &num_ras);
-    ns   = mvector_create(num_ras * 2 * interval);
+    int nlen;
+    nfst_s* nfsts = parse(argv[1], &nlen);
+    nfst_s nfst = nfsts[0];
+    ns   = mvector_create(nfst.num_ras * 4);
+    int nslen = nfst.len;
+    state* states = nfst.states;
 
     // ALlocate and initialize root node of the path tree.
     node* root = mvector_get(ns);
     root->valuation = cvector_create();
-    root->node_ind = ss;
+    root->node_ind = nfst.start;
     root->c = 0;
 
-    bool* visited = (bool*) malloc(sizeof(bool) * nlen);
+    bool* visited = (bool*) malloc(sizeof(bool) * nslen);
 
     // Intitialize differnt needed stuff.
     node_vector* tmp;
     node_vector* leafs = nvector_create();
     node_vector* leafs2 = nvector_create();
     node_vector* del = nvector_create();
-    follow_ep(nfst, root, leafs, visited, del);
-    memset(visited, 0, sizeof(bool) * nlen);
+    follow_ep(nfst.states, root, leafs, visited, del);
+    memset(visited, 0, sizeof(bool) * nslen);
     char buffer[2048];
     int pos = 0;
     int size = fread(buffer, 1, 2048, stdin);
@@ -338,7 +351,7 @@ int main(int argc, char** argv) {
         // Iterate over active leaf nodes.
         for (int j = 0; j < leafs->len; ++j) {
             node* leaf = leafs->data[j];
-            step(input, nfst, leaf, leafs2, visited, del);
+            step(input, states, leaf, leafs2, visited, del);
         }
 
         // Swap leafs to the newly found ones, and reset the other vector.
@@ -355,7 +368,7 @@ int main(int argc, char** argv) {
 
 
         // Reset visited array.
-        memset(visited, 0, sizeof(bool) * nlen);
+        memset(visited, 0, sizeof(bool) * nslen);
 
         pos++;
         if (pos >= size) {
@@ -365,7 +378,7 @@ int main(int argc, char** argv) {
             pos = 0;
         }
     }
-    output(leafs, nfst);
+    output(leafs, states);
     //fprintf(stderr, "Leafs: %i\n", leafs->len);
 
     // Free (most) of the used memory, to better use of Valgrind memchecker.
