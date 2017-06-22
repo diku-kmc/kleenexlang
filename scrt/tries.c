@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+
 #include "tries.h"
 
 node_vector* pool;
@@ -97,16 +99,21 @@ void parse_nfst(FILE* fd, nfst_s* nfst) {
 
 nfst_s* parse(char* fp, int* len) {
     FILE* fd = fopen(fp, "r");
-    int slen, starts;
-    if (fscanf(fd, "%i %i\n", &slen, &starts) != 2) exit(3);
-    nfst_s* nfsts = (nfst_s*) malloc(sizeof(nfst_s));
-    state* nfst = (state*) malloc(slen * sizeof(state));
-    nfsts[0].len    = slen;
-    nfsts[0].start  = starts;
-    nfsts[0].states = nfst;
-    parse_nfst(fd, nfsts + 0);
+    int slen, starts, num_nfsts;
+    if (fscanf(fd, "%i\n", &num_nfsts) != 1) exit(3);
+    nfst_s* nfsts = (nfst_s*) malloc(num_nfsts * sizeof(nfst_s));
+    for (int i = 0; i < num_nfsts; ++i) {
+        if (fscanf(fd, "%i %i ", &slen, &starts) != 2) exit(3);
+        nfsts[i].start  = starts;
+        nfsts[i].states = (state*) malloc(slen * sizeof(state));
+        nfsts[i].len    = slen;
+    }
 
-    *len = 1;
+    for (int i = 0; i < num_nfsts; ++i) {
+        parse_nfst(fd, nfsts + i);
+    }
+
+    *len = num_nfsts;
 
     return nfsts;
 }
@@ -218,7 +225,7 @@ bool follow_ep(state* nfst, node* n, node_vector* leafs, bool* visited,
 }
 
 
-void output(node_vector* leafs, state* nfst) {
+void foutput(node_vector* leafs, state* nfst, FILE* output) {
     char_vector* data = cvector_create();
     for (int i = 0; i < leafs->len; ++i) {
         // Is accept state.
@@ -236,9 +243,7 @@ void output(node_vector* leafs, state* nfst) {
     exit(0);
 
 end:
-    for (int i = 0; i < data->len; ++i) {
-        putchar(data->data[i]);
-    }
+    fwrite(data->data, 1, data->len, output);
     //cvector_free(data);
 }
 
@@ -310,21 +315,8 @@ void free_tree(node* n) {
     free_tree(n->rchild);
 }
 
-int main(int argc, char** argv) {
-    if (argc < 2) {
-        // Simple way to check actual size of a node struct.
-        printf("Node size: %lu, State size: %lu\n", sizeof(node), sizeof(state));
-        exit(23);
-    }
-
-    pool = nvector_create();
-
-    int nlen;
-    nfst_s* nfsts = parse(argv[1], &nlen);
-    nfst_s nfst = nfsts[0];
+void simulate(nfst_s nfst, FILE* input, FILE* output) {
     ns   = mvector_create(nfst.num_ras * 4);
-    int nslen = nfst.len;
-    state* states = nfst.states;
 
     // ALlocate and initialize root node of the path tree.
     node* root = mvector_get(ns);
@@ -332,7 +324,8 @@ int main(int argc, char** argv) {
     root->node_ind = nfst.start;
     root->c = 0;
 
-    bool* visited = (bool*) malloc(sizeof(bool) * nslen);
+    bool* visited = (bool*) malloc(sizeof(bool) * nfst.len);
+    memset(visited, 0, sizeof(bool) * nfst.len);
 
     // Intitialize differnt needed stuff.
     node_vector* tmp;
@@ -340,18 +333,18 @@ int main(int argc, char** argv) {
     node_vector* leafs2 = nvector_create();
     node_vector* del = nvector_create();
     follow_ep(nfst.states, root, leafs, visited, del);
-    memset(visited, 0, sizeof(bool) * nslen);
+    memset(visited, 0, sizeof(bool) * nfst.len);
     char buffer[2048];
     int pos = 0;
-    int size = fread(buffer, 1, 2048, stdin);
+    int size = fread(buffer, 1, 2048, input);
 
-    char input;
+    char cur_char;
     while (pos < size) {
-        input = buffer[pos];
+        cur_char = buffer[pos];
         // Iterate over active leaf nodes.
         for (int j = 0; j < leafs->len; ++j) {
             node* leaf = leafs->data[j];
-            step(input, states, leaf, leafs2, visited, del);
+            step(cur_char, nfst.states, leaf, leafs2, visited, del);
         }
 
         // Swap leafs to the newly found ones, and reset the other vector.
@@ -368,17 +361,69 @@ int main(int argc, char** argv) {
 
 
         // Reset visited array.
-        memset(visited, 0, sizeof(bool) * nslen);
+        memset(visited, 0, sizeof(bool) * nfst.len);
 
         pos++;
         if (pos >= size) {
-            fwrite(root->valuation->data, 1, root->valuation->len, stdout);
+            fwrite(root->valuation->data, 1, root->valuation->len, output);
             root->valuation->len = 0;
-            size = fread(buffer, 1, 2048, stdin);
+            size = fread(buffer, 1, 2048, input);
             pos = 0;
         }
     }
-    output(leafs, states);
+    foutput(leafs, nfst.states, output);
+}
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        // Simple way to check actual size of a node struct.
+        printf("Node size: %lu, State size: %lu\n", sizeof(node), sizeof(state));
+        exit(23);
+    }
+
+    pool = nvector_create();
+
+    int nlen;
+    nfst_s* nfsts = parse(argv[1], &nlen);
+    nfst_s nfst = nfsts[0];
+
+
+    if (nlen == 1) {
+        simulate(nfst, stdin, stdout);
+    } else {
+        FILE* cur_ifile = stdin;
+        FILE* cur_ofile, *next_ifile;
+        pid_t childpid;
+
+        for (int i = 0; i < nlen-1; ++i) {
+            // Last iteration?
+            int fd[2];
+            if(pipe(fd) == -1) {
+                perror("Failed call to pipe()");
+                exit(1);
+            }
+            cur_ofile = fdopen(fd[1], "w");
+            next_ifile = fdopen(fd[0], "r");
+
+            if ((childpid = fork()) == -1) {
+                perror("Failed fork()");
+                exit(1);
+            }
+
+            // Child
+            if (childpid == 0) {
+                fclose(next_ifile);
+                simulate(nfsts[i], cur_ifile, cur_ofile);
+                exit(0);
+            } else {
+                fclose(cur_ofile);
+                fclose(cur_ifile);
+                cur_ifile = next_ifile;
+            }
+        }
+        simulate(nfsts[nlen-1], cur_ifile, stdout);
+    }
+
     //fprintf(stderr, "Leafs: %i\n", leafs->len);
 
     // Free (most) of the used memory, to better use of Valgrind memchecker.
