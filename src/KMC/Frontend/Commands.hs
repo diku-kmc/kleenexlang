@@ -109,6 +109,17 @@ buildTransducers pu = do
     , tuProgramUnit = pu
     }
 
+buildNFSTs :: ProgramUnit -> Frontend [RProgNFST]
+buildNFSTs pu = do
+  let rp = puProgram pu
+  nfsts <- measure "NFST generation" $
+    forM (zip (rprogPipeline rp) ([0..]::[Int])) $ \(ident, i) ->
+      measure (unwords ["NFST", show i]) $
+        let nfst = enumerateNFST $ condenseSkip $ constructNFST rp ident
+            n    = stateSizeNFST nfst
+        in n `seq` return nfst
+  return nfsts
+
 generateOracleSSTs :: TransducerUnit -> Frontend OracleSSTUnit
 generateOracleSSTs tu = do
   mainOpts <- ask
@@ -378,10 +389,8 @@ visualize visOpts pu = do
 
 simul :: SimulOptions -> ProgramUnit -> Frontend (IO ExitCode)
 simul sOpts pu = do
-  let prog = puProgram pu
-  let pu' = pu { puProgram = prog { rprogPipeline = [rprogPipeline prog !! 0] } }
-  let nfst = constructNFST (puProgram pu') (head $ rprogPipeline (puProgram pu'))
-  let csv = nfstToCsv $ enumerateNFST $ condenseSkip nfst
+  nfsts <- buildNFSTs pu
+  let csv = nfstsToCSV nfsts
   --_ <- measure "aoeu" $ liftIO $ print (head $ tuTransducers tu)
   case optSimOut sOpts of
     Just fp -> do

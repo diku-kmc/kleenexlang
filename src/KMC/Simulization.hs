@@ -23,18 +23,22 @@ data Out a =
   deriving (Show)
 
 
-data TState st a =
+data TState st a b =
   Choice st st
   | Skip st (Out a)
-  | Symbol st [(a, a)] (Maybe (Out a)) -- Nothing means to copy input. The Word8 in maybe not currently used
+  | Symbol st [(a, a)] (Maybe (Out b)) -- Nothing means to copy input. The Word8 in maybe not currently used
   | Accept
   | Set st Int
   | Test st
   deriving (Show)
 
-type NFST st a = (st, M.Map st (TState st a))
+type NFST st a b = (st, M.Map st (TState st a b))
+type RProgNFST = NFST Int Word8 Word8
 
-condenseSkip :: (Ord st, Show st) => NFST st a -> NFST st a
+stateSizeNFST :: NFST st a b -> Int
+stateSizeNFST = M.size . snd
+
+condenseSkip :: (Ord st, Show st) => NFST st a b -> NFST st a b
 condenseSkip nfst@(start, states) = (start, go states M.empty S.empty)
   where
     go sts nsts del
@@ -67,7 +71,7 @@ condenseSkip nfst@(start, states) = (start, go states M.empty S.empty)
     reverseEdges = edgesFromNFST nfst
     mDelete m s = M.filterWithKey (\k _ -> not $ S.member k s) m
 
-edgesFromNFST :: (Ord st) => NFST st a -> M.Map st [st]
+edgesFromNFST :: (Ord st) => NFST st a b -> M.Map st [st]
 edgesFromNFST (_, states) = M.foldrWithKey f M.empty states
   where
     f k (Choice t1 t2) ac = M.unionWith (++) (M.fromList [(t1, [k]), (t2, [k])]) ac
@@ -80,7 +84,7 @@ edgesFromNFST (_, states) = M.foldrWithKey f M.empty states
     ins t k ac = M.insertWith (++) t [k] ac
 
 -- | Substitute state type by any enumerable type.
-enumerateNFST :: (Ord st, Enum i, Ord i) => NFST st a -> NFST i a
+enumerateNFST :: (Ord st, Enum i, Ord i) => NFST st a b -> NFST i a b
 enumerateNFST (initial, states) = (aux initial, M.mapKeys aux (M.map saux states))
   where
     statesMap = M.fromList (zip (M.keys states) [toEnum 0..])
@@ -96,7 +100,7 @@ enumerateNFST (initial, states) = (aux initial, M.mapKeys aux (M.map saux states
 constructNFST :: (Rng (CopyFunc a [Either a RegAction]) ~ [Either a RegAction], Show a)
                 => RProg a (Either a RegAction)
                 -> RIdent
-                -> (NFST [RIdent] a)
+                -> (NFST [RIdent] a a)
 constructNFST rprog initial = (follow [initial], allTransitions)
   where
     (_, allTransitions) = go (S.singleton (follow [initial])) S.empty M.empty
@@ -155,7 +159,7 @@ constructNFST rprog initial = (follow [initial], allTransitions)
       fromMaybe (error $ "internal error: identifier without declaration: " ++ show i)
         $ M.lookup i (rprogDecls rprog)
 
-stToString :: Int -> TState Int Word8 -> String
+stToString :: Int -> TState Int Word8 Word8 -> String
 stToString i st =
   case st of
     Choice t1 t2 -> printf "%i C %i %i\n" i t1 t2
@@ -174,8 +178,15 @@ stToString i st =
     Set t k      -> printf "%i I %i %i\n" i t k
     Test t       -> printf "%i T %i\n" i t
 
-nfstToCsv :: NFST Int Word8 -> String
-nfstToCsv (i, nfst') = let
-  line1 = printf "%i %i\n" (length nfst') i
+nfstsToCSV :: [RProgNFST] -> String
+nfstsToCSV nfsts = let
+  line1 = printf "%i\n" (length nfsts) :: String
+  line2 = (foldl (\str (start, nfst) -> str ++
+    (printf "%i %i " (length nfst) start)) "" nfsts) ++ "\n"
+  nfstStr = concat $ map nfstToCSV nfsts
+  in line1 ++ line2 ++ nfstStr
+
+nfstToCSV :: RProgNFST -> String
+nfstToCSV (_, nfst') = let
   sts   = M.mapWithKey stToString nfst'
-  in line1 ++ concat sts
+  in concat sts
