@@ -83,6 +83,13 @@ typedef struct state {
     };
 } state;
 
+typedef struct nfst_s {
+    int len;
+    int num_ras;
+    int start;
+    state* states;
+} nfst_s;
+
 typedef struct mvector {
     node* data;
     int len;
