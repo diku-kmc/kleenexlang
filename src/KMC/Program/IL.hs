@@ -21,9 +21,11 @@ newtype TableId = TableId { getTableId :: Int } deriving (Eq, Ord, Show)
 newtype BufferId = BufferId { getBufferId :: Int } deriving (Eq, Ord, Show)
 
 data Expr =
-    SymE Int          -- ^ next[i] (i less than value of AvailableSymbolsE)
-  | AvailableSymbolsE -- ^ Number of available symbols
-  | CompareE Int [Int] -- compare(&next[i], str, length(str))
+    SymE Int           -- ^ next[i] (i less than value of AvailableSymbolsE)
+  | AvailableSymbolsE  -- ^ Number of available symbols
+  | IsFinalChunk       -- ^ Are we in the final chunk so we can accept? Always true
+                       --   for standard sequential Kleenex
+  | CompareE Int [Int] -- ^ compare(&next[i], str, length(str))
   | ConstE Int
   | FalseE
   | TrueE

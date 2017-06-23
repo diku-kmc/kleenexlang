@@ -295,7 +295,11 @@ void *calculate(void *arg)
   chunk = task->chunk;
   tstate = task->tstate;
 
-  match(phase+1, tstate, NULL);
+  if (chunk == num_of_chunks-1) {
+    match(phase+1, tstate, NULL, true);
+  } else {
+    match(phase+1, tstate, NULL, false);
+  }
 
   if (chunk < num_of_chunks-1)
   {
@@ -412,7 +416,7 @@ void run_multi_chunk(int suffix_len) {
 void run_single_chunk() {
   transducer_state * state = init(target, target_size, 0);
   state->curr_state = -1;
-  match(1, state, NULL);
+  match(1, state, NULL, true);
   fprintf(stdout, "%s", state->outbuf->data);
   // TODO: print error text if we did not reach a accept state;
 }

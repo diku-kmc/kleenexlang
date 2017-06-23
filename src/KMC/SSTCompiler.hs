@@ -118,8 +118,7 @@ compileTransitions :: (Ord st, Ord var, Ord pred, Ord tid, Enum delta, Ord delta
 compileTransitions i (BranchT action tests) = do
   testBlock <- forM tests $ \(ps, ts') ->
     do block <- compileTransitions (i+length ps) ts'
-       return [IfI ((AvailableSymbolsE `GteE` (ConstE (i+length ps)))
-                    `AndE` (predListToExpr ps i))
+       return [IfI (AvailableSymbolsE `GteE` ConstE (i+length ps) `AndE` predListToExpr ps i)
                    block]
   actionBlock <- case action of
                     Nothing -> return []
@@ -151,7 +150,7 @@ compileState trans fin = do
                            -- Type signature needed to resolve types
                            ass <- compileAssignment var
                                     (constUpdateStringFunc upd :: UpdateStringFunc var func)
-                           return $ ass ++ [AcceptI]
+                           return [IfI IsFinalChunk (ass ++ [AcceptI])]
   transitions <- compileTransitions 0 (kvtree [ (ps, (upd, st')) | (ps, upd, st') <- trans ])
   return $ assignments ++ transitions ++ [NoMoveI]
 

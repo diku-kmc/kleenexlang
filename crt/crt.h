@@ -109,6 +109,6 @@ transducer_state *init(unsigned char* input, size_t input_size, int add_symbols)
  */
 void free_state(transducer_state *);
 
-void match(int phase, transducer_state *state, void (*callback)(transducer_state*));
+void match(int phase, transducer_state *state, void (*callback)(transducer_state*), bool is_final);
 int silent_match(int phase, int start_state, unsigned char * buf, long length);
 

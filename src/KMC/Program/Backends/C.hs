@@ -65,11 +65,11 @@ void free_state(transducer_state * tstate)
 }
 
 |]++concat (zipWith matchTemplate progStrings [1..])++[strQ|
-void match(int phase, transducer_state* tstate, void (*callback)(transducer_state*))
+void match(int phase, transducer_state* tstate, void (*callback)(transducer_state*), bool is_final)
 {
   switch(phase) {
     |]++intercalate "\n" ["case " ++ show i ++ ":\n\
-    \      return match" ++ show i ++ "(tstate, callback);\n\
+    \      return match" ++ show i ++ "(tstate, callback, is_final);\n\
     \      break;"
                          | i <- [1..(length progStrings)] ]++
     [strQ|
@@ -97,7 +97,7 @@ int silent_match(int phase, int start_state, unsigned char * buf, long length)
 
 matchTemplate :: String -> Int -> String
 matchTemplate progString n =
-  [strQ|void match|] ++ show n ++ [strQ|(transducer_state* tstate, void (*callback)(transducer_state*))
+  [strQ|void match|] ++ show n ++ [strQ|(transducer_state* tstate, void (*callback)(transducer_state*), bool is_final)
 {
 |]++progString++[strQ|
   //accept|]++show n++[strQ|:
@@ -112,6 +112,7 @@ silentMatchTemplate :: String -> Int -> String
 silentMatchTemplate progString n =
   [strQ|int silent_match|] ++ show n ++ [strQ|(int start_state, unsigned char * buf, long length)
 {
+bool is_final = true;
 |]++progString++[strQ|
   //accept|]++show n++[strQ|:
   //  return;
@@ -465,6 +466,7 @@ prettyExpr e silence =
   case e of
     SymE i            -> next <> brackets (int i)
     AvailableSymbolsE -> text "left"
+    IsFinalChunk      -> text "is_final"
     CompareE i str    -> text "cmp"
                            <> parens (hcat $ punctuate comma
                                         [text "&" <> next <> brackets (int i)
