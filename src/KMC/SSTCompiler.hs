@@ -150,7 +150,11 @@ compileState trans fin = do
                            -- Type signature needed to resolve types
                            ass <- compileAssignment var
                                     (constUpdateStringFunc upd :: UpdateStringFunc var func)
-                           return [IfI IsFinalChunk (ass ++ [AcceptI])]
+                           return $ 
+                              case ass of 
+                                [] -> [AcceptI]
+                                _  -> [IfI IsFinalChunk ass, AcceptI]
+                           -- return [IfI IsFinalChunk ass, AcceptI]
   transitions <- compileTransitions 0 (kvtree [ (ps, (upd, st')) | (ps, upd, st') <- trans ])
   return $ assignments ++ transitions ++ [NoMoveI]
 

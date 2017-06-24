@@ -54,7 +54,7 @@ void printCompilationInfo()
   fprintf(stdout, |]++infoString++[strQ|);
 }
 
-transducer_state* init(unsigned char* input, size_t input_size, int add_symbols)
+transducer_state* init(unsigned char* input, size_t input_size, bool add_symbols)
 {
 |] ++ initString ++ [strQ|
 }
@@ -112,7 +112,6 @@ silentMatchTemplate :: String -> Int -> String
 silentMatchTemplate progString n =
   [strQ|int silent_match|] ++ show n ++ [strQ|(int start_state, unsigned char * buf, long length)
 {
-bool is_final = true;
 |]++progString++[strQ|
   //accept|]++show n++[strQ|:
   //  return;
@@ -670,7 +669,7 @@ prettyStateTable progs =
     sc =
       text "state_count"
     entry (prog, phase) =
-      vcat  [ st <> brackets (int phase) <+> text "=" <+> malloc phase
+      vcat  [ st <> brackets (int phase) <+> text "=" <+> malloc phase
             , vcat (map (subentry phase) (M.toList $ progBlocks prog)) ]
     subentry phase (blid, is) =
       st <> brackets (int phase) <> brackets (prettyStateNo blid) <+> text "=" <+> parens ( parens ( text "state") <> stateRes is (prettyStateNo blid)) <> semi
@@ -678,7 +677,7 @@ prettyStateTable progs =
       text "malloc" <> parens ( sc <> brackets (int phase) <+> text "* sizeof(state)") <> semi
 
 -- | Pretty print a list of instructions.
--- | relies on check for eof is the appeas firs in each state.
+-- | relies on check for eof is the appeas firs in each state.
 stateRes :: Block -> Doc -> Doc
 stateRes instrs state =
   braces (text ".num = " <+> state <> comma <+> go instrs)
