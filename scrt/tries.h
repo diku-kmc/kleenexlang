@@ -11,8 +11,8 @@ typedef struct node node;
 
 // Struct to return a tuple, used by prune().
 typedef struct ret {
-    node* target;
-    bool keep;
+    int lstart;
+    int lend;
 } ret;
 
 enum Child { LEFT, RIGHT };
@@ -23,6 +23,7 @@ struct node {
 
     int c;
     bool islchild;
+    bool del;
     char_vector* valuation;
     struct node* lchild;
     struct node* rchild;
@@ -34,6 +35,7 @@ typedef struct rangeset {
     unsigned char start;
     unsigned char end;
 } rangeset;
+
 
 // Enumeration for the different kinds of states.
 enum SType { CHOICE, ACCEPT, SKIP, SYMBOL, SET, TEST };
@@ -89,6 +91,13 @@ typedef struct nfst_s {
     int start;
     state* states;
 } nfst_s;
+
+typedef struct visit {
+    ret pos;
+    int val;
+    node* n;
+    bool visited;
+} visit;
 
 typedef struct mvector {
     node* data;

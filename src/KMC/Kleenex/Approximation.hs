@@ -33,7 +33,7 @@ approxCount :: RProgAct -> Int -> RIdent -> ApproxMetric -> ApproxMode -> RProgA
 approxCount rprog k offset metric mode = prog
   where
     prog = RProg [offset] (M.union (start_terms offset)
-                            (snd $ go [start] M.empty (offset+2) M.empty))
+                            (snd $ go [start] M.empty (offset+3) M.empty))
     start = head $ rprogPipeline rprog
     decls = HM.fromList $ M.toList $ rprogDecls rprog
     go [] m _ ndecls = (m, ndecls)
@@ -53,7 +53,7 @@ approxCount rprog k offset metric mode = prog
                              (M.union (M.fromList nd) ndecls)
           term -> error $ "internal error: got RSet or RTest in approxTerm: " ++ (show term)
 
-    start_terms c = M.fromList [(c, RSeq [c+1, c+2]), (c+1, RSet k)]
+    start_terms c = M.fromList [(c, RSeq [c+1, c+3, c+2]), (c+1, RSet k), (c+2, RSet 0)]
 
     lo i m =
       fromMaybe (error $ "internal error: lookup: " ++ show i)

@@ -41,10 +41,11 @@ void nvector_insert(node_vector* vec, node* data, int ind) {
     vec->len++;
 }
 
-void nvector_append(node_vector* vec, node* data) {
+int nvector_append(node_vector* vec, node* data) {
     nvector_grow(vec, vec->len + 1);
     vec->data[vec->len] = data;
     vec->len++;
+    return vec->len-1;
 }
 
 void nvector_remove(node_vector* vec, int ind) {
@@ -64,6 +65,12 @@ void nvector_push(node_vector* vec, node* data) {
     nvector_grow(vec, vec->len + 1);
     vec->data[vec->len] = data;
     vec->len += 1;
+}
+
+void nvector_purge(node_vector* vec, int start, int end) {
+    //memmove(vec->data + start, vec->data + end, (vec->len - end) * sizeof(node*));
+    //vec->len = vec->len - (end - start);
+    memset(vec->data + start, 0, sizeof(node*) * (end - start));
 }
 
 

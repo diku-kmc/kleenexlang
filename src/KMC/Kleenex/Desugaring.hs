@@ -143,7 +143,7 @@ desugarTerm out counters t =
                       ieps <- decl $ RSeq []
                       decl $ RSum [it, ieps]
                     -- For some reason don't approximate if we don't output
-  (Approx e t1)  -> if not out
+  (Approx e t1)  -> if False
                     then desugarTerm out counters t1
                     else do i1 <- desugarTerm out counters t1
                             i2 <- getFresh
