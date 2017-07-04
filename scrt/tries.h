@@ -59,7 +59,7 @@ typedef struct skip_s {
 typedef struct symbol_s {
     int target;
     int ilen;
-    char output;
+    bool output;
     rangeset* input;
 } symbol_s;
 
@@ -96,7 +96,6 @@ typedef struct visit {
     ret pos;
     int val;
     node* n;
-    bool visited;
 } visit;
 
 typedef struct mvector {

@@ -159,6 +159,9 @@ void print_leafs(node_vector* leafs, char* fp) {
 }
 
 void purge(node* n, node_vector* leafs, ret r, node_vector* del) {
+    if (r.lstart == -1) {
+        return;
+    }
     for (int i = r.lstart; i <= r.lend; ++i) {
         nvector_push(del, leafs->data[i]);
     }
@@ -166,14 +169,14 @@ void purge(node* n, node_vector* leafs, ret r, node_vector* del) {
 }
 
 ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
-        node_vector* del)
+        node_vector* del, bool* vis)
 {
     int ind = n->node_ind;
 
     ret r = {-1, -1};
     // Stop and mark node for deletion, if the state has been previously
     // visited in current input iteration.
-    if (visited[ind].visited) {
+    if (vis[ind]) {
         if (visited[ind].val >= n->c) {
             nvector_push(del, n);
             return r;
@@ -181,7 +184,7 @@ ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
             purge(visited[ind].n, leafs, visited[ind].pos, del);
         }
     }
-    visited[ind].visited = true;
+    vis[ind] = true;
     visited[ind].n = n;
     visited[ind].val = n->c;
     state st = nfst[ind];
@@ -216,23 +219,24 @@ ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
             rchild->parent = n;
             rchild->node_ind = st.choice.t2;
 
-            ret lc = follow_ep(nfst, lchild, leafs, visited, del);
-            ret rc = follow_ep(nfst, rchild, leafs, visited, del);
+            ret lc = follow_ep(nfst, lchild, leafs, visited, del, vis);
+            ret rc = follow_ep(nfst, rchild, leafs, visited, del, vis);
             r.lstart = (lc.lstart == -1) ? rc.lstart : lc.lstart;
             r.lend   = (rc.lend == -1) ? lc.lend : rc.lend;
+            visited[ind].pos = r;
             return r;
                      }
         case SKIP: {
             n->node_ind = st.skip.target;
             cvector_concat(n->valuation, st.skip.output, st.skip.len);
-            ret c = follow_ep(nfst, n, leafs, visited, del);
+            ret c = follow_ep(nfst, n, leafs, visited, del, vis);
             visited[ind].pos = c;
             return c;
                    }
         case SET: {
             n->c = st.set.k;
             n->node_ind = st.set.target;
-            ret c = follow_ep(nfst, n, leafs, visited, del);
+            ret c = follow_ep(nfst, n, leafs, visited, del, vis);
             visited[ind].pos = c;
             return c;
                   }
@@ -240,11 +244,12 @@ ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
             if (n->c > 0) {
                 n->c--;
                 n->node_ind = st.test.target;
-                ret c = follow_ep(nfst, n, leafs, visited, del);
+                ret c = follow_ep(nfst, n, leafs, visited, del, vis);
                 visited[ind].pos = c;
                 return c;
             } else {
                 nvector_append(del, n);
+                visited[ind].pos = r;
                 return r;
             }
                    }
@@ -326,7 +331,7 @@ inline static void delete(node* n, node** root) {
 
 
 int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
-        visit* visited, node_vector* del) {
+        visit* visited, node_vector* del, bool* vis) {
     state st = nfst[n->node_ind];
     switch (st.s_type) {
         case SYMBOL: {
@@ -334,7 +339,7 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
                 if (input >= st.symbol.input[i].start && input <= st.symbol.input[i].end) {
                     n->node_ind = st.symbol.target;
                     if (st.symbol.output) cvector_append(n->valuation, input);
-                    follow_ep(nfst, n, leafs, visited, del);
+                    follow_ep(nfst, n, leafs, visited, del, vis);
                     return 0;
                 }
             }
@@ -369,15 +374,16 @@ void simulate(nfst_s nfst, FILE* input, FILE* output) {
     root->c = 0;
 
     visit* visited = (visit*) malloc(sizeof(visit) * nfst.len);
-    memset(visited, 0, sizeof(visit) * nfst.len);
+    bool* vis = (bool*) malloc (sizeof(bool) * nfst.len);
+    memset(vis, 0, sizeof(bool) * nfst.len);
 
     // Intitialize differnt needed stuff.
     node_vector* tmp;
     node_vector* leafs = nvector_create();
     node_vector* leafs2 = nvector_create();
     node_vector* del = nvector_create();
-    follow_ep(nfst.states, root, leafs, visited, del);
-    memset(visited, 0, sizeof(visit) * nfst.len);
+    follow_ep(nfst.states, root, leafs, visited, del, vis);
+    memset(vis, 0, sizeof(bool) * nfst.len);
     char buffer[2048];
     int pos = 0;
     int size = fread(buffer, 1, 2048, input);
@@ -392,7 +398,7 @@ void simulate(nfst_s nfst, FILE* input, FILE* output) {
             if (leaf == NULL) {
                 continue;
             }
-            step(cur_char, nfst.states, leaf, leafs2, visited, del);
+            step(cur_char, nfst.states, leaf, leafs2, visited, del, vis);
         }
 
         // Swap leafs to the newly found ones, and reset the other vector.
@@ -412,7 +418,7 @@ void simulate(nfst_s nfst, FILE* input, FILE* output) {
 
 
         // Reset visited array.
-        memset(visited, 0, sizeof(visit) * nfst.len);
+        memset(vis, 0, sizeof(bool) * nfst.len);
 
         pos++;
         if (pos >= size) {
