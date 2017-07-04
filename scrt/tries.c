@@ -7,6 +7,7 @@
 
 node_vector* pool;
 mvector* ns;
+node* root;
 
 void parse_nfst(FILE* fd, nfst_s* nfst) {
     state* states = nfst->states;
@@ -158,18 +159,58 @@ void print_leafs(node_vector* leafs, char* fp) {
     fclose(fd);
 }
 
-void purge(node* n, node_vector* leafs, ret r, node_vector* del) {
+inline static void delete(node* n) {
+    node* target;
+    node* parent = n->parent;
+
+    if (parent == NULL) {
+        printf("Reject!\n");
+        exit(111);
+    }
+
+    if (n->islchild) {
+        target = parent->rchild;
+    } else {
+        target = parent->lchild;
+    }
+
+    n->valuation->len = 0;
+    n->lchild = NULL;
+    n->rchild = NULL;
+    nvector_push(pool, n);
+
+    cvector_prepend(target->valuation, parent->valuation);
+    target->parent = parent->parent;
+    target->islchild = parent->islchild;
+    if (parent->parent == NULL) {
+        root = target;
+    } else {
+        if (parent->islchild) {
+            parent->parent->lchild = target;
+        } else {
+            parent->parent->rchild = target;
+        }
+    }
+    parent->valuation->len = 0;
+    parent->lchild = NULL;
+    parent->rchild = NULL;
+    nvector_push(pool, parent);
+}
+
+void purge(node* n, node_vector* leafs, ret r, state* nfst, visit* visited, bool* vis){
     if (r.lstart == -1) {
         return;
     }
     for (int i = r.lstart; i <= r.lend; ++i) {
-        nvector_push(del, leafs->data[i]);
+        if (leafs->data[i] != NULL) {
+            delete(leafs->data[i]);
+        }
     }
     nvector_purge(leafs, r.lstart, r.lend + 1);
 }
 
 ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
-        node_vector* del, bool* vis)
+        bool* vis)
 {
     int ind = n->node_ind;
 
@@ -178,10 +219,10 @@ ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
     // visited in current input iteration.
     if (vis[ind]) {
         if (visited[ind].val >= n->c) {
-            nvector_push(del, n);
+            delete(n);
             return r;
         } else {
-            purge(visited[ind].n, leafs, visited[ind].pos, del);
+            purge(visited[ind].n, leafs, visited[ind].pos, nfst, visited, vis);
         }
     }
     vis[ind] = true;
@@ -219,8 +260,8 @@ ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
             rchild->parent = n;
             rchild->node_ind = st.choice.t2;
 
-            ret lc = follow_ep(nfst, lchild, leafs, visited, del, vis);
-            ret rc = follow_ep(nfst, rchild, leafs, visited, del, vis);
+            ret lc = follow_ep(nfst, lchild, leafs, visited, vis);
+            ret rc = follow_ep(nfst, rchild, leafs, visited, vis);
             r.lstart = (lc.lstart == -1) ? rc.lstart : lc.lstart;
             r.lend   = (rc.lend == -1) ? lc.lend : rc.lend;
             visited[ind].pos = r;
@@ -229,14 +270,14 @@ ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
         case SKIP: {
             n->node_ind = st.skip.target;
             cvector_concat(n->valuation, st.skip.output, st.skip.len);
-            ret c = follow_ep(nfst, n, leafs, visited, del, vis);
+            ret c = follow_ep(nfst, n, leafs, visited, vis);
             visited[ind].pos = c;
             return c;
                    }
         case SET: {
             n->c = st.set.k;
             n->node_ind = st.set.target;
-            ret c = follow_ep(nfst, n, leafs, visited, del, vis);
+            ret c = follow_ep(nfst, n, leafs, visited, vis);
             visited[ind].pos = c;
             return c;
                   }
@@ -244,11 +285,14 @@ ret follow_ep(state* nfst, node* n, node_vector* leafs, visit* visited,
             if (n->c > 0) {
                 n->c--;
                 n->node_ind = st.test.target;
-                ret c = follow_ep(nfst, n, leafs, visited, del, vis);
+                ret c = follow_ep(nfst, n, leafs, visited, vis);
                 visited[ind].pos = c;
                 return c;
             } else {
-                nvector_append(del, n);
+                n->lchild = NULL;
+                n->rchild = NULL;
+                r.lstart = nvector_append(leafs, n);
+                r.lend = r.lstart;
                 visited[ind].pos = r;
                 return r;
             }
@@ -291,47 +335,10 @@ end:
     //cvector_free(data);
 }
 
-inline static void delete(node* n, node** root) {
-    node* target;
-    node* parent = n->parent;
-
-    if (parent == NULL) {
-        printf("Reject!\n");
-        exit(111);
-    }
-
-    if (n->islchild) {
-        target = parent->rchild;
-    } else {
-        target = parent->lchild;
-    }
-
-    n->valuation->len = 0;
-    n->lchild = NULL;
-    n->rchild = NULL;
-    nvector_push(pool, n);
-
-    cvector_prepend(target->valuation, parent->valuation);
-    target->parent = parent->parent;
-    target->islchild = parent->islchild;
-    if (parent->parent == NULL) {
-        *root = target;
-    } else {
-        if (parent->islchild) {
-            parent->parent->lchild = target;
-        } else {
-            parent->parent->rchild = target;
-        }
-    }
-    parent->valuation->len = 0;
-    parent->lchild = NULL;
-    parent->rchild = NULL;
-    nvector_push(pool, parent);
-}
 
 
 int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
-        visit* visited, node_vector* del, bool* vis) {
+        visit* visited, bool* vis) {
     state st = nfst[n->node_ind];
     switch (st.s_type) {
         case SYMBOL: {
@@ -339,13 +346,16 @@ int step(unsigned char input, state* nfst, node* n, node_vector* leafs,
                 if (input >= st.symbol.input[i].start && input <= st.symbol.input[i].end) {
                     n->node_ind = st.symbol.target;
                     if (st.symbol.output) cvector_append(n->valuation, input);
-                    follow_ep(nfst, n, leafs, visited, del, vis);
+                    follow_ep(nfst, n, leafs, visited, vis);
                     return 0;
                 }
             }
             } // Fallthrough
         case ACCEPT:
-            nvector_push(del, n);
+            delete(n);
+            return 0;
+        case TEST:
+            delete(n);
             return 0;
         default:
             exit(23); // Stepping on choice or skip state should not happen.
@@ -368,7 +378,7 @@ void simulate(nfst_s nfst, FILE* input, FILE* output) {
     ns   = mvector_create(nfst.num_ras * 4);
 
     // ALlocate and initialize root node of the path tree.
-    node* root = mvector_get(ns);
+    root = mvector_get(ns);
     root->valuation = cvector_create();
     root->node_ind = nfst.start;
     root->c = 0;
@@ -381,9 +391,9 @@ void simulate(nfst_s nfst, FILE* input, FILE* output) {
     node_vector* tmp;
     node_vector* leafs = nvector_create();
     node_vector* leafs2 = nvector_create();
-    node_vector* del = nvector_create();
-    follow_ep(nfst.states, root, leafs, visited, del, vis);
+    follow_ep(nfst.states, root, leafs, visited, vis);
     memset(vis, 0, sizeof(bool) * nfst.len);
+
     char buffer[2048];
     int pos = 0;
     int size = fread(buffer, 1, 2048, input);
@@ -398,7 +408,7 @@ void simulate(nfst_s nfst, FILE* input, FILE* output) {
             if (leaf == NULL) {
                 continue;
             }
-            step(cur_char, nfst.states, leaf, leafs2, visited, del, vis);
+            step(cur_char, nfst.states, leaf, leafs2, visited, vis);
         }
 
         // Swap leafs to the newly found ones, and reset the other vector.
@@ -406,16 +416,6 @@ void simulate(nfst_s nfst, FILE* input, FILE* output) {
         leafs = leafs2;
         leafs2 = tmp;
         leafs2->len = 0;
-
-        // Prune path tree, and print whatever resides in the root node.
-        for (int i = 0; i < del->len; ++i) {
-            if (del->data[i] == NULL) {
-                continue;
-            }
-            delete(del->data[i], &root);
-        }
-        del->len = 0;
-
 
         // Reset visited array.
         memset(vis, 0, sizeof(bool) * nfst.len);
@@ -475,8 +475,6 @@ int main(int argc, char** argv) {
         }
     }
     simulate(nfsts[nlen-1], cur_ifile, stdout);
-
-    //fprintf(stderr, "Leafs: %i\n", leafs->len);
 
     // Free (most) of the used memory, to better use of Valgrind memchecker.
     /*free(nfst);
