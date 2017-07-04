@@ -35,12 +35,12 @@ case $1 in
     approx)
         csv="build/approx.csv"
         $exedir/kexc/kexc simul --out $csv approx.kex
-        time $exedir/sim/sim $csv < data.txt > output/$1-${out}.txt
+        time $exedir/sim/sim $csv < data_bigger.txt > output/$1-${out}.txt
         ;;
     approx-counters)
         csv="build/approx-counters.csv"
         $exedir/kexc/kexc simul --counters --out $csv approx.kex
-        time $exedir/sim/sim $csv < data.txt > output/$1-${out}.txt
+        time $exedir/sim/sim $csv < data_bigger.txt > output/$1-${out}.txt
         ;;
     approx-data)
         rm data_big.txt data_bigger.txt
