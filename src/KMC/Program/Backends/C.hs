@@ -43,7 +43,6 @@ progTemplate buString tablesString declsString infoString initString freeString 
  [strQ|
 #define NUM_PHASES |] ++ show (length progStrings) ++ [strQ|
 #define BUFFER_UNIT_T |] ++ buString ++ "\n"
---  ++ [fileQ|crt/crt.h|] ++ "\n"
   ++ [fileQ|crt/crt.c|] ++ "\n"
   ++ tablesString ++ "\n\n"
   ++ stateCount ++ "\n"
@@ -170,13 +169,16 @@ callbackPrefix :: String
 callbackPrefix = "callback"
 
 invokeCallback :: Doc
-invokeCallback =  text "if" <+> parens (text callbackPrefix) <+> ( braces $ text callbackPrefix <> parens (text "tstate") <> semi)
+invokeCallback =      text "if" <+> parens (text callbackPrefix <+> text "!= NULL")
+                  $+$ lbrace
+                  $+$ nest 2 (text callbackPrefix <> parens (text "tstate") <> semi)
+                  $+$ rbrace
 
 startStateOutput :: String
-startStateOutput = "tstate->curr_state"
+startStateOutput = "tstate->curr_state" -- | variable holding start state in match function
 
 startStateSilent :: String
-startStateSilent = "start_state"
+startStateSilent = "start_state"        -- | variable holding start state in silent match function
 
 startState :: Bool -> Doc
 startState silence =
@@ -339,6 +341,7 @@ prettyInstr buftype tbltype prog instr phase state silence =
       AcceptI            -> text "return" <+> int state <> semi <+> text "//accept"
       FailI              -> text "return" <+> int state <> semi <+> text "//fail"
       NoMoveI            -> text "return -1;"
+      IfI IsFinalChunk _ -> empty
       IfI e is           -> text "if" <+> parens (prettyExpr e silence) $$
                             lbrace $+$
                             nest 3 (prettyBlock buftype tbltype prog is phase state silence) $+$
