@@ -1,3 +1,12 @@
+//
+//  The Code contained in this file is based on the Thread Pool
+//  code examples of the 'Multithreaded Programming Guide' created
+//  and made public by Oracle Corporation.
+//
+//  The guide is available at:
+//  http://docs.oracle.com/cd/E19253-01/816-5137/ggedd/index.html
+//
+
 /*
  * Thread pool implementation.
  * See <thr_pool.h> for interface declarations.
@@ -20,9 +29,9 @@
  */
 typedef struct job job_t;
 struct job {
-  job_t	*job_next;		/* linked list of jobs */
-  void	*(*job_func)(void *);	/* function to call */
-  void	*job_arg;		/* its argument */
+  job_t	*job_next;             /* linked list of jobs */
+  void	*(*job_func)(void *);  /* function to call    */
+  void	*job_arg;              /* its argument        */
   job_id id;
 };
 
@@ -40,42 +49,37 @@ struct active {
  * The thread pool, opaque to the clients.
  */
 struct thr_pool {
-  thr_pool_t	*pool_forw;	/* circular linked list */
-  thr_pool_t	*pool_back;	/* of all thread pools */
-  pthread_mutex_t	pool_mutex;	/* protects the pool data */
-  pthread_cond_t	pool_busycv;	/* synchronization in pool_queue */
-  pthread_cond_t	pool_workcv;	/* synchronization with workers */
-  pthread_cond_t	pool_waitcv;	/* synchronization in pool_wait() */
-  active_t	*pool_active;	/* list of threads performing work */
-  job_t		*pool_head;	/* head of FIFO job queue */
-  job_t		*pool_tail;	/* tail of FIFO job queue */
-  job_t   *pool_prio_head; /* head of prioritized job queue */
-  job_t   *pool_prio_tail; /* tail of prioritized job queue */
-  pthread_attr_t	pool_attr;	/* attributes of the workers */
-  int		pool_flags;	/* see below */
-  ushort		pool_linger;	/* seconds before idle workers exit */
-  int		pool_minimum;	/* minimum number of worker threads */
-  int		pool_maximum;	/* maximum number of worker threads */
-  int		pool_nthreads;	/* current number of worker threads */
-  int		pool_idle;	/* number of idle workers */
-  job_id current_id; /* most recent used job_id */
+  pthread_mutex_t	pool_mutex;     /* protects the pool data */
+  pthread_cond_t	pool_busycv;    /* synchronization in pool_queue */
+  pthread_cond_t	pool_workcv;    /* synchronization with workers */
+  pthread_cond_t	pool_waitcv;    /* synchronization in pool_wait() */
+  active_t	*pool_active;           /* list of threads performing work */
+  job_t		*pool_head;             /* head of FIFO job queue */
+  job_t		*pool_tail;             /* tail of FIFO job queue */
+  job_t   *pool_prio_head;          /* head of prioritized job queue */
+  job_t   *pool_prio_tail;          /* tail of prioritized job queue */
+  pthread_attr_t	pool_attr;      /* attributes of the workers */
+  int		pool_flags;             /* see below */
+  ushort		pool_linger;        /* seconds before idle workers exit */
+  int		pool_minimum;           /* minimum number of worker threads */
+  int		pool_maximum;           /* maximum number of worker threads */
+  int		pool_nthreads;          /* current number of worker threads */
+  int		pool_idle;              /* number of idle workers */
+  job_id current_id;                /* most recent used job_id */
 };
 
 /* pool_flags */
-#define	POOL_WAIT	0x01		/* waiting in thr_pool_wait() */
-#define	POOL_DESTROY	0x02		/* pool is being destroyed */
-
-/* the list of all created and not yet destroyed thread pools */
-static thr_pool_t *thr_pools = NULL;
-
-/* protects thr_pools */
-static pthread_mutex_t thr_pool_lock = PTHREAD_MUTEX_INITIALIZER;
+#define	POOL_WAIT	0x01          /* waiting in thr_pool_wait() */
+#define	POOL_DESTROY	0x02      /* pool is being destroyed */
 
 /* set of all signals */
 static sigset_t fillset;
 
 static void *worker_thread(void *);
 
+/*
+ * Generates the next unique job_id for a given thread pool
+ */
 job_id
 next_id(thr_pool_t *pool) {
   return ++(pool->current_id);
@@ -103,8 +107,9 @@ create_worker(thr_pool_t *pool)
  * if necessary to keep the pool populated.
  */
 static void
-worker_cleanup(thr_pool_t *pool)
+worker_cleanup(void *arg)
 {
+  thr_pool_t *pool = (thr_pool_t *)arg;
   --(pool->pool_nthreads);
   if (pool->pool_flags & POOL_DESTROY) {
     if (pool->pool_nthreads == 0)
@@ -133,8 +138,9 @@ notify_waiters(thr_pool_t *pool)
  * Called by a worker thread on return from a job.
  */
 static void
-job_cleanup(thr_pool_t *pool)
+job_cleanup(void *arg)
 {
+  thr_pool_t *pool = (thr_pool_t *)arg;
   pthread_t my_tid = pthread_self();
   active_t *activep;
   active_t **activepp;
@@ -204,6 +210,7 @@ worker_thread(void *arg)
     if (pool->pool_flags & POOL_DESTROY)
       break;
 
+    /* First check for prioritized jobs, */
     if ((job = pool->pool_prio_head) != NULL) {
       timedout = 0;
       func = job->job_func;
@@ -228,6 +235,7 @@ worker_thread(void *arg)
        */
       pthread_cleanup_pop(1);	/* job_cleanup(pool) */
     }
+    /* then check the normal job queue */
     else if ((job = pool->pool_head) != NULL) {
       timedout = 0;
       func = job->job_func;
@@ -265,41 +273,6 @@ worker_thread(void *arg)
   return (NULL);
 }
 
-static void
-clone_attributes(pthread_attr_t *new_attr, pthread_attr_t *old_attr)
-{
-  struct sched_param param;
-  void *addr;
-  size_t size;
-  int value;
-
-  (void) pthread_attr_init(new_attr);
-
-  if (old_attr != NULL) {
-    (void) pthread_attr_getstack(old_attr, &addr, &size);
-    /* don't allow a non-NULL thread stack address */
-    (void) pthread_attr_setstack(new_attr, NULL, size);
-
-    (void) pthread_attr_getscope(old_attr, &value);
-    (void) pthread_attr_setscope(new_attr, value);
-
-    (void) pthread_attr_getinheritsched(old_attr, &value);
-    (void) pthread_attr_setinheritsched(new_attr, value);
-
-    (void) pthread_attr_getschedpolicy(old_attr, &value);
-    (void) pthread_attr_setschedpolicy(new_attr, value);
-
-    (void) pthread_attr_getschedparam(old_attr, &param);
-    (void) pthread_attr_setschedparam(new_attr, &param);
-
-    (void) pthread_attr_getguardsize(old_attr, &size);
-    (void) pthread_attr_setguardsize(new_attr, size);
-  }
-
-  /* make all pool threads be detached threads */
-  (void) pthread_attr_setdetachstate(new_attr, PTHREAD_CREATE_DETACHED);
-}
-
 thr_pool_t *
 thr_pool_create(ushort min_threads, ushort max_threads, ushort linger,
                 pthread_attr_t *attr)
@@ -334,28 +307,9 @@ thr_pool_create(ushort min_threads, ushort max_threads, ushort linger,
   pool->pool_idle = 0;
   pool->current_id = 1;
 
-  /*
-   * We cannot just copy the attribute pointer.
-   * We need to initialize a new pthread_attr_t structure using
-   * the values from the caller-supplied attribute structure.
-   * If the attribute pointer is NULL, we need to initialize
-   * the new pthread_attr_t structure with default values.
-   */
-  clone_attributes(&pool->pool_attr, attr);
-
-  /* insert into the global list of all thread pools */
-  (void) pthread_mutex_lock(&thr_pool_lock);
-  if (thr_pools == NULL) {
-    pool->pool_forw = pool;
-    pool->pool_back = pool;
-    thr_pools = pool;
-  } else {
-    thr_pools->pool_back->pool_forw = pool;
-    pool->pool_forw = thr_pools;
-    pool->pool_back = thr_pools->pool_back;
-    thr_pools->pool_back = pool;
-  }
-  (void) pthread_mutex_unlock(&thr_pool_lock);
+  (void) pthread_attr_init(&pool->pool_attr);
+  /* Create threads whith detach state 'DETACHED' to release resource on thread exit */
+  (void) pthread_attr_setdetachstate(&pool->pool_attr, PTHREAD_CREATE_DETACHED);
 
   return (pool);
 }
@@ -511,20 +465,6 @@ thr_pool_destroy(thr_pool_t **poolPtr)
 
   pthread_cleanup_pop(1);	/* pthread_mutex_unlock(&pool->pool_mutex); */
 
-  /*
-   * Unlink the pool from the global list of all pools.
-   */
-  (void) pthread_mutex_lock(&thr_pool_lock);
-  if (thr_pools == pool)
-    thr_pools = pool->pool_forw;
-  if (thr_pools == pool)
-    thr_pools = NULL;
-  else {
-    pool->pool_back->pool_forw = pool->pool_forw;
-    pool->pool_forw->pool_back = pool->pool_back;
-  }
-  (void) pthread_mutex_unlock(&thr_pool_lock);
-  
   /*
    * There should be no pending jobs, but just in case...
    */

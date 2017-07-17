@@ -102,7 +102,7 @@ void printCompilationInfo();
  *    size_t input_size:    size of input
  *    int add_symbols:      specifies is symbols representing
  */
-transducer_state *init(unsigned char* input, size_t input_size, int add_symbols);
+transducer_state *init(unsigned char* input, size_t input_size, bool add_symbols);
 
 /*
  *    Frees a transducer state and its content.
@@ -110,5 +110,9 @@ transducer_state *init(unsigned char* input, size_t input_size, int add_symbols)
 void free_state(transducer_state *);
 
 void match(int phase, transducer_state *state, void (*callback)(transducer_state*), bool is_final);
+
+/* 
+ * Pure transition function, no output generated
+ */
 int silent_match(int phase, int start_state, unsigned char * buf, long length);
 

@@ -9,68 +9,107 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <string.h>
 
 #include "thr_pool.h"
 #include "crt.h"
 
+/* Macro for toggling debugging related code */
 //#define DEBUGGING
+
+/* Exit codes for non-successful evaluation */
 #define RETC_PRINT_USAGE      1
 #define RETC_PRINT_ERROR      2
-#define DEFAULT_SUFFIX_LENGTH 256
 
+/* Timing flags */
+#define TIME_ALL     0x01   // Flag for timing full execution
+#define TIME_DATA    0x02   // Flag for timing mapping of input to memory
+#define TIME_FST     0x04   // Flag for timing data processing
+#define TIME_OUTPUT  0x08   // Flag for timing writing output
+
+/* Default values */
+#define DEFAULT_SUFFIX_LENGTH     256
+#define DEFAULT_NUMBER_OF_CHUNKS  sysconf(_SC_NPROCESSORS_ONLN) // Use number of online processors as default
+
+/* 
+ * Struct representing a job to be executed.
+ * Contains relevant information for adding 
+ * a job to the pool queue, and to keep track
+ * of the queued job.
+ */
 typedef struct job_t {
   struct job_t *next;
   int start_state;
   int chunk;
   int phase;
-  int completed;
-  int cancled;
+  bool completed;
+  bool cancled;
   job_id job;
   transducer_state *tstate;
 } job_t;
 
+
+/*
+ * Struct containing data relevant for
+ * job generation.
+ */
 typedef struct {
   int phase;
   int chunk;
   size_t offset;
   size_t chunk_lengt;
   size_t suffix_length;
-  thr_pool_t * pool;
 } task_gen_arg_t;
 
-/* Mutex */
+
+/* Mutexes */
 static pthread_mutex_t job_list_lock = PTHREAD_MUTEX_INITIALIZER; /* Protects job list */
 static pthread_mutex_t path_lock = PTHREAD_MUTEX_INITIALIZER; /* Protects job list */
 
+/* Global variables */
+thr_pool_t *pool;           // Thread Pool
 
-unsigned char* target;
-long target_size;
+unsigned char* target;      // Content of target file
+long target_size;           // Size of target file
 
-int num_of_chunks;
+long num_of_chunks;         // Number of chunks to split input data into
 
-transducer_state **** outputmap;
-thr_pool_t *pool;
+transducer_state **** outputmap;  // Table of handles used to reference transducer
+                                  // states generated during data processing
 
+job_t **joblist;            // Job list for keeping track of active jobs
 
-/* job list keeping track of active jobs */
-job_t **joblist;
+transducer_state **path;    // List of tranducer states that, when combined,
+                            // representes the ouput
 
-transducer_state **path;
+struct timeval time_start;  // Wall time after processing argument options
+struct timeval time_data;   // Wall time after mapping input data to memory
+struct timeval time_fst;    // Wall time after processing input data
+struct timeval time_output; // Wall time after writing output
 
 /* Function declarations */
 void print_usage(char *);
+void print_timeing(int);
 void enqueue_job(job_t *);
 
-/* thread jobs */
+/* Thread jobs */
 void *calculate(void *);
 void *generate_tasks(void *);
 void *update_path_and_clean(void *);
 
+
+/*
+ * Checks if a specific job is part of the 
+ * path.
+ *
+ * If so, cancle other jobs on same chunk, 
+ * and add next job to the path.
+ */
 void *update_path_and_clean(void *arg)
 {
   job_t *job = (job_t *)arg;
@@ -79,6 +118,7 @@ void *update_path_and_clean(void *arg)
   (void) pthread_mutex_lock(&job_list_lock);
 
   /* Check that job has finished */
+  // TODO: Is this check needed?
   if (! job->completed) {
     (void) pthread_mutex_unlock(&job_list_lock);
     return (0);
@@ -93,6 +133,7 @@ void *update_path_and_clean(void *arg)
     return (0);
   }
 
+  /* Else, terminate competing jobs */
   for (head = joblist[job->chunk];
        head != NULL;)
   {
@@ -251,8 +292,8 @@ void *generate_tasks(void *arg) {
     if (! started[start_state]) {
       //CREATE JOB
       job_t * task = malloc(sizeof(job_t));
-      task->cancled = 0;
-      task->completed = 0;
+      task->cancled = false;
+      task->completed = false;
       task->chunk = chunk;
       task->next = NULL;
       task->phase = phase;
@@ -274,17 +315,23 @@ void *generate_tasks(void *arg) {
 
 
 /*
- *    Function for processing a chunk of data.
+ *    Function for processing a data chunk.
  */
 void *calculate(void *arg)
 {
-  int old_state;
-  job_t * task = (job_t *)arg;
-  int phase, chunk;
+  int old_state, phase, chunk;
   transducer_state *tstate;
-
+  job_t * task = (job_t *)arg;
+#ifdef DEBUGGING
+  /* Store start state when debugging */
+  int start_state = task->tstate->curr_state;
+#endif
+  
+  /* Check if job has already been processed */
+  /* NB! this should never happen */
   if (task->completed) return (0);
 
+  /* Check if job has been cancled */
   if (task->cancled)
   {
     task = NULL;
@@ -295,12 +342,21 @@ void *calculate(void *arg)
   chunk = task->chunk;
   tstate = task->tstate;
 
+  /* 
+   * Kleenex phases are 1 indexed,
+   * but everything else is 0 inexed.
+   * Thus +1 on phase number.
+   */
   if (chunk == num_of_chunks-1) {
     match(phase+1, tstate, NULL, true);
   } else {
     match(phase+1, tstate, NULL, false);
   }
-
+  
+  /*
+   * If this is not the final chunk, then point
+   * 'nextPtr' to the subsequent transducer state.
+   */
   if (chunk < num_of_chunks-1)
   {
     tstate->nextPtr = &outputmap[phase][chunk+1][tstate->curr_state];
@@ -320,14 +376,15 @@ void *calculate(void *arg)
 
   thr_pool_queue_prioritized(pool, update_path_and_clean, task);
 
-  /* Reset teh cancel state of the thread */
+  /* Reset the cancel state of the thread */
   (void) pthread_setcancelstate(old_state, NULL);
 
 #ifdef DEBUGGING
-  fprintf(stdout, "Job: phase: %i, chunk: %i, ended at state: %i\n", phase, chunk, tstate->curr_state);
+  /* If debugging, print phase, chunk,  */
+  fprintf(stdout, "Job: phase: %i, chunk: %i, from -> to: %i -> %i\n", phase, chunk, start_state, tstate->curr_state);
 #endif
 
-  // SIGNAL THAT WE CAN COMBINE OUTPUT
+  // TODO: SIGNAL THAT WE CAN COMBINE OUTPUT
   task = NULL;
 
   return (0);
@@ -348,12 +405,18 @@ void enqueue_job(job_t *task)
   (void) pthread_mutex_unlock(&job_list_lock);
 }
 
+/*
+ * Controller for handling multiple data chunks.
+ */
 void run_multi_chunk(int suffix_len) {
   int i;
   job_t *init_task;
+  
   /* SET UP */
   long chunk_size = target_size / num_of_chunks;
 
+  /* CALCULATE SIZE OF EACH CHUNK */
+  /* NB! CURRENTLY ONLY LAST CHUNK WILL DIFFER IN SIZE */
   size_t * chunk_sizes = malloc(num_of_chunks * sizeof(size_t));
   for (i = 0; i < num_of_chunks -1; chunk_sizes[i++] = chunk_size);
   chunk_sizes[num_of_chunks - 1] = target_size - chunk_size * (num_of_chunks - 1);
@@ -364,12 +427,19 @@ void run_multi_chunk(int suffix_len) {
     chunk_offset[i] = i * chunk_size;
   }
 
+  /* Initialize map keeping track transducer states. */
   init_outputmap();
+  
+  /* Array of linked lists, each containing jobs for a given chunk */
   joblist = calloc(num_of_chunks * sizeof(job_t*), 1);
+  /* Array holding transducer states needed to generate the output */
   path = calloc(num_of_chunks * sizeof(job_t*), 1);
 
+  /* Instantiates a thread pool */
+  // TODO: Add argument for minimum number of threads, and for linger time
   pool = thr_pool_create(num_of_chunks, num_of_chunks, 10, NULL);
 
+  /* Create job for first data chunk */
   init_task = malloc(sizeof(job_t));
 
   init_task->cancled = 0;
@@ -380,30 +450,31 @@ void run_multi_chunk(int suffix_len) {
   init_task->tstate = init(target, chunk_sizes[0], 0);
   init_task->tstate->curr_state = -1;
 
+  enqueue_job(init_task);
+  
+  /* Add transducer state to output map and path */
   outputmap[0][0][0] = path[0] = init_task->tstate;
 
-  enqueue_job(init_task);
-
+  /* Add 'job generation' jobs for each chunk */
   for (i = 1; i  < num_of_chunks; i++) {
     task_gen_arg_t * arg = malloc(sizeof(task_gen_arg_t));
     arg->chunk = i;
     arg->offset = chunk_offset[i];
     arg->phase = 0;
     arg->suffix_length = suffix_len;
-    arg->pool = pool;
     arg->chunk_lengt = chunk_sizes[i];
 
     thr_pool_queue_prioritized(pool, generate_tasks, arg);
   }
 
+  /* Wait for jobs to finish */
+  // TODO: Destroy pool if we reach fail state
   thr_pool_wait(pool);
 
   if (pool)
   {
     thr_pool_destroy(&pool);
   }
-
-  output(outputmap[0][0][0]);
 
   /* Clean up */
   free(chunk_sizes);
@@ -414,11 +485,13 @@ void run_multi_chunk(int suffix_len) {
  *    Handles single chunk by processing entire file in one call to match.
  */
 void run_single_chunk() {
-  transducer_state * state = init(target, target_size, 0);
-  state->curr_state = -1;
-  match(1, state, NULL, true);
-  fprintf(stdout, "%s", state->outbuf->data);
-  // TODO: print error text if we did not reach a accept state;
+  transducer_state * tstate = init(target, target_size, 0);
+  tstate->curr_state = -1;
+  outputmap = malloc(sizeof(transducer_state*));
+  outputmap[0] = malloc(sizeof(transducer_state*));
+  outputmap[0][0] = malloc(sizeof(transducer_state*));
+  outputmap[0][0][0] = tstate;
+  match(1, tstate, NULL, true);
 }
 
 static struct option long_options[] = {
@@ -427,16 +500,22 @@ static struct option long_options[] = {
   { "help"        , no_argument      , 0, 'h' },
   { "len-suffix"  , required_argument, 0, 'l' },
   { "time"        , no_argument      , 0, 't' },
+  { "time-all"    , no_argument      , 0, TIME_ALL    },
+  { "time-data"   , no_argument      , 0, TIME_DATA   },
+  { "time-fst"    , no_argument      , 0, TIME_FST    },
+  { "time-output" , no_argument      , 0, TIME_OUTPUT },
   { 0, 0, 0, 0 }
 };
 
 
 int main(int argc, char *argv[]) {
   int c;
+  int time_flags = 0;
   int option_index = 0;
   int chunks_provided = 0;
   int do_timing = 0;
   int suffix_len = DEFAULT_SUFFIX_LENGTH;
+  num_of_chunks = DEFAULT_NUMBER_OF_CHUNKS;
   char* file_name = NULL;
 
   if (argc == 1) {
@@ -471,9 +550,19 @@ int main(int argc, char *argv[]) {
         }
         break;
 
+      case TIME_ALL:
+      case TIME_DATA:
+      case TIME_FST:
+      case TIME_OUTPUT:
+        /* handle --time-all, --time-data, --timeprocess and --time-output */
+        do_timing = 1;
+        time_flags |= c;
+        break;
+
       case 't':
         /* handle -t and --time */
         do_timing = 1;
+        time_flags |= 0xff;
         break;
 
       case ':':
@@ -536,39 +625,79 @@ int main(int argc, char *argv[]) {
     return RETC_PRINT_ERROR;
   }
 
-  struct timeval time_before, time_after, time_result;
-  long int millis;
   if (do_timing) {
-    gettimeofday(&time_before, NULL);
+    gettimeofday(&time_start, NULL);
   }
 
   /* Handle multiple chunks */
   init_target(file_name);
 
+  if (do_timing) {
+    gettimeofday(&time_data, NULL);
+  }
+
+
   /* Handle single chunk */
   if (num_of_chunks == 1) {
     run_single_chunk();
-    if (do_timing) {
-      gettimeofday(&time_after, NULL);
-      timersub(&time_after, &time_before, &time_result);
-      // A timeval contains seconds and microseconds.
-      millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
-      fprintf(stderr, "time (ms): %ld\n", millis);
-    }
-    return 0;
+  } else {
+    run_multi_chunk(suffix_len);
   }
 
-  run_multi_chunk(suffix_len);
+  if (do_timing) {
+    gettimeofday(&time_fst, NULL);
+  }
+
+  output(outputmap[0][0][0]);
 
   if (do_timing) {
-    gettimeofday(&time_after, NULL);
-    timersub(&time_after, &time_before, &time_result);
-    // A timeval contains seconds and microseconds.
-    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
-    fprintf(stderr, "time (ms): %ld\n", millis);
+    gettimeofday(&time_output, NULL);
+  }
+
+  if (do_timing) {
+    print_timeing(time_flags);
   }
   return 0;
 }
+
+void print_timeing(int flags)
+{
+  struct timeval time_result;
+  long int millis;
+
+  if (flags & TIME_ALL)
+  {
+    /* Output total time */
+    timersub(&time_output, &time_start, &time_result);
+    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+    fprintf(stderr, "total time (ms): %ld\n", millis);
+  }
+
+  if (flags & TIME_DATA)
+  {
+    /* Output time for mapping data to memory */
+    timersub(&time_data, &time_start, &time_result);
+    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+    fprintf(stderr, "data time (ms): %ld\n", millis);
+  }
+
+  if (flags & TIME_FST)
+  {
+    /* Output time for processing data */
+    timersub(&time_fst, &time_data, &time_result);
+    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+    fprintf(stderr, "FST time (ms): %ld\n", millis);
+  }
+
+  if (flags & TIME_OUTPUT)
+  {
+    /* Output time for outputting data */
+    timersub(&time_output, &time_fst, &time_result);
+    millis = time_result.tv_sec * 1000 + time_result.tv_usec / 1000;
+    fprintf(stderr, "output time (ms): %ld\n", millis);
+  }
+}
+
 
 /**
  *    Print usage text to stdout.
@@ -592,6 +721,14 @@ void print_usage(char *name)
           "    Specifies the length of the suffixes used for suffix analysis.\n"
           "    default: 256\n"
           "  -t, --time\n"
-          "    Times execution and writes time to stderr\n",
+          "    Times execution with all timing flags set.\n"
+          "  --time-all\n"
+          "    Sets flag for timing entire execution.\n"
+          "  --time-fst\n"
+          "    Sets flag for timing data processing.\n"
+          "  --time-data\n"
+          "    Sets flag for timing reading data to memory.\n"
+          "  --time-output\n"
+          "    Sets flag for timing writing output data to stdout,\n",
           name);
 }

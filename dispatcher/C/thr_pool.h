@@ -1,3 +1,12 @@
+//
+//  The Code contained in this file is based on the Thread Pool
+//  code examples of the 'Multithreaded Programming Guide' created
+//  and made public by Oracle Corporation.
+//
+//  The guide is available at:
+//  http://docs.oracle.com/cd/E19253-01/816-5137/ggedd/index.html
+//
+
 /*
  * Declarations for the clients of a thread pool.
  */
@@ -48,7 +57,15 @@ extern	int	thr_pool_queue(thr_pool_t *pool,
 extern  int thr_pool_dequeue(thr_pool_t *pool, job_id id);
 
 /*
- * Enqueue a work request to the thread pool job queue.
+ * Enqueue a work request to the thread pool prioritized job queue.
+ * Jobs added via this function will be prioritized over any new or existing 
+ * job enqued using thr_pool_queue. If multiple prioritized jobs are enqued
+ * these will be executed in the order they are added.
+ *
+ * The purpose of prioritized jobs are to ensure that ensure that jobs 
+ * with the purpose of generating new jobs, or terminating existing ones
+ * are executed as early as possible.
+ *
  * If there are idle worker threads, awaken one to perform the job.
  * Else if the maximum number of workers has not been reached,
  * create a new worker thread to perform the job.
