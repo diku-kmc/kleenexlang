@@ -646,12 +646,12 @@ int main(int argc, char *argv[]) {
 
   /* Validate number of chunks */
   if (!chunks_provided) {
-    fprintf(stderr, "%s: option ['-c' | '--chunks'] is required\n\n",
+    fprintf(stderr, "%s: option ['-c' | '--chunks'] is required\n\n",
             argv[0]);
     print_usage(argv[0]);
     return RETC_PRINT_ERROR;
   } else if (num_of_chunks < 1) {
-    fprintf(stderr, "%s: argument for option ['-c' | '--chunks'] must be > 0\n\n",
+    fprintf(stderr, "%s: argument for option ['-c' | '--chunks'] must be > 0\n\n",
             argv[0]);
     print_usage(argv[0]);
     return RETC_PRINT_ERROR;
