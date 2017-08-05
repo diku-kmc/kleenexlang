@@ -53,7 +53,7 @@ void printCompilationInfo()
   fprintf(stdout, |]++infoString++[strQ|);
 }
 
-transducer_state* init(unsigned char* input, size_t input_size, bool add_symbols)
+transducer_state* init(unsigned char* input, size_t input_size, bool copy_data, bool add_symbols)
 {
 |] ++ initString ++ [strQ|
 }
@@ -582,14 +582,21 @@ prettyInit progs = text $ printf [strQ|
   // Init in/out buffers
 
   if (input) {
-    tstate->outbuf = init_buffer(input_size);
+    if (copy_data) {
+      tstate->inbuf  = init_input_buffer(input_size);
+      memcpy(tstate->inbuf->data, input, input_size);
+      tstate->inbuf->length = input_size;
+    } else {
+      tstate->inbuf = init_input_buffer_by_ref(input, input_size);
+    }
+    tstate->inbuf->clear_data_on_delete = copy_data;
+
+    tstate->outbuf = init_buffer(4096);
     tstate->buffers[0] = tstate->outbuf;
     tstate->buffers[0]->symbols = NULL;
-    tstate->inbuf  = init_input_buffer(input_size);
-    memcpy(tstate->inbuf->data, input, input_size);
-    tstate->inbuf->length = input_size;
     tstate->output_cursor = 0;
   }
+
   tstate->nextPtr = NULL;
   tstate->src = NULL;
   return tstate;
@@ -609,10 +616,17 @@ prettyFree progs = text $ printf [strQ|
     tstate->buffers[i] = NULL;
   }
 
-  tstate->inbuf->next = NULL;
-  free(tstate->inbuf->data);
-  free(tstate->inbuf);
-  tstate->inbuf = NULL;
+  if (tstate->inbuf->clear_data_on_delete) {
+    tstate->inbuf->next = NULL;
+    free(tstate->inbuf->data);
+    free(tstate->inbuf);
+    tstate->inbuf = NULL;
+  } else {
+    tstate->inbuf->next = NULL;
+    tstate->inbuf->data = NULL;
+    free(tstate->inbuf);
+    tstate->inbuf = NULL;
+  }
 
   tstate->outbuf = NULL;
   tstate->nextPtr = NULL;

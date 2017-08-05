@@ -65,6 +65,7 @@ typedef struct {
   size_t size;
   long length;    // static length of input, -1 if unknown
   buffer_unit_t *next; /* pointer to next data */
+  bool clear_data_on_delete;
 } input_buffer;
 
 #define BUFFER_UNIT_SIZE (sizeof(buffer_unit_t))
@@ -102,7 +103,7 @@ void printCompilationInfo();
  *    size_t input_size:    size of input
  *    int add_symbols:      specifies is symbols representing
  */
-transducer_state *init(unsigned char* input, size_t input_size, bool add_symbols);
+transducer_state *init(unsigned char* input, size_t input_size, bool copy_data, bool add_symbols);
 
 /*
  *    Frees a transducer state and its content.

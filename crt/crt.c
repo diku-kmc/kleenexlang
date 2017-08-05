@@ -107,6 +107,17 @@ buffer_t* init_buffer(size_t size)
   return buf;
 }
 
+input_buffer* init_input_buffer_by_ref(unsigned char* input_ref, size_t size)
+{
+  input_buffer *inbuf = malloc(sizeof(input_buffer));
+  inbuf->data = input_ref;
+  inbuf->size = size;
+  inbuf->cursor = 0;
+  inbuf->length = size;
+  inbuf->next = inbuf->data;
+  return inbuf;
+}
+
 input_buffer* init_input_buffer(size_t size)
 {
   input_buffer *inbuf = malloc(sizeof(input_buffer));

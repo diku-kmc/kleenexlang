@@ -36,9 +36,9 @@
 #define DEFAULT_SUFFIX_LENGTH     256
 #define DEFAULT_NUMBER_OF_CHUNKS  sysconf(_SC_NPROCESSORS_ONLN) // Use number of online processors as default
 
-/* 
+/*
  * Struct representing a job to be executed.
- * Contains relevant information for adding 
+ * Contains relevant information for adding
  * a job to the pool queue, and to keep track
  * of the queued job.
  */
@@ -104,10 +104,28 @@ void *update_path_and_clean(void *);
 
 
 /*
- * Checks if a specific job is part of the 
+ * Called by a worker thread on return from a job.
+ */
+static void
+cleanup_joblist(void *_)
+{
+  (void) pthread_mutex_unlock(&job_list_lock);
+}
+
+/*
+ * Called by a worker thread on return from a job.
+ */
+static void
+cleanup_paht(void *_)
+{
+  (void) pthread_mutex_unlock(&path_lock);
+}
+
+/*
+ * Checks if a specific job is part of the
  * path.
  *
- * If so, cancle other jobs on same chunk, 
+ * If so, cancle other jobs on same chunk,
  * and add next job to the path.
  */
 void *update_path_and_clean(void *arg)
@@ -115,54 +133,51 @@ void *update_path_and_clean(void *arg)
   job_t *job = (job_t *)arg;
   job_t *head = NULL, *next = NULL;
 
+
   (void) pthread_mutex_lock(&job_list_lock);
+  pthread_cleanup_push(cleanup_joblist, NULL);
 
   /* Check that job has finished */
   // TODO: Is this check needed?
-  if (! job->completed) {
-    (void) pthread_mutex_unlock(&job_list_lock);
-    return (0);
-  }
+  if (path[job->chunk] != job->tstate) {
+    (void) pthread_mutex_lock(&path_lock);
+    pthread_cleanup_push(cleanup_paht, NULL);
 
-  (void) pthread_mutex_lock(&path_lock);
+    /* Else, terminate competing jobs */
+    for (head = joblist[job->chunk];
+         head != NULL;)
+    {
+      next = head->next;
+      if (head->job != job->job) {
+        if(!job->completed) {
+          thr_pool_dequeue(pool, job->job);
+        }
+        free_state(job->tstate);
+        free(job);
+      }
+      head = next;
+    }
 
-  /* If job is not on path stop */
-  if (path[job->chunk] != job->tstate){
+    if (job->completed && job->tstate->nextPtr != NULL) {
+      path[job->chunk+1] = *(job->tstate->nextPtr);
+    }
+
+    if (job->chunk < num_of_chunks-1) {
+      for (head = joblist[job->chunk+1];
+           head != NULL;
+           head = head->next)
+      {
+        thr_pool_queue_prioritized(pool, update_path_and_clean, head);
+      }
+
+    }
+    joblist[job->chunk] = NULL;
+
     (void) pthread_mutex_unlock(&path_lock);
-    (void) pthread_mutex_unlock(&job_list_lock);
-    return (0);
+    pthread_cleanup_pop(false);
   }
-
-  /* Else, terminate competing jobs */
-  for (head = joblist[job->chunk];
-       head != NULL;)
-  {
-    next = head->next;
-    if (head->job != job->job && !job->completed)
-    {
-      thr_pool_dequeue(pool, job->job);
-    }
-    head = next;
-  }
-
-  if (job->completed && job->tstate->nextPtr != NULL) {
-    path[job->chunk+1] = *(job->tstate->nextPtr);
-  }
-
-  if (job->chunk < num_of_chunks-1) {
-    for (head = joblist[job->chunk+1];
-         head != NULL;
-         head = head->next)
-    {
-      thr_pool_queue_prioritized(pool, update_path_and_clean, head);
-    }
-
-  }
-  joblist[job->chunk] = NULL;
-
-  (void) pthread_mutex_unlock(&path_lock);
   (void) pthread_mutex_unlock(&job_list_lock);
-
+  pthread_cleanup_pop(false);
   return (0);
 }
 
@@ -195,6 +210,14 @@ void output(transducer_state *tstate) {
 
   if (!tstate) return;
 
+  /* Handle fail state */
+  if (tstate->curr_state == -1
+      || (tstate->nextPtr == NULL && ! state_table[0][tstate->curr_state].accepting)) {
+    for (chunk = 0; chunk < num_of_chunks && path[chunk] != tstate && path[chunk] != NULL; chunk++);
+    position = (target_size / num_of_chunks) * chunk + tstate->inbuf->cursor;
+    fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", position, tstate->inbuf->next[0]);
+    return;
+  }
 
   for (sym = tstate->outbuf->symbols;
        sym != NULL;
@@ -219,14 +242,6 @@ void output(transducer_state *tstate) {
     sym = sym->next;
     free(tstate->outbuf->symbols);
     tstate->outbuf->symbols = sym;
-  }
-
-  /* Handle fail state */
-  if (tstate->curr_state == -1) {
-    for (chunk = 0; chunk < num_of_chunks && path[chunk] != tstate && path[chunk] != NULL; chunk++);
-    position = (target_size / num_of_chunks) * chunk + tstate->inbuf->cursor;
-    fprintf(stderr, "Match error at input symbol %zu, (next char: %u)!\n", position, tstate->inbuf->next[0]);
-    return;
   }
 
   if (tstate->nextPtr != NULL) {
@@ -283,7 +298,6 @@ void *generate_tasks(void *arg) {
 
   suffix = target + offset - suffix_length;
   start = target + offset;
-
   started = calloc(sizeof(start_state), state_count[phase]);
 
   for (i = 0; i < state_count[phase]; i++) {
@@ -297,7 +311,7 @@ void *generate_tasks(void *arg) {
       task->chunk = chunk;
       task->next = NULL;
       task->phase = phase;
-      task->tstate = init(start, length, 1);
+      task->tstate = init(start, length, false, true);
       task->tstate->curr_state = start_state;
       task->tstate->output_cursor = 0;
       enqueue_job(task);
@@ -319,14 +333,14 @@ void *generate_tasks(void *arg) {
  */
 void *calculate(void *arg)
 {
-  int old_state, phase, chunk;
+  int phase, chunk;
   transducer_state *tstate;
   job_t * task = (job_t *)arg;
 #ifdef DEBUGGING
   /* Store start state when debugging */
   int start_state = task->tstate->curr_state;
 #endif
-  
+
   /* Check if job has already been processed */
   /* NB! this should never happen */
   if (task->completed) return (0);
@@ -342,7 +356,7 @@ void *calculate(void *arg)
   chunk = task->chunk;
   tstate = task->tstate;
 
-  /* 
+  /*
    * Kleenex phases are 1 indexed,
    * but everything else is 0 inexed.
    * Thus +1 on phase number.
@@ -352,7 +366,7 @@ void *calculate(void *arg)
   } else {
     match(phase+1, tstate, NULL, false);
   }
-  
+
   /*
    * If this is not the final chunk, then point
    * 'nextPtr' to the subsequent transducer state.
@@ -363,21 +377,20 @@ void *calculate(void *arg)
   }
 
   task->completed = 1;
-  /* Prevent thread from beeing canceled while holding a lock */
-  /* NB! The thread might still terminate due other causes */
-  (void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old_state);
 
   (void) pthread_mutex_lock(&path_lock);
-  if (path[chunk] == tstate && tstate->nextPtr != NULL)
+  pthread_cleanup_push(cleanup_paht, NULL);
+
+  if (path[chunk] == tstate)
   {
-    path[chunk+1] = *(tstate->nextPtr);
+    if (tstate->nextPtr != NULL) {
+      path[chunk+1] = *(tstate->nextPtr);
+      thr_pool_queue_prioritized(pool, update_path_and_clean, task);
+    }
   }
+
   (void) pthread_mutex_unlock(&path_lock);
-
-  thr_pool_queue_prioritized(pool, update_path_and_clean, task);
-
-  /* Reset the cancel state of the thread */
-  (void) pthread_setcancelstate(old_state, NULL);
+  pthread_cleanup_pop(false);
 
 #ifdef DEBUGGING
   /* If debugging, print phase, chunk,  */
@@ -397,21 +410,23 @@ void *calculate(void *arg)
 void enqueue_job(job_t *task)
 {
   (void) pthread_mutex_lock(&job_list_lock);
+  pthread_cleanup_push(cleanup_joblist, NULL);
 
   task->next = joblist[task->chunk];
   joblist[task->chunk] = task;
   thr_pool_queue(pool, calculate, task, &task->job);
 
   (void) pthread_mutex_unlock(&job_list_lock);
+  pthread_cleanup_pop(false);
 }
 
 /*
  * Controller for handling multiple data chunks.
  */
-void run_multi_chunk(int suffix_len) {
+void run_multi_chunk(int suffix_len, int nthreads) {
   int i;
   job_t *init_task;
-  
+
   /* SET UP */
   long chunk_size = target_size / num_of_chunks;
 
@@ -429,7 +444,7 @@ void run_multi_chunk(int suffix_len) {
 
   /* Initialize map keeping track transducer states. */
   init_outputmap();
-  
+
   /* Array of linked lists, each containing jobs for a given chunk */
   joblist = calloc(num_of_chunks * sizeof(job_t*), 1);
   /* Array holding transducer states needed to generate the output */
@@ -437,7 +452,7 @@ void run_multi_chunk(int suffix_len) {
 
   /* Instantiates a thread pool */
   // TODO: Add argument for minimum number of threads, and for linger time
-  pool = thr_pool_create(num_of_chunks, num_of_chunks, 10, NULL);
+  pool = thr_pool_create(nthreads / 2, nthreads, 1, NULL);
 
   /* Create job for first data chunk */
   init_task = malloc(sizeof(job_t));
@@ -447,11 +462,11 @@ void run_multi_chunk(int suffix_len) {
   init_task->start_state = -1;
   init_task->phase = 0;
   init_task->chunk = 0;
-  init_task->tstate = init(target, chunk_sizes[0], 0);
+  init_task->tstate = init(target, chunk_sizes[0], false, false);
   init_task->tstate->curr_state = -1;
 
   enqueue_job(init_task);
-  
+
   /* Add transducer state to output map and path */
   outputmap[0][0][0] = path[0] = init_task->tstate;
 
@@ -485,12 +500,10 @@ void run_multi_chunk(int suffix_len) {
  *    Handles single chunk by processing entire file in one call to match.
  */
 void run_single_chunk() {
-  transducer_state * tstate = init(target, target_size, 0);
+  transducer_state * tstate = init(target, target_size, false, true);
   tstate->curr_state = -1;
-  outputmap = malloc(sizeof(transducer_state*));
-  outputmap[0] = malloc(sizeof(transducer_state*));
-  outputmap[0][0] = malloc(sizeof(transducer_state*));
-  outputmap[0][0][0] = tstate;
+  path = malloc(sizeof(transducer_state*));
+  path[0] = tstate;
   match(1, tstate, NULL, true);
 }
 
@@ -499,6 +512,7 @@ static struct option long_options[] = {
   { "file"        , required_argument, 0, 'f' },
   { "help"        , no_argument      , 0, 'h' },
   { "len-suffix"  , required_argument, 0, 'l' },
+  { "threads"     , required_argument, 0, 'p' },
   { "time"        , no_argument      , 0, 't' },
   { "time-all"    , no_argument      , 0, TIME_ALL    },
   { "time-data"   , no_argument      , 0, TIME_DATA   },
@@ -512,10 +526,12 @@ int main(int argc, char *argv[]) {
   int c;
   int time_flags = 0;
   int option_index = 0;
-  int chunks_provided = 0;
-  int do_timing = 0;
+  bool chunks_provided = false;
+  bool nthreads_provided = false;
+  bool do_timing = false;
   int suffix_len = DEFAULT_SUFFIX_LENGTH;
   num_of_chunks = DEFAULT_NUMBER_OF_CHUNKS;
+  int nthreads = DEFAULT_NUMBER_OF_CHUNKS;
   char* file_name = NULL;
 
   if (argc == 1) {
@@ -523,7 +539,7 @@ int main(int argc, char *argv[]) {
     return RETC_PRINT_USAGE;
   }
 
-  while ((c = getopt_long(argc, argv, ":htl:f:c:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, ":htl:f:c:p:", long_options, &option_index)) != -1) {
     switch (c)
     {
       case 'f':
@@ -535,13 +551,29 @@ int main(int argc, char *argv[]) {
         /* handle -c and --chunks */
         num_of_chunks = atoi(optarg);
         chunks_provided = 1;
+        if (num_of_chunks == 1 && !nthreads_provided) {
+          nthreads = 1;
+        }
+        break;
+
+      case 'p':
+        /* handle -p and --threads */
+        nthreads = atoi(optarg);
+        if (num_of_chunks < 1) {
+          fprintf(stderr,
+                  "%s: arguments '%s' is invalid for option [-p | --threads]\n"
+                  "  argiment must be a positive integer\n\n",
+                  argv[0], optarg);
+          print_usage(argv[0]);
+          return RETC_PRINT_ERROR;
+        }
         break;
 
       case 'l':
         /* handle -l and --len-suffix */
         suffix_len = atoi(optarg);
         if (suffix_len <= 0) {
-          fprintf(stdout,
+          fprintf(stderr,
                   "%s: argument '%s' is invalid for option [-l | --len-suffix]\n"
                   "  argument must be a positive integer\n\n",
                   argv[0], optarg);
@@ -625,12 +657,27 @@ int main(int argc, char *argv[]) {
     return RETC_PRINT_ERROR;
   }
 
+  if (nthreads == 1 && num_of_chunks > 1) {
+    fprintf(stderr,
+            "%s: invalid combination of [-c | --chunks] and [-p | --threads]\n"
+            "  Single thread with multiple chunks, setting number of chunks to 1\n"
+            ,argv[0]);
+    num_of_chunks = 1;
+  } else if (nthreads > 1 && num_of_chunks == 1) {
+    fprintf(stderr,
+            "%s: invalid combination of [-c | --chunks] and [-p | --threads]\n"
+            "  Multiple threads with single chunk, setting number of threads to 1\n",
+            argv[0]);
+    nthreads = 1;
+  }
+
   if (do_timing) {
     gettimeofday(&time_start, NULL);
   }
 
-  /* Handle multiple chunks */
+  init_state_table();
   init_target(file_name);
+
 
   if (do_timing) {
     gettimeofday(&time_data, NULL);
@@ -641,15 +688,15 @@ int main(int argc, char *argv[]) {
   if (num_of_chunks == 1) {
     run_single_chunk();
   } else {
-    run_multi_chunk(suffix_len);
+    /* Handle multiple chunks */
+    run_multi_chunk(suffix_len, nthreads);
   }
 
   if (do_timing) {
     gettimeofday(&time_fst, NULL);
   }
 
-  output(outputmap[0][0][0]);
-
+  output(path[0]);
   if (do_timing) {
     gettimeofday(&time_output, NULL);
   }
@@ -720,6 +767,9 @@ void print_usage(char *name)
           "  -l, --len-suffix :: int\n"
           "    Specifies the length of the suffixes used for suffix analysis.\n"
           "    default: 256\n"
+          "  -p, --threads :: int\n"
+          "    Specifies the number threads to populate the thread pool with.\n"
+          "    default: # of online cores on system\n"
           "  -t, --time\n"
           "    Times execution with all timing flags set.\n"
           "  --time-all\n"

@@ -223,7 +223,6 @@ worker_thread(void *arg)
       active.job = job->id;
       (void) pthread_mutex_unlock(&pool->pool_mutex);
       pthread_cleanup_push(job_cleanup, pool);
-      free(job);
       /*
        * Call the specified job function.
        */
@@ -248,7 +247,6 @@ worker_thread(void *arg)
       active.job = job->id;
       (void) pthread_mutex_unlock(&pool->pool_mutex);
       pthread_cleanup_push(job_cleanup, pool);
-      free(job);
       /*
        * Call the specified job function.
        */
@@ -397,7 +395,6 @@ thr_pool_dequeue(thr_pool_t *pool, job_id id) {
       } else if (prev) {
         prev->job_next = job->job_next;
       }
-      free(job);
       (void) pthread_mutex_unlock(&pool->pool_mutex);
       return (0);
     }
@@ -465,17 +462,6 @@ thr_pool_destroy(thr_pool_t **poolPtr)
 
   pthread_cleanup_pop(1);	/* pthread_mutex_unlock(&pool->pool_mutex); */
 
-  /*
-   * There should be no pending jobs, but just in case...
-   */
-  for (job = pool->pool_prio_head; job != NULL; job = pool->pool_prio_head) {
-    pool->pool_prio_head = job->job_next;
-    free(job);
-  }
-  for (job = pool->pool_head; job != NULL; job = pool->pool_head) {
-    pool->pool_head = job->job_next;
-    free(job);
-  }
   (void) pthread_attr_destroy(&pool->pool_attr);
   free(pool);
   (*poolPtr) = NULL;
