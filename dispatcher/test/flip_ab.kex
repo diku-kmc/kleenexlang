@@ -1,0 +1,3 @@
+// Converts all as to bs and vice versa
+// Leaves all newlines in place.
+main := ("b" ~/a/ | "a" ~/b/ | /\n/)*

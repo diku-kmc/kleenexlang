@@ -1,0 +1,12 @@
+// Emit all lines that end with a "b", emit an empty line for the rest.
+// The last line in the input ends with a newline.
+// The last output line ends with a newline.
+// Corresponds to bench/re2/src/patho2.cpp
+start: patho2
+
+patho2 := ~/[a-z]*a/ /\n/ patho2
+        | /[a-z]*b/ /\n/ patho2
+        | /\n/ patho2
+        | ~/[a-z]*a\n/ 
+        | /[a-z]*b\n/
+
