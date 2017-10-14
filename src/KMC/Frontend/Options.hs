@@ -36,6 +36,7 @@ data CompileOptions =
     , optAltCompiler     :: FilePath       -- ^ Alternative compiler
     , optElimIdTables    :: Bool           -- ^ Eliminate identity tables in generated code
     , optGenerateHFile   :: Bool           -- ^ Generate header file
+    , optParallel        :: Bool           -- ^ Use the parallel C template
     }
 
 data SimulateOptions =
@@ -139,6 +140,7 @@ instance Options CompileOptions where
       <*> simpleOption "cc" "gcc" "C compiler"
       <*> simpleOption "rmidtbls" False "Eliminate C-tables that implement the identity function."
       <*> simpleOption "hf" False "Generate header file to use with dispatcher."
+      <*> simpleOption "par" False "Use parallel processing"
 
 instance Options SimulateOptions where
     defineOptions =

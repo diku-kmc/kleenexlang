@@ -30,7 +30,11 @@ compileCmd mainOpts compileOpts args = do
   -- Sanity checking
   arg <- checkArgs args
 
-  (res, phases) <- runFrontend mainOpts $ measure "Compile" $ do
+  -- Avoid mutually excluse options
+  let mainOpts' = if optParallel compileOpts
+                    then mainOpts {optLookahead = False, optActionEnabled = False}
+                    else mainOpts
+  (res, phases) <- runFrontend mainOpts' $ measure "Compile" $ do
     pu <- createProgram arg
     tu <- buildTransducers pu
     actionDecomp <- asks optActionEnabled

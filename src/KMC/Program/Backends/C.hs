@@ -782,33 +782,41 @@ compileProgram :: (MonadIO m)
                -> FilePath         -- ^ Path to C compiler
                -> Maybe FilePath   -- ^ Binary output path
                -> Maybe FilePath   -- ^ C code output path
+               -> Bool             -- ^ Use parallel template
                -> Bool             -- ^ Use word alignment
                -> m ExitCode
-compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath wordAlign = do
+compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath useParallel wordAlign = do
   cver <- ccVersion comp
   let info = (maybe noOutInfo (outInfo cver) moutPath)
-  let cprog = programsToC buftype $ pipeline
+  let cprog = programsToC buftype pipeline
   let cstr = renderCProg info cprog
   let sourceLineCount = length (lines cstr)
-  case cCodeOutPath of
-    Nothing -> return ()
-    Just p  -> do
-      infoCallback $ "Writing C source to " ++ p
-      liftIO $ writeFile p cstr
-  case moutPath of
-    Nothing -> return ExitSuccess
-    Just outPath -> do
-      infoCallback $ "Generated " ++ show sourceLineCount ++ " lines of C code."
-      infoCallback $ "Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'"
-      liftIO $ do
-        (Just hin, _, _, hproc) <- liftIO $ createProcess (proc comp (compilerOpts outPath))
-                                                          { std_in = CreatePipe }
-        hPutStrLn hin cstr
-        hClose hin
-        waitForProcess hproc
+  if not useParallel
+    then return ExitSuccess
+    else do
+      let headers    = [fileQ|crt/crt.h|] ++ [fileQ|crt/thr_pool.h|]
+      let dispatcher = [fileQ|crt/dispatcher.c|]
+      let threadLib  = [fileQ|crt/thr_pool.c|]
+      case cCodeOutPath of
+        Nothing -> return ()
+        Just p  -> do
+          infoCallback $ "Writing C source to " ++ p
+          liftIO $ writeFile p cstr
+      case moutPath of
+        Nothing -> return ExitSuccess
+        Just outPath -> do
+          infoCallback $ "Generated " ++ show sourceLineCount ++ " lines of C code."
+          infoCallback $ "Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'"
+          liftIO $ do
+            (Just hin, _, _, hproc) <- liftIO $ createProcess (proc comp (compilerOpts outPath))
+                                                              { std_in = CreatePipe }
+            hPutStrLn hin (headers ++ dispatcher ++ threadLib ++ cstr)
+            hClose hin
+            waitForProcess hproc
   where
     compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
-                           , "-o", binPath] ++
+                           , "-o", binPath
+                           , "-pthread"] ++
                            (if isInfixOf "clang" comp
                            then ["-Wno-tautological-constant-out-of-range-compare"]
                            else [])
