@@ -28,10 +28,13 @@
 #define INLINE static inline
 #endif
 
+#ifndef BUFFER_UNIT_T
+#warning "BUFFER_UNIT_T not defined. Falling back to default 'uint8_t'"
 #define BUFFER_UNIT_T uint8_t
+#endif
 
 #ifndef NUM_PHASES
-#define NUM_PHASES 1
+#warning "NUM_PHASES not defined."
 #endif
 
 #ifndef OUTSTREAM

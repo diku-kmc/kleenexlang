@@ -31,6 +31,7 @@ data CompileOptions =
     CompileOptions
     { optOptimizeLevelCC :: Int            -- ^ CC optimization level
     , optOutFile         :: Maybe FilePath -- ^ Binary output file
+    , optOutTmp          :: Maybe FilePath -- ^ Temporary folder output path
     , optCFile           :: Maybe FilePath -- ^ Intermediate source file
     , optWordSize        :: CType          -- ^ Word size in run-time buffer
     , optAltCompiler     :: FilePath       -- ^ Alternative compiler
@@ -131,6 +132,7 @@ instance Options CompileOptions where
       CompileOptions
       <$> simpleOption "copt" 3 "C compiler optimization level (1-3)"
       <*> simpleOption "out" Nothing "Output file"
+      <*> simpleOption "tmpout" Nothing "Copy Temporary folder to given file path"
       <*> simpleOption "srcout" Nothing "Write intermediate C program to given file path"
       <*> defineOption ctypeOptionType
               (\o -> o { optionLongFlags   = ["wordsize"]

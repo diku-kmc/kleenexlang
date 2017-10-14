@@ -215,7 +215,7 @@ int cmp(unsigned char *str1, unsigned char *str2, int l)
 
 /* no tables */
 
-int state_count[1] = {13};
+int state_count[1] = {12};
 int phases = 1;
 void init_state_table() {
   state_table = malloc(1 * sizeof(state*));
@@ -232,13 +232,19 @@ void init_state_table() {
   state_table[0][9] = ((state){.num =  9, .accepting = 0});
   state_table[0][10] = ((state){.num =  10, .accepting = 0});
   state_table[0][11] = ((state){.num =  11, .accepting = 0});
-  state_table[0][12] = ((state){.num =  12, .accepting = 0});
 }
 
-
+// \xa
+const buffer_unit_t const_1_0[1] = {0xa};
+// -
+const buffer_unit_t const_1_1[1] = {0x2d};
+// .
+const buffer_unit_t const_1_2[1] = {0x2e};
+// @
+const buffer_unit_t const_1_3[1] = {0x40};
 void printCompilationInfo()
 {
-  fprintf(stdout, "No object file generated!\nOptions:\nSST optimization level:  3\nWord size:               UInt8T\nIdentity tables removed: False\n\nSource file: email.kex\nSource md5:  7213a874cd5afa1a79168b78715dac84\nSST states:  13\n");
+  fprintf(stdout, "No object file generated!\nOptions:\nSST optimization level:  3\nWord size:               UInt8T\nIdentity tables removed: False\n\nSource file: ../../bench/kleenex/src/email.kex\nSource md5:  65b11bd751a334edf99e8f11582189f9\nSST states:  12\n");
 }
 
 transducer_state* init(unsigned char* input, size_t input_size, bool copy_data, bool add_symbols)
@@ -248,8 +254,8 @@ transducer_state* init(unsigned char* input, size_t input_size, bool copy_data, 
   transducer_state* tstate = malloc(sizeof(transducer_state));
 
   // Init regular buffers
-  tstate->buffers = malloc(1 * sizeof(buffer_t *));
-  for (i = 1; i < 1; i++) {
+  tstate->buffers = malloc(8 * sizeof(buffer_t *));
+  for (i = 1; i < 8; i++) {
     tstate->buffers[i] = init_buffer(INITIAL_BUFFER_SIZE);
     tstate->buffers[i]->symbols = NULL;
     if (add_symbols) {
@@ -290,7 +296,7 @@ void free_state(transducer_state * tstate)
 
   int i;
 
-  for (i = 0; i < 1; i++) {
+  for (i = 0; i < 8; i++) {
     free(tstate->buffers[i]->data);
     tstate->buffers[i]->data = NULL;
     free(tstate->buffers[i]);
@@ -344,8 +350,6 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
       goto l1_10;
     case 11:
       goto l1_11;
-    case 12:
-      goto l1_12;
     default:
       tstate->curr_state = -1;
       return;
@@ -370,6 +374,8 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && (((tstate->inbuf->next[0] == '!') || ((('#' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 39)) || ((('*' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '+')) || ((tstate->inbuf->next[0] == '-') || ((('/' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || ((tstate->inbuf->next[0] == '=') || ((tstate->inbuf->next[0] == '?') || ((tstate->inbuf->next[0] == 92) || (('^' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '~')))))))))) && 1)))
   {
+     reset(tstate->buffers[1]);
+     append(tstate->buffers[1],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_5;
@@ -416,6 +422,7 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && (((tstate->inbuf->next[0] == '!') || ((('#' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 39)) || ((('*' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '+')) || ((tstate->inbuf->next[0] == '-') || ((('/' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || ((tstate->inbuf->next[0] == '=') || ((tstate->inbuf->next[0] == '?') || ((tstate->inbuf->next[0] == 92) || (('^' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '~')))))))))) && 1)))
   {
+     append(tstate->buffers[1],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_6;
@@ -442,6 +449,9 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && (((('0' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || (('a' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 'z'))) && 1)))
   {
+     reset(tstate->buffers[5]);
+     reset(tstate->buffers[2]);
+     append(tstate->buffers[1],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_9;
@@ -468,6 +478,8 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && (((tstate->inbuf->next[0] == '!') || ((('#' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 39)) || ((('*' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '+')) || ((tstate->inbuf->next[0] == '-') || ((('/' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || ((tstate->inbuf->next[0] == '=') || ((tstate->inbuf->next[0] == '?') || ((tstate->inbuf->next[0] == 92) || (('^' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '~')))))))))) && 1)))
   {
+     reset(tstate->buffers[1]);
+     append(tstate->buffers[1],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_5;
@@ -494,18 +506,21 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && (((tstate->inbuf->next[0] == '!') || ((('#' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 39)) || ((('*' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '+')) || ((tstate->inbuf->next[0] == '-') || ((('/' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || ((tstate->inbuf->next[0] == '=') || ((tstate->inbuf->next[0] == '?') || ((tstate->inbuf->next[0] == 92) || (('^' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '~')))))))))) && 1)))
   {
+     append(tstate->buffers[1],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_5;
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '.') && 1)))
   {
+     appendarray(tstate->buffers[1],const_1_2,8);
      consume(tstate,1);
      left -= 1;
      goto l1_2;
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '@') && 1)))
   {
+     appendarray(tstate->buffers[1],const_1_3,8);
      consume(tstate,1);
      left -= 1;
      goto l1_3;
@@ -532,18 +547,21 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && (((tstate->inbuf->next[0] == '!') || ((('#' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 39)) || ((('*' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '+')) || ((tstate->inbuf->next[0] == '-') || ((('/' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || ((tstate->inbuf->next[0] == '=') || ((tstate->inbuf->next[0] == '?') || ((tstate->inbuf->next[0] == 92) || (('^' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '~')))))))))) && 1)))
   {
+     append(tstate->buffers[1],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_6;
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '.') && 1)))
   {
+     appendarray(tstate->buffers[1],const_1_2,8);
      consume(tstate,1);
      left -= 1;
      goto l1_2;
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '@') && 1)))
   {
+     appendarray(tstate->buffers[1],const_1_3,8);
      consume(tstate,1);
      left -= 1;
      goto l1_3;
@@ -570,6 +588,14 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && (((('0' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || (('a' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 'z'))) && 1)))
   {
+     reset(tstate->buffers[7]);
+     reset(tstate->buffers[6]);
+     reset(tstate->buffers[5]);
+     append(tstate->buffers[5],tstate->inbuf->next[0],8);
+     reset(tstate->buffers[4]);
+     reset(tstate->buffers[3]);
+     reset(tstate->buffers[2]);
+     append(tstate->buffers[2],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_11;
@@ -596,12 +622,17 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '-') && 1)))
   {
+     appendarray(tstate->buffers[1],const_1_1,8);
      consume(tstate,1);
      left -= 1;
      goto l1_8;
   }
   if (((left >= 1) && (((('0' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || (('a' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 'z'))) && 1)))
   {
+     reset(tstate->buffers[5]);
+     append(tstate->buffers[5],tstate->inbuf->next[0],8);
+     reset(tstate->buffers[2]);
+     append(tstate->buffers[2],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_9;
@@ -628,18 +659,27 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '-') && 1)))
   {
+     concat(tstate->buffers[1],tstate->buffers[2]);
+     appendarray(tstate->buffers[1],const_1_1,8);
      consume(tstate,1);
      left -= 1;
      goto l1_8;
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '.') && 1)))
   {
+     concat(tstate->buffers[1],tstate->buffers[5]);
+     appendarray(tstate->buffers[1],const_1_2,8);
      consume(tstate,1);
      left -= 1;
      goto l1_7;
   }
   if (((left >= 1) && (((('0' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || (('a' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 'z'))) && 1)))
   {
+     reset(tstate->buffers[5]);
+     append(tstate->buffers[5],tstate->inbuf->next[0],8);
+     concat(tstate->buffers[1],tstate->buffers[2]);
+     reset(tstate->buffers[2]);
+     append(tstate->buffers[2],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
      goto l1_9;
@@ -666,15 +706,25 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '-') && 1)))
   {
+     appendarray(tstate->buffers[5],const_1_1,8);
+     appendarray(tstate->buffers[2],const_1_1,8);
      consume(tstate,1);
      left -= 1;
      goto l1_10;
   }
   if (((left >= 1) && (((('0' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || (('a' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 'z'))) && 1)))
   {
+     reset(tstate->buffers[7]);
+     append(tstate->buffers[7],tstate->inbuf->next[0],8);
+     reset(tstate->buffers[6]);
+     append(tstate->buffers[6],tstate->inbuf->next[0],8);
+     reset(tstate->buffers[4]);
+     append(tstate->buffers[4],tstate->inbuf->next[0],8);
+     reset(tstate->buffers[3]);
+     append(tstate->buffers[3],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
-     goto l1_12;
+     goto l1_11;
   }
   tstate->curr_state = -1;
   return;
@@ -692,65 +742,64 @@ void match1(transducer_state* tstate, void (*callback)(transducer_state*), bool 
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == 10) && 1)))
   {
+     concat(tstate->buffers[0],tstate->buffers[1]);
+     if (callback != NULL)
+     {
+       callback(tstate);
+     }
+     concat(tstate->buffers[0],tstate->buffers[5]);
+     if (callback != NULL)
+     {
+       callback(tstate);
+     }
+     concat(tstate->buffers[0],tstate->buffers[7]);
+     if (callback != NULL)
+     {
+       callback(tstate);
+     }
+     appendarray(tstate->buffers[0],const_1_0,8);
+     if (callback != NULL)
+     {
+       callback(tstate);
+     }
      consume(tstate,1);
      left -= 1;
      goto l1_4;
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '-') && 1)))
   {
+     concat(tstate->buffers[5],tstate->buffers[4]);
+     appendarray(tstate->buffers[5],const_1_1,8);
+     concat(tstate->buffers[2],tstate->buffers[3]);
+     appendarray(tstate->buffers[2],const_1_1,8);
      consume(tstate,1);
      left -= 1;
      goto l1_10;
   }
   if (((left >= 1) && ((tstate->inbuf->next[0] == '.') && 1)))
   {
+     concat(tstate->buffers[1],tstate->buffers[2]);
+     concat(tstate->buffers[1],tstate->buffers[6]);
+     appendarray(tstate->buffers[1],const_1_2,8);
      consume(tstate,1);
      left -= 1;
      goto l1_7;
   }
   if (((left >= 1) && (((('0' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || (('a' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 'z'))) && 1)))
   {
+     reset(tstate->buffers[7]);
+     append(tstate->buffers[7],tstate->inbuf->next[0],8);
+     reset(tstate->buffers[6]);
+     append(tstate->buffers[6],tstate->inbuf->next[0],8);
+     concat(tstate->buffers[5],tstate->buffers[4]);
+     reset(tstate->buffers[4]);
+     append(tstate->buffers[4],tstate->inbuf->next[0],8);
+     concat(tstate->buffers[2],tstate->buffers[3]);
+     reset(tstate->buffers[3]);
+     append(tstate->buffers[3],tstate->inbuf->next[0],8);
      consume(tstate,1);
      left -= 1;
-     goto l1_12;
-  }
-  tstate->curr_state = -1;
-  return;
-  l1_12:
-  if (left < 1)
-  {
-     tstate->curr_state = 12;
-     return; //fail
-  }
-  if (((left >= 1) && ((((0 <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 9)) || (((11 <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= ',')) || ((tstate->inbuf->next[0] == '/') || (((':' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '`')) || (('{' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 255)))))) && 1)))
-  {
-     consume(tstate,1);
-     left -= 1;
-     goto l1_1;
-  }
-  if (((left >= 1) && ((tstate->inbuf->next[0] == 10) && 1)))
-  {
-     consume(tstate,1);
-     left -= 1;
-     goto l1_4;
-  }
-  if (((left >= 1) && ((tstate->inbuf->next[0] == '-') && 1)))
-  {
-     consume(tstate,1);
-     left -= 1;
-     goto l1_10;
-  }
-  if (((left >= 1) && ((tstate->inbuf->next[0] == '.') && 1)))
-  {
-     consume(tstate,1);
-     left -= 1;
-     goto l1_7;
-  }
-  if (((left >= 1) && (((('0' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= '9')) || (('a' <= tstate->inbuf->next[0]) && (tstate->inbuf->next[0] <= 'z'))) && 1)))
-  {
-     consume(tstate,1);
-     left -= 1;
-     goto l1_12;
+     goto l1_11;
   }
   tstate->curr_state = -1;
   return;
@@ -803,8 +852,6 @@ int silent_match1(int start_state, unsigned char * buf, long length)
       goto l1_10;
     case 11:
       goto l1_11;
-    case 12:
-      goto l1_12;
     default:
       return -1;
   }
@@ -1111,7 +1158,7 @@ int silent_match1(int start_state, unsigned char * buf, long length)
   {
      next += 1;
      left -= 1;
-     goto l1_12;
+     goto l1_11;
   }
   return -1;
   l1_11:
@@ -1147,43 +1194,7 @@ int silent_match1(int start_state, unsigned char * buf, long length)
   {
      next += 1;
      left -= 1;
-     goto l1_12;
-  }
-  return -1;
-  l1_12:
-  if (left < 1)
-  {
-     return 12; //fail
-  }
-  if (((left >= 1) && ((((0 <= next[0]) && (next[0] <= 9)) || (((11 <= next[0]) && (next[0] <= ',')) || ((next[0] == '/') || (((':' <= next[0]) && (next[0] <= '`')) || (('{' <= next[0]) && (next[0] <= 255)))))) && 1)))
-  {
-     next += 1;
-     left -= 1;
-     goto l1_1;
-  }
-  if (((left >= 1) && ((next[0] == 10) && 1)))
-  {
-     next += 1;
-     left -= 1;
-     goto l1_4;
-  }
-  if (((left >= 1) && ((next[0] == '-') && 1)))
-  {
-     next += 1;
-     left -= 1;
-     goto l1_10;
-  }
-  if (((left >= 1) && ((next[0] == '.') && 1)))
-  {
-     next += 1;
-     left -= 1;
-     goto l1_7;
-  }
-  if (((left >= 1) && (((('0' <= next[0]) && (next[0] <= '9')) || (('a' <= next[0]) && (next[0] <= 'z'))) && 1)))
-  {
-     next += 1;
-     left -= 1;
-     goto l1_12;
+     goto l1_11;
   }
   return -1;
   //accept1:

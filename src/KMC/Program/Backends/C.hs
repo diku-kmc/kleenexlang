@@ -4,7 +4,7 @@
 
 module KMC.Program.Backends.C where
 
-import           Control.Monad (join)
+import           Control.Monad
 import           Control.Monad.Trans
 import           Data.Bits
 import           Data.Char (ord, chr, isPrint, isAscii, isSpace)
@@ -13,7 +13,9 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import           Numeric
 import           System.Exit (ExitCode(..))
+import           System.Directory (copyFile, createDirectory)
 import           System.IO
+import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process
 import           Text.PrettyPrint
 import           Text.Printf
@@ -782,59 +784,80 @@ compileProgram :: (MonadIO m)
                -> FilePath         -- ^ Path to C compiler
                -> Maybe FilePath   -- ^ Binary output path
                -> Maybe FilePath   -- ^ C code output path
+               -> Maybe FilePath   -- ^ C code output path
                -> Bool             -- ^ Use parallel template
                -> Bool             -- ^ Use word alignment
                -> m ExitCode
-compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath useParallel wordAlign = do
+compileProgram buftype optLevel infoCallback pipeline desc comp moutPath cCodeOutPath tmpDirOutPath useParallel wordAlign = do
   cver <- ccVersion comp
-  let info = (maybe noOutInfo (outInfo cver) moutPath)
+  let info = (maybe noOutInfo (outInfo cver []) moutPath)
   let cprog = programsToC buftype pipeline
   let cstr = renderCProg info cprog
   let sourceLineCount = length (lines cstr)
-  if not useParallel
-    then return ExitSuccess
-    else do
-      let headers    = [fileQ|crt/crt.h|] ++ [fileQ|crt/thr_pool.h|]
-      let dispatcher = [fileQ|crt/dispatcher.c|]
-      let threadLib  = [fileQ|crt/thr_pool.c|]
-      case cCodeOutPath of
-        Nothing -> return ()
-        Just p  -> do
-          infoCallback $ "Writing C source to " ++ p
-          liftIO $ writeFile p cstr
-      case moutPath of
-        Nothing -> return ExitSuccess
-        Just outPath -> do
-          infoCallback $ "Generated " ++ show sourceLineCount ++ " lines of C code."
-          infoCallback $ "Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath) ++ "'"
-          liftIO $ do
-            (Just hin, _, _, hproc) <- liftIO $ createProcess (proc comp (compilerOpts outPath))
-                                                              { std_in = CreatePipe }
-            hPutStrLn hin (headers ++ dispatcher ++ threadLib ++ cstr)
-            hClose hin
-            waitForProcess hproc
+  let srcFiles = if useParallel
+                 then [ ("crt.h", [fileQ|crt/crt.h|])
+                      , ("dispatcher.c", [fileQ|crt/dispatcher.c|])
+                      , ("thr_pool.c", [fileQ|crt/thr_pool.c|])
+                      , ("thr_pool.h", [fileQ|crt/thr_pool.h|])
+                      , ("out.c", cstr)
+                      ]
+                 else [ ("crt.h", [fileQ|crt/crt.h|])
+                      , ("standalone.c", [fileQ|crt/standalone.c|])
+                      , ("out.c", cstr)
+                      ]
+  case cCodeOutPath of
+    Nothing -> return ()
+    Just p  -> do
+      infoCallback $ "Writing C source to " ++ p
+      liftIO $ writeFile p cstr
+  case tmpDirOutPath of
+    Just outDir -> do
+      liftIO $ do
+        createDirectory outDir
+        forM_ srcFiles $ \(fname, str) ->
+          writeFile (outDir ++ "/" ++ fname) str
+    Nothing -> return ()
+  case moutPath of
+    Nothing -> return ExitSuccess
+    Just outPath -> do
+      infoCallback $ "Generated " ++ show sourceLineCount ++ " lines of C code."
+      infoCallback $ "Running compiler cmd: '" ++ intercalate " " (comp : compilerOpts outPath (map fst srcFiles)) ++ "'"
+      liftIO $
+        withSystemTempDirectory "kleenex-tmp" $ \tmpdir -> do
+          forM_ srcFiles $ \(fname, str) ->
+            writeFile (tmpdir ++ "/" ++ fname) str
+          let srcFilesPaths = map fst srcFiles
+          (_, _, _, hproc) <- createProcess (proc comp (compilerOpts outPath srcFilesPaths))
+                                { cwd = Just tmpdir }
+          res <- waitForProcess hproc
+          case res of
+            ExitSuccess -> do
+              copyFile (tmpdir ++ "/out") outPath
+              return ExitSuccess
+            _ -> return res
   where
-    compilerOpts binPath = [ "-O" ++ show optLevel, "-xc"
-                           , "-o", binPath
-                           , "-pthread"] ++
-                           (if isInfixOf "clang" comp
-                           then ["-Wno-tautological-constant-out-of-range-compare"]
-                           else [])
-                           ++ (if wordAlign then ["-D FLAG_WORDALIGNED"] else [])
-                           ++ ["-"]
+    compilerOpts _ srcFiles =
+      [ "-O" ++ show optLevel
+      , "-o", "out"
+      , "-pthread"] ++
+      srcFiles ++
+      (if isInfixOf "clang" comp
+        then ["-Wno-tautological-constant-out-of-range-compare"]
+        else [])
+      ++ (if wordAlign then ["-D FLAG_WORDALIGNED"] else [])
     quote s = "\"" ++ s ++ "\""
     noOutInfo = quote $ intercalate "\\n"
                 [ "No object file generated!"
                 , maybe "No environment info available" id desc
                 , "" -- adds newline at the end
                 ]
-    outInfo cver path = quote $ intercalate "\\n"
-                        [ "Compiler info: "
-                        , cver
-                        , ""
-                        , "CC cmd: "
-                        , intercalate " " (comp : compilerOpts path)
-                        , ""
-                        , maybe "No environment info available" id desc
-                        , "" -- adds newline at the end
-                        ]
+    outInfo cver srcFiles path = quote $ intercalate "\\n"
+                                 [ "Compiler info: "
+                                 , cver
+                                 , ""
+                                 , "CC cmd: "
+                                 , intercalate " " (comp : compilerOpts path srcFiles)
+                                 , ""
+                                 , maybe "No environment info available" id desc
+                                 , "" -- adds newline at the end
+                                 ]

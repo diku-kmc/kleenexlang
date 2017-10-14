@@ -1,3 +1,4 @@
+#include "crt.h"
 state ** state_table;
 
 void buf_flush(buffer_t *buf)

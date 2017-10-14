@@ -13,9 +13,10 @@
  */
 
 #if !defined(_REENTRANT)
-#define _REENTRANT
+#define	_REENTRANT
 #endif
 
+#include "thr_pool.h"
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
@@ -26,11 +27,11 @@
 /*
  * FIFO queued job
  */
-typedef struct job thr_job_t;
+typedef struct job job_t;
 struct job {
-  thr_job_t *job_next;             /* linked list of jobs */
-  void  *(*job_func)(void *);  /* function to call    */
-  void  *job_arg;              /* its argument        */
+  job_t	*job_next;             /* linked list of jobs */
+  void	*(*job_func)(void *);  /* function to call    */
+  void	*job_arg;              /* its argument        */
   job_id id;
 };
 
@@ -39,8 +40,8 @@ struct job {
  */
 typedef struct active active_t;
 struct active {
-  active_t  *active_next;   /* linked list of threads */
-  pthread_t active_tid; /* active thread id */
+  active_t	*active_next;	/* linked list of threads */
+  pthread_t	active_tid;	/* active thread id */
   job_id job;
 };
 
@@ -48,28 +49,28 @@ struct active {
  * The thread pool, opaque to the clients.
  */
 struct thr_pool {
-  pthread_mutex_t   pool_mutex;     /* protects the pool data */
-  pthread_cond_t    pool_busycv;    /* synchronization in pool_queue */
-  pthread_cond_t    pool_workcv;    /* synchronization with workers */
-  pthread_cond_t    pool_waitcv;    /* synchronization in pool_wait() */
-  active_t         *pool_active;    /* list of threads performing work */
-  thr_job_t        *pool_head;      /* head of FIFO job queue */
-  thr_job_t        *pool_tail;      /* tail of FIFO job queue */
-  thr_job_t        *pool_prio_head; /* head of prioritized job queue */
-  thr_job_t        *pool_prio_tail; /* tail of prioritized job queue */
-  pthread_attr_t    pool_attr;      /* attributes of the workers */
-  int       pool_flags;             /* see below */
-  ushort        pool_linger;        /* seconds before idle workers exit */
-  int       pool_minimum;           /* minimum number of worker threads */
-  int       pool_maximum;           /* maximum number of worker threads */
-  int       pool_nthreads;          /* current number of worker threads */
-  int       pool_idle;              /* number of idle workers */
+  pthread_mutex_t	pool_mutex;     /* protects the pool data */
+  pthread_cond_t	pool_busycv;    /* synchronization in pool_queue */
+  pthread_cond_t	pool_workcv;    /* synchronization with workers */
+  pthread_cond_t	pool_waitcv;    /* synchronization in pool_wait() */
+  active_t	*pool_active;           /* list of threads performing work */
+  job_t		*pool_head;             /* head of FIFO job queue */
+  job_t		*pool_tail;             /* tail of FIFO job queue */
+  job_t   *pool_prio_head;          /* head of prioritized job queue */
+  job_t   *pool_prio_tail;          /* tail of prioritized job queue */
+  pthread_attr_t	pool_attr;      /* attributes of the workers */
+  int		pool_flags;             /* see below */
+  ushort		pool_linger;        /* seconds before idle workers exit */
+  int		pool_minimum;           /* minimum number of worker threads */
+  int		pool_maximum;           /* maximum number of worker threads */
+  int		pool_nthreads;          /* current number of worker threads */
+  int		pool_idle;              /* number of idle workers */
   job_id current_id;                /* most recent used job_id */
 };
 
 /* pool_flags */
-#define POOL_WAIT   0x01          /* waiting in thr_pool_wait() */
-#define POOL_DESTROY    0x02      /* pool is being destroyed */
+#define	POOL_WAIT	0x01          /* waiting in thr_pool_wait() */
+#define	POOL_DESTROY	0x02      /* pool is being destroyed */
 
 /* set of all signals */
 static sigset_t fillset;
@@ -162,7 +163,7 @@ worker_thread(void *arg)
 {
   thr_pool_t *pool = (thr_pool_t *)arg;
   int timedout;
-  thr_job_t *job;
+  job_t *job;
   void *(*func)(void *);
   active_t active;
   struct timespec ts;
@@ -231,7 +232,7 @@ worker_thread(void *arg)
        * calls job_cleanup(pool) and worker_cleanup(pool);
        * the integrity of the pool is thereby maintained.
        */
-      pthread_cleanup_pop(1);   /* job_cleanup(pool) */
+      pthread_cleanup_pop(1);	/* job_cleanup(pool) */
     }
     /* then check the normal job queue */
     else if ((job = pool->pool_head) != NULL) {
@@ -255,7 +256,7 @@ worker_thread(void *arg)
        * calls job_cleanup(pool) and worker_cleanup(pool);
        * the integrity of the pool is thereby maintained.
        */
-      pthread_cleanup_pop(1);   /* job_cleanup(pool) */
+      pthread_cleanup_pop(1);	/* job_cleanup(pool) */
     }
     if (timedout && pool->pool_nthreads > pool->pool_minimum) {
       /*
@@ -266,7 +267,7 @@ worker_thread(void *arg)
       break;
     }
   }
-  pthread_cleanup_pop(1);   /* worker_cleanup(pool) */
+  pthread_cleanup_pop(1);	/* worker_cleanup(pool) */
   return (NULL);
 }
 
@@ -274,7 +275,7 @@ thr_pool_t *
 thr_pool_create(ushort min_threads, ushort max_threads, ushort linger,
                 pthread_attr_t *attr)
 {
-  thr_pool_t    *pool;
+  thr_pool_t	*pool;
 
   (void) sigfillset(&fillset);
 
@@ -314,7 +315,7 @@ thr_pool_create(ushort min_threads, ushort max_threads, ushort linger,
 int
 thr_pool_queue(thr_pool_t *pool, void *(*func)(void *), void *arg, job_id *id)
 {
-  thr_job_t *job;
+  job_t *job;
 
   if ((job = malloc(sizeof (*job))) == NULL) {
     errno = ENOMEM;
@@ -349,7 +350,7 @@ thr_pool_queue(thr_pool_t *pool, void *(*func)(void *), void *arg, job_id *id)
 int
 thr_pool_queue_prioritized(thr_pool_t *pool, void *(*func)(void *), void *arg)
 {
-  thr_job_t *job;
+  job_t *job;
 
   if ((job = malloc(sizeof (*job))) == NULL) {
     errno = ENOMEM;
@@ -381,12 +382,12 @@ thr_pool_queue_prioritized(thr_pool_t *pool, void *(*func)(void *), void *arg)
 
 int
 thr_pool_dequeue(thr_pool_t *pool, job_id id) {
-  thr_job_t *job, *prev = NULL;
+  job_t *job, *prev = NULL;
   active_t *active;
-
+  
   (void) pthread_mutex_lock(&pool->pool_mutex);
   job = pool->pool_head;
-
+  
   while (job) {
     if (job->id == id) {
       if (pool->pool_head == job) {
@@ -400,7 +401,7 @@ thr_pool_dequeue(thr_pool_t *pool, job_id id) {
     prev = job;
     job = job->job_next;
   }
-
+  
   active = pool->pool_active;
   while (active) {
     if (active->job == id) {
@@ -409,9 +410,9 @@ thr_pool_dequeue(thr_pool_t *pool, job_id id) {
     }
     active = active->active_next;
   }
-
+  
   (void) pthread_mutex_unlock(&pool->pool_mutex);
-
+  
   return (0);
 }
 
@@ -427,14 +428,14 @@ thr_pool_wait(thr_pool_t *pool)
     pool->pool_flags |= POOL_WAIT;
     (void) pthread_cond_wait(&pool->pool_waitcv, &pool->pool_mutex);
   }
-  pthread_cleanup_pop(1);   /* pthread_mutex_unlock(&pool->pool_mutex); */
+  pthread_cleanup_pop(1);	/* pthread_mutex_unlock(&pool->pool_mutex); */
 }
 
 void
 thr_pool_destroy(thr_pool_t **poolPtr)
 {
   active_t *activep;
-  thr_job_t *job;
+  job_t *job;
   thr_pool_t * pool = (*poolPtr);
   (void) pthread_mutex_lock(&pool->pool_mutex);
   pthread_cleanup_push(pthread_mutex_unlock, &pool->pool_mutex);
@@ -459,7 +460,7 @@ thr_pool_destroy(thr_pool_t **poolPtr)
   while (pool->pool_nthreads != 0)
     (void) pthread_cond_wait(&pool->pool_busycv, &pool->pool_mutex);
 
-  pthread_cleanup_pop(1);   /* pthread_mutex_unlock(&pool->pool_mutex); */
+  pthread_cleanup_pop(1);	/* pthread_mutex_unlock(&pool->pool_mutex); */
 
   (void) pthread_attr_destroy(&pool->pool_attr);
   free(pool);

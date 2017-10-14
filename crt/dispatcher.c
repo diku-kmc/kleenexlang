@@ -8,6 +8,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "thr_pool.h"
+#include "crt.h"
+
 /* Macro for toggling debugging related code */
 //#define DEBUGGING
 

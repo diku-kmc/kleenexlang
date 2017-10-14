@@ -32,7 +32,9 @@ compileCmd mainOpts compileOpts args = do
 
   -- Avoid mutually excluse options
   let mainOpts' = if optParallel compileOpts
-                    then mainOpts {optLookahead = False, optActionEnabled = False}
+                    then mainOpts { optLookahead = False
+                                  , optActionEnabled = False
+                                  }
                     else mainOpts
   (res, phases) <- runFrontend mainOpts' $ measure "Compile" $ do
     pu <- createProgram arg
@@ -45,7 +47,7 @@ compileCmd mainOpts compileOpts args = do
         compileOracleAction compileOpts True (puSourceName pu) (puSourceHash pu) ou au
       KleenexFlavor | otherwise -> do
         du <- generateDirectSSTs tu
-        compileDirect compileOpts True (puSourceName pu) (puSourceHash pu) du
+        compileDirect compileOpts False (puSourceName pu) (puSourceHash pu) du
       RegexFlavor -> do
         ou <- generateOracleSSTs tu
         compileCoder compileOpts True (puSourceName pu) (puSourceHash pu) ou

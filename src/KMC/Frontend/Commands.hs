@@ -199,6 +199,7 @@ compileDirect compileOpts useWordAlignment srcFile srcMd5 du =
                    (optAltCompiler compileOpts)
                    (optOutFile compileOpts)
                    (optCFile compileOpts)
+                   (optOutTmp compileOpts)
                    (optParallel compileOpts)
                    useWordAlignment
 
@@ -234,6 +235,7 @@ compileOracleAction compileOpts useWordAlignment srcFile srcMd5 ou au =
                    (optAltCompiler compileOpts)
                    (optOutFile compileOpts)
                    (optCFile compileOpts)
+                   (optOutTmp compileOpts)
                    False
                    useWordAlignment
 
@@ -266,6 +268,7 @@ compileCoder compileOpts useWordAlignment srcFile srcMd5 ou =
                    (optAltCompiler compileOpts)
                    (optOutFile compileOpts)
                    (optCFile compileOpts)
+                   (optOutTmp compileOpts)
                    False
                    useWordAlignment
 
