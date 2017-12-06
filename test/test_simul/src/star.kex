@@ -1,0 +1,7 @@
+// IN:aaaaaabaaa
+// IN:
+// IN:aaa
+// OUT:Weeeeee-eee!
+// OUT:W!
+// OUT:Weee!
+main := ("W" (~/a/ "e" | ~/b/ "-")* "!" /\n/)*
