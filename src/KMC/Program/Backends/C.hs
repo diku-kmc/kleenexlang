@@ -21,6 +21,8 @@ import           KMC.Util.Coding
 import           KMC.Program.IL
 import           KMC.Util.Heredoc
 
+import           Prelude hiding ((<>))
+
 {- Utility functions -}
 -- | Chunk a list into list of lists of length n, starting from the left. The
 -- last list in the result may be shorter than n.

@@ -13,6 +13,8 @@ To clone, run `git clone --recursive https://github.com/diku-kmc/kleenexlang.git
 
 Due to dependencies not on Hackage, it is easiest to build in a sandbox. After cloning, cd into project directory and run `cabal sandbox init && cabal sandbox add-source regexps-syntax`. Then pull in dependencies by `cabal install --dependencies-only`.
 
+Note: You may need to write `cabal v1-sandbox` instead of `cabal sandbox`.
+
 To build, run `cabal configure && cabal build`. This will place a binary in `dist/build/kexc/kexc`.
 
 ## Use ##
