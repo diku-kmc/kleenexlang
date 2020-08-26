@@ -1,6 +1,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 module KMC.SymbolicFST
        (FST(..)
        ,Edge
@@ -91,19 +92,6 @@ fstStateSize = S.size . fstS
 -- | Get the number of transitions in the FST
 fstTransSize :: FST q pred func -> Int
 fstTransSize fst' = M.size (eForward (fstE fst')) + M.size (eForwardEpsilon (fstE fst'))
-
-{-
-unionEdges :: (Ord q) => OrderedEdgeSet q pred func
-           -> OrderedEdgeSet q pred func
-           -> OrderedEdgeSet q pred func
-unionEdges es es' =
-  OrderedEdgeSet
-  { eForward  = M.unionWith (++) (eForward es) (eForward es')
-  , eBackward = M.unionWith (++) (eBackward es) (eBackward es')
-  , eForwardEpsilon = M.unionWith (++) (eForwardEpsilon es) (eForwardEpsilon es')
-  , eBackwardEpsilon = M.unionWith (++) (eBackwardEpsilon es) (eBackwardEpsilon es')
-  }
--}
 
 flipEdges :: OrderedEdgeSet q pred func -> OrderedEdgeSet q pred func
 flipEdges es = OrderedEdgeSet {eForward = eBackward es

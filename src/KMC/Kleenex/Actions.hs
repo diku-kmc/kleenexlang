@@ -7,7 +7,6 @@ module KMC.Kleenex.Actions(RegAction(..)
 import           Data.ByteString.Builder
 import           Data.Map (Map, (!))
 import qualified Data.Map as M
-import           Data.Monoid
 import           Data.Word (Word8)
 
 import           KMC.Kleenex.Syntax
@@ -38,9 +37,11 @@ pop r = Action $ \(store, h:stck) -> (M.insert r h store, stck)
 wr :: RegIdent -> Action
 wr r = Action $ \(store, h:stck) -> (M.insert r mempty store, (h <> store!r):stck)
 
+instance Semigroup Action where
+  (Action is1) <> (Action is2) = Action $ is2 . is1
+
 instance Monoid Action where
   mempty = Action id
-  mappend (Action is1) (Action is2) = Action $ is2 . is1
 
 -- | Interprets an action as a state transformation
 actionSem :: RegAction -> Action

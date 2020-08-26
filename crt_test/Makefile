@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-c -O0 -g -std=c99
+CFLAGS=-c -O2 -g -std=c99
 LDFLAGS=
 
 TESTS=\
