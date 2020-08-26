@@ -11,9 +11,7 @@ This is a compiler that can:
 
 To clone, run `git clone --recursive https://github.com/diku-kmc/kleenexlang.git`.
 
-Due to dependencies not on Hackage, it is easiest to build in a sandbox. After cloning, cd into project directory and run `cabal sandbox init && cabal sandbox add-source regexps-syntax`. Then pull in dependencies by `cabal install --dependencies-only`.
-
-To build, run `cabal configure && cabal build`. This will place a binary in `dist/build/kexc/kexc`.
+The project can be built using `stack` by running `stack build` or `stack install` (which also installs kexc to ~/.local/bin).
 
 ## Use ##
 
@@ -54,7 +52,7 @@ Invoke the interpreter via the `simulate` subcommand. You probably want `--quiet
 
 A number of test suites are included.
 
-* To run the unit tests: `cabal test`.
+* To run the unit tests: `stack test`.
 * To test the C runtime: `cd crt_test && make`. Note that this uses the Valgrind tool.
 * To run the end-to-end blackbox tests: `cd test/test_compiled && make`.
 

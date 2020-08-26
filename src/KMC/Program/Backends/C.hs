@@ -16,6 +16,7 @@ import           System.Exit (ExitCode(..))
 import           System.IO
 import           System.Process
 import           Text.PrettyPrint
+import           Prelude hiding ((<>))
 
 import           KMC.Util.Coding
 import           KMC.Program.IL
@@ -272,7 +273,7 @@ prettyInstr buftype tbltype prog instr phase =
   case instr of
     AcceptI            -> text "goto accept" <> int phase <> semi
     FailI              -> text "goto fail" <> int phase <> semi
-    AppendI bid constid -> 
+    AppendI bid constid ->
       let lendoc   = text $ show $ length (progConstants prog M.! constid) * progOutBits prog
       in if bid == streamBuf then
              text "outputarray"
