@@ -1,0 +1,7 @@
+packages: kexc.cabal
+index-state: 2021-03-03T05:14:22Z
+
+source-repository-package
+    type: git
+    location: https://github.com/diku-kmc/regexps-syntax.git
+    tag: 5c235fc057e25dffc1f5a3ca5a122ce1367ab594
