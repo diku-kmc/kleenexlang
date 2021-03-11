@@ -11,6 +11,7 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Text.PrettyPrint
+import           Prelude hiding ((<>))
 
 --------
 -- Types

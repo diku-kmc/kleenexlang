@@ -20,7 +20,7 @@ import           Control.Applicative
 import           Control.Monad
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
-import qualified Data.IntMap as M
+import qualified Data.IntMap.Strict as M
 import qualified Data.IntSet as S
 import           Data.Word (Word8)
 
@@ -52,7 +52,7 @@ type Index = Int
 type Marks = M.IntMap S.IntSet
 
 mark :: Name -> Index -> Marks -> Marks
-mark p i = M.insertWith' S.union p (S.singleton i)
+mark p i = M.insertWith S.union p (S.singleton i)
 
 isMarked :: Name -> Index -> Marks -> Bool
 isMarked p i m = maybe False (S.member i) (M.lookup p m)

@@ -16,6 +16,7 @@ import           System.Exit (ExitCode(..))
 import           System.IO
 import           System.Process
 import           Text.PrettyPrint
+import           Prelude hiding ((<>))
 
 import           KMC.Util.Coding
 import           KMC.Program.IL

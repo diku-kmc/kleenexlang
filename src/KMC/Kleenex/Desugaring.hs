@@ -165,7 +165,7 @@ desugarTerm out t =
                                                ++ [Right $ Pop r]) >>= decl . RSeq
   WriteReg r          -> decl $ RConst (Right (Write r))
   RedirectReg r t1    -> do it <- desugarTerm out t1
-                            [ipush, ipop] <- mapM (decl . RConst . Right) [Push, Pop r]
+                            ~[ipush, ipop] <- mapM (decl . RConst . Right) [Push, Pop r]
                             decl $ RSeq [ipush,it,ipop]
   TermInfo _ t1       -> desugarTerm out t1
   where
