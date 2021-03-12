@@ -61,7 +61,7 @@ quickTest :: QC.Testable prop => Int -> prop -> IO TS.Result
 quickTest r prop = do
   res <- QC.verboseCheckWithResult QC.stdArgs { QC.maxSuccess = r } prop
   case res of
-    QC.Success _ _ _ -> return TS.Pass
+    QC.Success {} -> return TS.Pass
     _ -> return $ TS.Error "QuickCheck failed"
 
 -- | For debugging purposes.  Manually run a test case.
