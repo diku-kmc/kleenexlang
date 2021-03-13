@@ -12,7 +12,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-haskell@v1.1
+    - uses: haskell/actions/setup@v1
+
+    - uses: actions/cache@v2
+      name: Cache ~/.stack and .stack-work
+      with:
+        path: |
+          ~/.cabal
+          ~/.ghc
+          dist-newstyle
+        key: ${{ runner.os }}-cabal
 
     - run: cabal build
 
