@@ -1,6 +1,6 @@
 # The KMC Kleenex compiler #
 
-[![Travis status](https://travis-ci.org/diku-kmc/kleenexlang.svg?branch=master)](https://travis-ci.org/diku-kmc/kleenexlang)
+[![CI](https://github.com/diku-kmc/kleenexlang/actions/workflows/main.yml/badge.svg)](https://github.com/diku-kmc/kleenexlang/actions/workflows/main.yml)
 
 This is a compiler that can:
 
