@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ master ]
+
+  push:
+
+jobs:
+  build-linux-cabal:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-haskell@v1.1
+
+    - run: cabal build
+
+    - run: cabal test
+
+    - run: cabal exec -- make -C crt_test
+
+    - run: cabal exec -- make -C test/test_compiled
