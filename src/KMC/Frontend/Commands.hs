@@ -28,9 +28,10 @@ import           Control.Monad.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB
 import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.UTF8 as BSU
 import           Data.Char (toLower)
 import qualified Data.GraphViz.Commands as GC
-import           Data.Hash.MD5 (md5s, Str(..))
+import           Crypto.Hash.MD5 as MD5
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import           Data.Monoid as Mon
@@ -39,6 +40,11 @@ import           Data.Word (Word8)
 import           System.Exit (ExitCode(..),exitWith)
 import           System.FilePath (takeExtension)
 import           System.IO (hPutStrLn,stdout,stderr)
+import           Text.Printf
+
+md5s :: String -> String
+md5s = concatMap f . B.unpack . MD5.hash . BSU.fromString
+  where f = printf "%2x"
 
 createProgram :: String -> Frontend ProgramUnit
 createProgram arg = do
@@ -57,7 +63,7 @@ createProgram arg = do
               return ProgramUnit { puProgram = desugarProg ast
                                    (optApproxMetric mainOpts) (optApproxMode mainOpts) (optIte mainOpts)
                                  , puSourceName = arg
-                                 , puSourceHash = md5s (Str kleenexSrc)
+                                 , puSourceHash = md5s kleenexSrc
                                  }
     RegexFlavor -> do
       (reSrc, sn) <- if optExpressionArg mainOpts then
@@ -69,7 +75,7 @@ createProgram arg = do
           exitWith $ ExitFailure 1
         Right re -> return ProgramUnit { puProgram = desugarRegex re
                                        , puSourceName = sn
-                                       , puSourceHash = md5s (Str reSrc)
+                                       , puSourceHash = md5s reSrc
                                        }
 
 buildTransducers :: ProgramUnit -> Frontend TransducerUnit

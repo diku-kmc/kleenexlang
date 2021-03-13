@@ -22,10 +22,10 @@ library
   default-language: Haskell2010
   ghc-options: -Wall
   hs-source-dirs: src
-  build-depends:       MissingH >= 1.3
-                     , base >=4.6 && <5
+  build-depends:       base >=4.6 && <5
                      , bytestring >= 0.10.0.2
                      , containers >= 0.5.0.0
+                     , cryptohash-md5 >= 0.11
                      , filepath >= 1.3.0.2
                      , hashable >= 1.2.3.1
                      , kmc-regexps-syntax
@@ -40,6 +40,7 @@ library
                      , time >= 1.4.2
                      , transformers >= 0.4
                      , unordered-containers >= 0.2.7
+                     , utf8-string
   exposed-modules: KMC.Determinization
                  , KMC.SymbolicSST
                  , KMC.SymbolicSST.ActionSST
