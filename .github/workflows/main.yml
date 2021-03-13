@@ -13,6 +13,8 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - uses: haskell/actions/setup@v1
+      with:
+        ghc-version: '8.10.4'
 
     - uses: actions/cache@v2
       name: Cache ~/.stack and .stack-work
