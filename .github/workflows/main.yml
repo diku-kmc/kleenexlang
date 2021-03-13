@@ -23,6 +23,8 @@ jobs:
           dist-newstyle
         key: ${{ runner.os }}-cabal
 
+    - run: cabal update
+
     - run: cabal build
 
     - run: cabal test
