@@ -31,6 +31,6 @@ jobs:
 
     - run: cabal test
 
-    - run: cabal exec -- make -C crt_test
+#    - run: cabal exec -- make -C crt_test
 
     - run: cabal exec -- make -C test/test_compiled
