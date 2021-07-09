@@ -1,0 +1,9 @@
+// IN:abcd
+// OUT:yes
+
+start: p1 >> p2 >> p3
+
+p1 := ~/abcd\n/ "aaaabb"
+p2 := ~/a*/ "AA" /bb/
+p3 := ~/AAbb/ "yes\n"
+

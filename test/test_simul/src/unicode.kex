@@ -1,0 +1,5 @@
+// IN:æblegrød
+// OUT:æblegrød is apple sauce
+main := /æblegrød/
+        " is apple sauce"
+        /\n/

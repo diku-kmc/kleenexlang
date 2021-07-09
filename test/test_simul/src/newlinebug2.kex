@@ -1,0 +1,9 @@
+// IN:aabbaa
+// OUT:aabbaa
+
+main := ( keep /\n/ | ~drop ~/\n/ ) main
+      | ( keep /\n/ | ~drop ~/\n/ )
+
+keep := /(a|b)+(a|b)(a|b)+/
+
+drop := /[^\n]*/

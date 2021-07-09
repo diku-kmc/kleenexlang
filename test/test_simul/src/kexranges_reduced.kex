@@ -1,0 +1,13 @@
+// IN:
+// IN:c
+// IN:cc
+// IN:ccc
+// IN:cccc
+// OUT:y
+// OUT:y
+// OUT:n
+// OUT:n
+// OUT:n
+
+main := (cs /\n/)*
+cs := ~/c/{,1} "y" | ~/c*/ "n"

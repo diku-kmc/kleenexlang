@@ -16,6 +16,7 @@ main = runSubcommand
          -- --sb=false for the FST simulation types.
        , subcommand "interpret" interpretCmd
        , subcommand "visualize" visualizeCmd
+       , subcommand "simul" simulCmd
        ]
 
 checkArgs :: [String] -> IO FilePath
@@ -91,6 +92,15 @@ visualizeCmd mainOpts visOpts args = do
   (act, phases) <- runFrontend mainOpts $ measure "Visualize" $ do
     pu <- createProgram arg
     visualize visOpts pu
+  when (optReport mainOpts) $ printPhases phases
+  act
+
+simulCmd :: MainOptions -> SimulOptions -> [String] -> IO ExitCode
+simulCmd mainOpts sOpts args = do
+  arg <- checkArgs args
+  (act, phases) <- runFrontend mainOpts $ measure "Simul" $ do
+    pu <- createProgram arg
+    simul sOpts pu
   when (optReport mainOpts) $ printPhases phases
   act
 
