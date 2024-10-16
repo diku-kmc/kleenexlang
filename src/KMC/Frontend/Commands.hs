@@ -23,6 +23,7 @@ import           KMC.SymbolicFST.Transducer (constructTransducer, projectTransdu
 import qualified KMC.SymbolicSST as SST
 import qualified KMC.SymbolicSST.ActionSST as ASST
 import           KMC.Visualization (fstToDot, sstToDot, graphSize)
+import           KMC.Simulization
 
 import           Control.Monad.Reader
 import qualified Data.ByteString as B
@@ -112,6 +113,17 @@ buildTransducers pu = do
     , tuLastPostDominators = lpdoms
     , tuProgramUnit = pu
     }
+
+buildNFSTs :: ProgramUnit -> Frontend [RProgNFST]
+buildNFSTs pu = do
+  let rp = puProgram pu
+  nfsts <- measure "NFST generation" $
+    forM (zip (rprogPipeline rp) ([0..]::[Int])) $ \(ident, i) ->
+      measure (unwords ["NFST", show i]) $
+        let nfst = enumerateNFST $ condenseSkip $ constructNFST rp ident
+            n    = stateSizeNFST nfst
+        in n `seq` return nfst
+  return nfsts
 
 generateOracleSSTs :: TransducerUnit -> Frontend OracleSSTUnit
 generateOracleSSTs tu = do
@@ -379,6 +391,17 @@ visualize visOpts pu = do
                  ".svgz" -> Just GC.SvgZ
                  _ -> Nothing
 
+
+simul :: SimulOptions -> ProgramUnit -> Frontend (IO ExitCode)
+simul sOpts pu = do
+  nfsts <- buildNFSTs pu
+  let csv = nfstsToCSV nfsts
+  --_ <- measure "aoeu" $ liftIO $ print (head $ tuTransducers tu)
+  case optSimOut sOpts of
+    Just fp -> do
+                    _ <- measure "CSV aoeu" $ liftIO $ writeFile fp csv
+                    return $ return ExitSuccess
+    Nothing -> return $ return ExitSuccess
 
 --------------------
 -- Utility functions
