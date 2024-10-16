@@ -3,6 +3,7 @@
 module KMC.Determinization where
 
 import           Control.Applicative
+import           Control.Monad (guard, when)
 import           Control.Monad.State
 import           Data.Maybe (maybeToList, isJust)
 import           Data.Monoid

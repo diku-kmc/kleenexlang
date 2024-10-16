@@ -14,6 +14,7 @@ import qualified KMC.SymbolicFST.Transducer as T
 import           KMC.SymbolicSST (SST)
 import qualified KMC.SymbolicSST.ActionSST as ASST
 
+import           Control.Monad (when)
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Functor.Identity (Identity)

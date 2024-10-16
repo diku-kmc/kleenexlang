@@ -17,6 +17,7 @@ module KMC.TreeWriter
        )
 where
 
+import Control.Monad (foldM, when)
 import Control.Applicative
 import Control.Monad.Trans
 import Control.Monad.Identity

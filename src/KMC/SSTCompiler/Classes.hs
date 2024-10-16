@@ -6,6 +6,7 @@
 module KMC.SSTCompiler.Classes where
 
 import           Control.Applicative
+import           Control.Monad (zipWithM)
 import           Control.Monad.Reader
 import           Data.Functor.Identity (Identity(runIdentity))
 import qualified Data.Map as M

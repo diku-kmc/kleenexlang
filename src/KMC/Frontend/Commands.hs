@@ -24,6 +24,7 @@ import qualified KMC.SymbolicSST as SST
 import qualified KMC.SymbolicSST.ActionSST as ASST
 import           KMC.Visualization (fstToDot, sstToDot, graphSize)
 
+import           Control.Monad (when, (>=>), forM)
 import           Control.Monad.Reader
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Builder as BB

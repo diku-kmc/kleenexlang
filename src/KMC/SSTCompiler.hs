@@ -7,6 +7,7 @@ module KMC.SSTCompiler
        where
 
 import           Control.Applicative
+import           Control.Monad (liftM, forM)
 import           Control.Monad.Reader
 import qualified Data.Map as M
 import qualified Data.Set as S

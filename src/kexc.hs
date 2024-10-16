@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad (when)
 import Control.Monad.Reader
 import KMC.Frontend
 import KMC.Frontend.Commands

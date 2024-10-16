@@ -5,6 +5,7 @@ module KMC.Kleenex.WellFormedness(PosInfo, CheckError(..), MetaData(..)
 import           KMC.Kleenex.Parser (SourcePos, sourceName, sourceLine, sourceColumn)
 import           KMC.Kleenex.Syntax
 
+import           Control.Monad (when, foldM, forM_)
 import           Control.Monad.State
 import           Data.Map (Map, (!))
 import qualified Data.Map as M
