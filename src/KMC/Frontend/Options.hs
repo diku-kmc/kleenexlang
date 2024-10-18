@@ -177,7 +177,7 @@ instance Options CompileOptions where
                        , optionDefault     = UInt8T
                        , optionDescription = "Buffer word size"
                        })
-      <*> simpleOption "cc" "gcc" "C compiler"
+      <*> simpleOption "cc" "cc" "C compiler"
       <*> simpleOption "rmidtbls" False "Eliminate C-tables that implement the identity function."
 
 instance Options SimulateOptions where
